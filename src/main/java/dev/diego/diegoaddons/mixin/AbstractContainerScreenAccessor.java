@@ -1,15 +1,12 @@
 package dev.diego.diegoaddons.mixin;
 
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.world.inventory.ContainerInput;
-import net.minecraft.world.inventory.Slot;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
-import org.spongepowered.asm.mixin.gen.Invoker;
 
 /**
- * Exposes the container GUI's on-screen origin, so the inventory buttons can sit beside the menu,
- * plus the protected slot-click entry point the wardrobe keybinds use.
+ * Exposes the container GUI's on-screen origin and size, so the inventory buttons can anchor
+ * themselves to the menu's corners.
  */
 @Mixin(AbstractContainerScreen.class)
 public interface AbstractContainerScreenAccessor {
@@ -24,11 +21,4 @@ public interface AbstractContainerScreenAccessor {
 
     @Accessor("imageHeight")
     int diego$imageHeight();
-
-    /**
-     * The screen's own click handler. Going through this rather than crafting a packet means a
-     * keybind press behaves exactly like the user clicking that slot themselves.
-     */
-    @Invoker("slotClicked")
-    void diego$slotClicked(Slot slot, int slotId, int button, ContainerInput input);
 }

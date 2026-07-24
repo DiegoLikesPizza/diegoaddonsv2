@@ -14,6 +14,7 @@ import dev.diego.diegoaddons.module.modules.ChatCompactModule;
 import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
 import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
+import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
 import dev.diego.diegoaddons.module.modules.CoordinatesModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
 import dev.diego.diegoaddons.module.modules.DirectionModule;
@@ -22,14 +23,15 @@ import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
+import dev.diego.diegoaddons.module.modules.PartyCommandsModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.ReplaceWordsModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
-import dev.diego.diegoaddons.module.modules.WardrobeKeybindsModule;
 import dev.diego.diegoaddons.util.InventoryButtons;
 import dev.diego.diegoaddons.util.IgnoreList;
 import dev.diego.diegoaddons.util.LegacyText;
 import dev.diego.diegoaddons.util.OldMasterStars;
+import dev.diego.diegoaddons.util.PartyCommands;
 import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.util.TpsTracker;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -85,7 +87,6 @@ public final class ModuleManager {
         register(new InventoryHudModule(), false);
         register(new MusicDisplayModule(), false);
         register(new OldMasterStarsModule(), false);
-        register(new WardrobeKeybindsModule(), false);
         register(new InventoryButtonsModule(), false);
         register(new ChatHistoryModule(), false);
         register(new ChatSearchModule(), false);
@@ -93,6 +94,8 @@ public final class ModuleManager {
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);
+        register(new PartyCommandsModule(), false);
+        register(new CommandHotkeysModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
@@ -129,11 +132,13 @@ public final class ModuleManager {
         // The word list is applied when text is drawn (see FontMixin), which covers item names and
         // lore along with everything else - so there is deliberately no tooltip hook for it here.
 
-        // Watch system messages for blocked players joining the party. Observing only; the message
-        // itself is left alone.
+        // Watch system messages: blocked players joining the party, and party chat triggers.
+        // Observing only; the message itself is left alone.
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (!overlay) {
-                IgnoreList.onMessage(LegacyText.strip(message.getString()));
+                String plain = LegacyText.strip(message.getString());
+                IgnoreList.onMessage(plain);
+                PartyCommands.onMessage(plain);
             }
         });
 
@@ -157,6 +162,7 @@ public final class ModuleManager {
             TpsTracker.reset();
             dev.diego.diegoaddons.util.SkyblockHud.reset();
             dev.diego.diegoaddons.util.ChatCompactor.reset();
+            PartyCommands.reset();
         });
 
         DiegoAddonsV2Client.LOGGER.info("[DiegoAddons V2] {} modules registered", MODULES.size());
