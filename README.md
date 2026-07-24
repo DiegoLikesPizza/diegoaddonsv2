@@ -87,6 +87,14 @@ The bundled font is **Poppins** (Indian Type Foundry & contributors), licensed u
 **SIL Open Font License 1.1** — free to use, embed, and redistribute, including in a public release
 of this mod. The TTFs live at `assets/diegoaddonsv2/font/poppins_*.ttf`.
 
+## Credits
+
+**Inventory Buttons** is an independent implementation of an idea popularised by
+[NotEnoughUpdates](https://github.com/NotEnoughUpdates/NotEnoughUpdates) and its Fabric port
+[Inventory-Buttons](https://github.com/afranz29/Inventory-Buttons). No code or artwork is taken from
+either — both are LGPLv3, and NEU's button textures belong to its contributors, so the feature here
+is written from scratch against this mod's own themed renderer and uses plain item icons.
+
 ## Build
 
 Requires **JDK 25** (MC 26.x ships de-obfuscated, so Loom needs no `mappings` line).

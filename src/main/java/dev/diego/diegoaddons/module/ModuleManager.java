@@ -13,6 +13,7 @@ import dev.diego.diegoaddons.module.modules.CoordinatesModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
 import dev.diego.diegoaddons.module.modules.DirectionModule;
 import dev.diego.diegoaddons.module.modules.EquipmentOverlayModule;
+import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
@@ -20,12 +21,14 @@ import dev.diego.diegoaddons.module.modules.SkinChangerModule;
 import dev.diego.diegoaddons.module.modules.WardrobeKeybindsModule;
 import dev.diego.diegoaddons.module.modules.WardrobeOverlayModule;
 import dev.diego.diegoaddons.util.EquipmentOverlay;
+import dev.diego.diegoaddons.util.InventoryButtons;
 import dev.diego.diegoaddons.util.OldMasterStars;
 import dev.diego.diegoaddons.util.TpsTracker;
 import dev.diego.diegoaddons.util.WardrobeOverlay;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
@@ -75,6 +78,7 @@ public final class ModuleManager {
         register(new WardrobeOverlayModule(), false);
         register(new EquipmentOverlayModule(), false);
         register(new WardrobeKeybindsModule(), false);
+        register(new InventoryButtonsModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
@@ -114,7 +118,12 @@ public final class ModuleManager {
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
                     WardrobeOverlay.render((AbstractContainerScreen<?>) scr, g);
                     EquipmentOverlay.render((AbstractContainerScreen<?>) scr, g, mx, my);
+                    InventoryButtons.render((AbstractContainerScreen<?>) scr, g, mx, my);
                 });
+                // Deny the click to the menu when it lands on one of our buttons, so the button
+                // press cannot also be read as a click on the slot behind it.
+                ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) ->
+                        !InventoryButtons.click((AbstractContainerScreen<?>) scr, ev.x(), ev.y(), ev.button()));
             }
         });
 

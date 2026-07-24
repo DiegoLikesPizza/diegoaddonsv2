@@ -1,6 +1,8 @@
 package dev.diego.diegoaddons.config;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,4 +24,7 @@ public class AddonConfig {
 
     /** Per-module settings, keyed by the module id. */
     public Map<String, ModuleConfig> modules = new LinkedHashMap<>();
+
+    /** User-defined buttons drawn beside container GUIs (see the Inventory Buttons module). */
+    public List<InventoryButton> inventoryButtons = new ArrayList<>();
 }

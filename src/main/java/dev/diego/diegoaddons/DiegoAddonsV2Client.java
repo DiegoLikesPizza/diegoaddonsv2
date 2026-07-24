@@ -43,6 +43,7 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
                 GLFW.GLFW_KEY_BACKSLASH,
                 KeyMapping.Category.MISC));
         dev.diego.diegoaddons.module.modules.WardrobeKeybindsModule.registerKeys();
+        dev.diego.diegoaddons.module.modules.InventoryButtonsModule.registerKeys();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (OPEN_MENU.consumeClick()) {
