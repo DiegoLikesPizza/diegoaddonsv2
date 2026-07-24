@@ -25,6 +25,14 @@ public class AddonConfig {
     /** Per-module settings, keyed by the module id. */
     public Map<String, ModuleConfig> modules = new LinkedHashMap<>();
 
+    /**
+     * Last seen SkyBlock equipment and pet, serialised as JSON item stacks. Those live only inside
+     * server-side menus, so without this they would be blank after every restart until the menus
+     * were opened again.
+     */
+    public String[] savedEquipment = new String[4];
+    public String savedPet;
+
     /** User-defined buttons drawn beside container GUIs (see the Inventory Buttons module). */
     public List<InventoryButton> inventoryButtons = new ArrayList<>();
 }

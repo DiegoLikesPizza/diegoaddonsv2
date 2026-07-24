@@ -1,15 +1,16 @@
 package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.gui.InventoryButtonsScreen;
+import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
-import dev.diego.diegoaddons.module.KeybindSetting;
 import dev.diego.diegoaddons.module.Module;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 
 /**
- * Shortcut buttons beside container GUIs, each running a command. Press the editor key to add, move
- * and configure them - the key is bound in this feature's own settings panel. See
+ * Shortcut buttons beside container GUIs, each running a command. The editor opens from this
+ * feature's own settings rather than a key binding, since it is something you set up once. See
  * {@code InventoryButtons} for the drawing and {@link InventoryButtonsScreen} for the editor.
  */
 public class InventoryButtonsModule extends Module {
@@ -19,16 +20,22 @@ public class InventoryButtonsModule extends Module {
             new BooleanSetting(this, "tooltips", "Show tooltips", true);
     private final BooleanSetting hideInCreative =
             new BooleanSetting(this, "hideInCreative", "Hide in creative", false);
-    private final KeybindSetting editorKey =
-            new KeybindSetting(this, "editorKey", "Editor key");
+    private final ActionSetting editor =
+            new ActionSetting(this, "editor", "Button editor", "Open", InventoryButtonsModule::openEditor);
 
     public InventoryButtonsModule() {
         super("inventorybuttons", Category.MISC, "Inventory Buttons",
                 "Command shortcut buttons beside container menus.");
         settings.add(tooltips);
         settings.add(hideInCreative);
-        settings.add(editorKey);
+        settings.add(editor);
         INSTANCE = this;
+    }
+
+    private static void openEditor() {
+        Minecraft mc = Minecraft.getInstance();
+        Screen previous = mc.screen;
+        mc.setScreen(new InventoryButtonsScreen(previous));
     }
 
     public boolean showTooltips() {
@@ -37,12 +44,5 @@ public class InventoryButtonsModule extends Module {
 
     public boolean hideInCreative() {
         return hideInCreative.get();
-    }
-
-    @Override
-    public void onClientTick(Minecraft mc) {
-        if (editorKey.consumePress() && !(mc.screen instanceof InventoryButtonsScreen)) {
-            mc.setScreen(new InventoryButtonsScreen(mc.screen));
-        }
     }
 }
