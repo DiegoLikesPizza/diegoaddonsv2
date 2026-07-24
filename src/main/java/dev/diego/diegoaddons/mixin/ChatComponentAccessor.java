@@ -28,6 +28,10 @@ public interface ChatComponentAccessor {
     @Accessor("chatScrollbarPos")
     int diego$chatScrollbarPos();
 
+    /** Scrolls the chat directly, used to jump to a search result. */
+    @Accessor("chatScrollbarPos")
+    void diego$setChatScrollbarPos(int pos);
+
     @Invoker("getScale")
     double diego$getScale();
 
