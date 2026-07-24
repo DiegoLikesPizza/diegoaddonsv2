@@ -6,6 +6,7 @@ import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
@@ -18,7 +19,7 @@ import java.util.Locale;
 
 /**
  * Searches the chat backlog. Opened with Ctrl+F, it lists every message containing the query,
- * newest first, and copies one to the clipboard when clicked.
+ * newest first. <b>Left-click</b> jumps the chat to that message, <b>right-click</b> copies it.
  *
  * <p>The search reads the untrimmed message list rather than the wrapped display lines, so a hit is
  * a whole message. Pair this with the Unlimited Chat History feature and the backlog worth searching
@@ -31,7 +32,11 @@ public class ChatSearchScreen extends Screen {
     private final Screen parent;
 
     private EditBox query;
-    private final List<String> results = new ArrayList<>();
+    /** A hit: the message itself, so it can be found in the chat, plus its plain text. */
+    private record Hit(GuiMessage message, String text) {
+    }
+
+    private final List<Hit> results = new ArrayList<>();
     private int scroll;
     private int copied = -1;      // index of the row flashed as copied
     private long copiedAt;
@@ -81,7 +86,7 @@ public class ChatSearchScreen extends Screen {
             String plain = m.content().getString().replaceAll("§.", "");
             String hay = cs ? plain : plain.toLowerCase(Locale.ROOT);
             if (hay.contains(needle)) {
-                results.add(plain);
+                results.add(new Hit(m, plain));
             }
         }
     }
@@ -116,18 +121,44 @@ public class ChatSearchScreen extends Screen {
                         t.surfaceAlt(), sm);
             }
             boolean flash = i == copied && System.currentTimeMillis() - copiedAt < 700;
-            String line = trim(results.get(i), panelW - PAD * 2 - 6);
+            String line = trim(results.get(i).text(), panelW - PAD * 2 - 6);
             UiRender.text(g, font, line, Fonts.SMALL, panelX + PAD, ry + 1,
                     flash ? t.accent() : (hover ? t.text() : t.textMuted()));
         }
 
-        if (results.size() > rows) {
-            UiRender.text(g, font, "scroll · click to copy", Fonts.SMALL,
+        if (!results.isEmpty()) {
+            UiRender.text(g, font, "left-click: jump · right-click: copy", Fonts.SMALL,
                     panelX + PAD, panelY + panelH - 12, t.textFaint());
         }
         super.extractRenderState(g, mouseX, mouseY, partialTick);
         // On top of our own scrim, so the confirmation is not dimmed by it.
         dev.diego.diegoaddons.util.Toasts.render(g);
+    }
+
+    /**
+     * Scrolls the chat so the given message is on screen, then leaves the search for the chat.
+     *
+     * <p>The chat scrolls in wrapped display lines, not messages, so the message's first line has to
+     * be located in that list - a long message occupies several lines and its index there is not its
+     * index among messages.
+     */
+    private void jumpTo(GuiMessage message) {
+        ChatComponentAccessor acc = (ChatComponentAccessor) minecraft.gui.getChat();
+        List<GuiMessage.Line> lines = acc.diego$trimmedMessages();
+        int target = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).parent() == message) {
+                target = i;
+            }
+        }
+        if (target < 0) {
+            // Trimmed away since the search ran - the backlog still has it, the display does not.
+            dev.diego.diegoaddons.util.Toasts.show("Not in view", "Message scrolled out of the chat");
+            return;
+        }
+        int max = Math.max(0, lines.size() - minecraft.gui.getChat().getLinesPerPage());
+        acc.diego$setChatScrollbarPos(Math.min(target, max));
+        minecraft.setScreen(parent instanceof ChatScreen ? parent : new ChatScreen("", false));
     }
 
     /** Cuts a message to the panel width, since results are single-line rows. */
@@ -151,13 +182,19 @@ public class ChatSearchScreen extends Screen {
         int end = Math.min(results.size(), scroll + rows);
         for (int i = scroll; i < end; i++) {
             int ry = listTop + (i - scroll) * ROW_H;
-            if (UiRender.inside(event.x(), event.y(), panelX + PAD, ry, panelW - PAD * 2, ROW_H)) {
-                minecraft.keyboardHandler.setClipboard(results.get(i));
+            if (!UiRender.inside(event.x(), event.y(), panelX + PAD, ry, panelW - PAD * 2, ROW_H)) {
+                continue;
+            }
+            Hit hit = results.get(i);
+            if (event.button() == 1) {
+                minecraft.keyboardHandler.setClipboard(hit.text());
                 copied = i;
                 copiedAt = System.currentTimeMillis();
-                dev.diego.diegoaddons.util.Toasts.show("Copied to clipboard", results.get(i));
-                return true;
+                dev.diego.diegoaddons.util.Toasts.show("Copied to clipboard", hit.text());
+            } else if (event.button() == 0) {
+                jumpTo(hit.message());
             }
+            return true;
         }
         return super.mouseClicked(event, doubleClick);
     }
