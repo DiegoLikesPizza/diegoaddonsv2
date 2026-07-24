@@ -132,7 +132,9 @@ public final class ModuleManager {
             if (mod == null || !mod.isEnabled() || !mod.inItems()) {
                 return;
             }
-            for (int i = 0; i < lines.size(); i++) {
+            // Line 0 is the item's hover name, already rewritten by ItemStackNameMixin - doing it
+            // again here could compound a replacement whose output still contains its own input.
+            for (int i = 1; i < lines.size(); i++) {
                 Component replaced = WordReplacer.apply(lines.get(i));
                 if (replaced != lines.get(i)) {
                     lines.set(i, replaced);

@@ -14,6 +14,7 @@
     "EffectsInInventoryMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",
+    "ItemStackNameMixin",
     "LivingEntitySwingMixin"
   ],
   "injectors": {
