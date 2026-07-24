@@ -17,6 +17,7 @@ import net.minecraft.world.item.equipment.Equippable;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -35,7 +36,26 @@ public final class WardrobeOverlay {
     private static final int PLAYER_INV_SLOTS = 36; // 27 storage + 9 hotbar, always last in a chest menu
     private static final List<ClientMannequin> POOL = new ArrayList<>();
 
+    /**
+     * Menu titles this overlay applies to, lower-case. SkyBlock renamed the menu from "Wardrobe" to
+     * "Armor Sets", and the title carries a page prefix ("(1/3) Armor Sets"), so we match on a
+     * substring and keep the old name for older versions. This is the tuning knob if it is renamed
+     * again.
+     */
+    private static final String[] TITLES = {"wardrobe", "armor sets", "armour sets"};
+
     private WardrobeOverlay() {
+    }
+
+    /** Whether {@code title} is one of the wardrobe menus, ignoring page prefix, colour and case. */
+    private static boolean isWardrobe(String title) {
+        String t = title.replaceAll("§.", "").toLowerCase(Locale.ROOT);
+        for (String name : TITLES) {
+            if (t.contains(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g) {
@@ -43,7 +63,7 @@ public final class WardrobeOverlay {
         if (mod == null || !mod.isEnabled()) {
             return;
         }
-        if (!screen.getTitle().getString().contains("Wardrobe")) {
+        if (!isWardrobe(screen.getTitle().getString())) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
