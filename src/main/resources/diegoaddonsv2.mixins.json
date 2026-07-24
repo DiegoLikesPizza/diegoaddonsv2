@@ -12,6 +12,7 @@
     "ChatComponentMixin",
     "ChatScreenMixin",
     "ClientPacketListenerMixin",
+    "ClientboundPingPacketMixin",
     "CustomHeadLayerMixin",
     "EffectsInInventoryMixin",
     "EtherwarpZoomMixin",
