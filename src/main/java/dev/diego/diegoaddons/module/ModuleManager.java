@@ -152,6 +152,7 @@ public final class ModuleManager {
         net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
             if (level.isClientSide()) {
                 dev.diego.diegoaddons.util.BoulderSolver.onInteract(hit.getBlockPos());
+                dev.diego.diegoaddons.util.WaterSolver.onInteract(hit.getBlockPos());
             }
             return net.minecraft.world.InteractionResult.PASS;
         });

@@ -32,7 +32,12 @@ public final class WorldRender {
     private record Box(AABB box, int argb, boolean throughWalls, boolean filled) {
     }
 
+    /** One queued label: what to write, where, and how big. */
+    private record Label(String text, Vec3 pos, float scale) {
+    }
+
     private static final List<Box> QUEUE = new ArrayList<>();
+    private static final List<Label> LABELS = new ArrayList<>();
     private static boolean registered;
 
     private WorldRender() {
@@ -117,21 +122,35 @@ public final class WorldRender {
         box(new AABB(x, y, z, x + 1, y + 1, z + 1), argb, throughWalls);
     }
 
+    /**
+     * Queues a label floating at a world position. It always faces the camera and draws through
+     * walls, because a countdown you cannot read is worse than none.
+     */
+    public static void text(String text, Vec3 pos, float scale) {
+        synchronized (QUEUE) {
+            LABELS.add(new Label(text, pos, scale));
+        }
+    }
+
     /** Drops everything queued, e.g. when leaving a world. */
     public static void clear() {
         synchronized (QUEUE) {
+            LABELS.clear();
             QUEUE.clear();
         }
     }
 
     private static void draw(LevelRenderContext ctx) {
         List<Box> boxes;
+        List<Label> labels;
         synchronized (QUEUE) {
-            if (QUEUE.isEmpty()) {
+            if (QUEUE.isEmpty() && LABELS.isEmpty()) {
                 return;
             }
             boxes = new ArrayList<>(QUEUE);
+            labels = new ArrayList<>(LABELS);
             QUEUE.clear();
+            LABELS.clear();
         }
         Minecraft mc = Minecraft.getInstance();
         if (mc.gameRenderer == null) {
@@ -152,7 +171,28 @@ public final class WorldRender {
                         -cam.x, -cam.y, -cam.z, b.argb(), 1.0f);
             }
         }
+        for (Label l : labels) {
+            label(mc, pose, buffers, l, cam);
+        }
         buffers.endBatch();
+    }
+
+    /**
+     * Draws a label as a billboard: rotated by the camera so it always faces the viewer, and flipped
+     * on X and Y because text is laid out top-down while the world is not.
+     */
+    private static void label(Minecraft mc, PoseStack pose, MultiBufferSource.BufferSource buffers,
+                              Label l, Vec3 cam) {
+        var font = mc.font;
+        var text = net.minecraft.network.chat.Component.literal(l.text());
+        pose.pushPose();
+        pose.translate((float) (l.pos().x - cam.x), (float) (l.pos().y - cam.y), (float) (l.pos().z - cam.z));
+        pose.mulPose(mc.gameRenderer.getMainCamera().rotation());
+        pose.scale(-0.025f * l.scale(), -0.025f * l.scale(), 0.025f * l.scale());
+        font.drawInBatch(text, -font.width(text) / 2f, 0f, 0xFFFFFFFF, false,
+                pose.last().pose(), buffers, net.minecraft.client.gui.Font.DisplayMode.SEE_THROUGH,
+                0, 15728880);
+        pose.popPose();
     }
 
     /** The six faces of a box, wound so it is solid from any side. */
