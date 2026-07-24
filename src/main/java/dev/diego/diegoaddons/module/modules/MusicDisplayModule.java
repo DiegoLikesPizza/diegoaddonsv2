@@ -2,17 +2,18 @@ package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.HudModule;
-import dev.diego.diegoaddons.util.SpotifyWatcher;
+import dev.diego.diegoaddons.util.MediaWatcher;
 import net.minecraft.client.Minecraft;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Shows the track currently playing in the Spotify desktop client as a HUD element.
+ * Shows the track currently playing on this machine as a HUD element.
  *
- * <p>Reads the client's window title rather than the Spotify Web API, so there is nothing to set up
- * - no app registration, no login. See {@link SpotifyWatcher} for what that costs: Windows only, no
- * album art, and a paused client looks the same as a closed one.
+ * <p>Backed by Windows' System Media Transport Controls (see {@link MediaWatcher}), so it follows
+ * whatever app owns the media session - Spotify, a browser tab, a local player - rather than being
+ * tied to one program.
  */
 public class MusicDisplayModule extends HudModule {
     private final BooleanSetting showArtist =
@@ -21,41 +22,57 @@ public class MusicDisplayModule extends HudModule {
             new BooleanSetting(this, "artistFirst", "Artist first", false);
     private final BooleanSetting twoLines =
             new BooleanSetting(this, "twoLines", "Two lines", false);
+    private final BooleanSetting showTime =
+            new BooleanSetting(this, "time", "Show time", false);
+    private final BooleanSetting hideWhenPaused =
+            new BooleanSetting(this, "hidePaused", "Hide when paused", false);
 
     public MusicDisplayModule() {
-        super("music", "Music Display", "Shows what you are playing on Spotify.");
+        super("music", "Music Display", "Shows the track playing on your PC.");
         settings.add(showArtist);
         settings.add(artistFirst);
         settings.add(twoLines);
+        settings.add(showTime);
+        settings.add(hideWhenPaused);
     }
 
     @Override
     protected void onEnable() {
-        SpotifyWatcher.start();
-        SpotifyWatcher.wanted = true;
+        MediaWatcher.start();
     }
 
     @Override
     protected void onDisable() {
-        SpotifyWatcher.wanted = false;
+        MediaWatcher.stop();
+    }
+
+    /** Whether there is anything worth drawing right now, honouring the paused option. */
+    private boolean visible() {
+        if (!MediaWatcher.hasTrack()) {
+            return false;
+        }
+        return !(MediaWatcher.isPaused() && hideWhenPaused.get());
     }
 
     @Override
     protected String label() {
-        return "Music";
+        return MediaWatcher.isPaused() ? "Paused" : "Music";
     }
 
     @Override
     protected String value(Minecraft mc) {
-        if (!SpotifyWatcher.isPlaying()) {
+        if (!visible()) {
             return null;   // nothing playing - the chip hides itself
         }
-        String song = SpotifyWatcher.title();
-        String artist = SpotifyWatcher.artist();
-        if (!showArtist.get()) {
-            return song;
-        }
-        return artistFirst.get() ? artist + " - " + song : song + " - " + artist;
+        String song = MediaWatcher.title();
+        String artist = MediaWatcher.artist();
+        String main = !showArtist.get() ? song
+                : (artistFirst.get() ? artist + " - " + song : song + " - " + artist);
+        return showTime.get() ? main + "  " + time() : main;
+    }
+
+    private String time() {
+        return MediaWatcher.time(MediaWatcher.position()) + " / " + MediaWatcher.time(MediaWatcher.duration());
     }
 
     @Override
@@ -63,14 +80,22 @@ public class MusicDisplayModule extends HudModule {
         return "misery. - pupsies";
     }
 
-    /** Optionally splits song and artist across two rows, which reads better in a narrow chip. */
+    /** Optionally splits song, artist and time across rows, which reads better in a narrow chip. */
     @Override
     public List<String> hudLines(Minecraft mc) {
-        if (!twoLines.get() || !showArtist.get() || !SpotifyWatcher.isPlaying()) {
+        if (!twoLines.get() || !visible()) {
             return super.hudLines(mc);
         }
-        String first = artistFirst.get() ? SpotifyWatcher.artist() : SpotifyWatcher.title();
-        String second = artistFirst.get() ? SpotifyWatcher.title() : SpotifyWatcher.artist();
-        return List.of(showLabel.get() ? label() + ": " + first : first, second);
+        String first = artistFirst.get() ? MediaWatcher.artist() : MediaWatcher.title();
+        String second = artistFirst.get() ? MediaWatcher.title() : MediaWatcher.artist();
+
+        List<String> out = new ArrayList<>(2);
+        out.add(showLabel.get() ? label() + ": " + first : first);
+        if (showArtist.get()) {
+            out.add(showTime.get() ? second + "  " + time() : second);
+        } else if (showTime.get()) {
+            out.add(time());
+        }
+        return out;
     }
 }
