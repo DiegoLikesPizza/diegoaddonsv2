@@ -18,6 +18,7 @@ import dev.diego.diegoaddons.module.modules.DirectionModule;
 import dev.diego.diegoaddons.module.modules.EquipmentOverlayModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
+import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
@@ -79,6 +80,7 @@ public final class ModuleManager {
         register(new DirectionModule(), false);
         register(new ClockModule(), false);
         register(new InventoryHudModule(), false);
+        register(new MusicDisplayModule(), false);
         register(new OldMasterStarsModule(), false);
         register(new WardrobeOverlayModule(), false);
         register(new EquipmentOverlayModule(), false);
