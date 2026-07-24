@@ -15,9 +15,7 @@ import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
 import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
-import dev.diego.diegoaddons.module.modules.CoordinatesModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
-import dev.diego.diegoaddons.module.modules.DirectionModule;
 import dev.diego.diegoaddons.module.modules.HideEffectsModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
@@ -81,8 +79,6 @@ public final class ModuleManager {
         register(new AnimationsModule(), false);
         register(new SkinChangerModule(), false);
         register(new PerformanceModule(), false);
-        register(new CoordinatesModule(), false);
-        register(new DirectionModule(), false);
         register(new ClockModule(), false);
         register(new InventoryHudModule(), false);
         register(new MusicDisplayModule(), false);
