@@ -29,6 +29,11 @@ import java.util.Map;
  *
  * <p>The hash is order-sensitive and skips the blocks that differ between runs of the same room -
  * chests and the planks around them - so a looted room still matches an unlooted one.
+ *
+ * <p>Knowing the name is only half of it: the same room is placed in any of four orientations, so a
+ * solution written down once has to be turned to match. The orientation is found from a marker block
+ * the game builds into every room - a blue terracotta in one corner - and whichever corner it turns
+ * up in names the rotation. {@link #toWorld} then turns a recorded position into the real one.
  */
 public final class DungeonRooms {
     /** 6x6 tiles of 32 blocks; the world origin sits at -201 so tile 0 lands at index 0. */
@@ -38,6 +43,25 @@ public final class DungeonRooms {
 
     /** One entry of the room table. */
     public record RoomData(String name, String type, String shape) {
+    }
+
+    /**
+     * How a room is turned, named after the corner the marker block sits in. The offsets are where
+     * to look for that marker relative to the room's corner.
+     */
+    public enum Rotation {
+        NORTH(15, 15),
+        SOUTH(-15, -15),
+        WEST(15, -15),
+        EAST(-15, 15);
+
+        final int dx;
+        final int dz;
+
+        Rotation(int dx, int dz) {
+            this.dx = dx;
+            this.dz = dz;
+        }
     }
 
     private static Map<Integer, RoomData> byCore;
@@ -51,6 +75,10 @@ public final class DungeonRooms {
     private static int tileX = -1;
     private static int tileZ = -1;
     private static RoomData current;
+    private static Rotation rotation;
+    private static BlockPos marker;
+    /** The tile the rotation and marker belong to, so they are not carried into the next room. */
+    private static int rotationTile = -1;
 
     private DungeonRooms() {
     }
@@ -64,9 +92,48 @@ public final class DungeonRooms {
         return current == null ? null : current.name();
     }
 
+    /** The current room's orientation, or null while it is unknown. */
+    public static Rotation rotation() {
+        return rotation;
+    }
+
+    /**
+     * Turns a position recorded for this room into the real one, applying the room's rotation and
+     * origin. Positions are recorded relative to the marker block, which is why it is kept.
+     */
+    public static BlockPos toWorld(BlockPos recorded) {
+        if (marker == null || rotation == null) {
+            return null;
+        }
+        BlockPos r = switch (rotation) {
+            case NORTH -> new BlockPos(-recorded.getX(), recorded.getY(), -recorded.getZ());
+            case WEST -> new BlockPos(-recorded.getZ(), recorded.getY(), recorded.getX());
+            case SOUTH -> recorded;
+            case EAST -> new BlockPos(recorded.getZ(), recorded.getY(), -recorded.getX());
+        };
+        return r.offset(marker.getX(), 0, marker.getZ());
+    }
+
+    /** The inverse of {@link #toWorld}, for recording a position seen in the world. */
+    public static BlockPos toRecorded(BlockPos world) {
+        if (marker == null || rotation == null) {
+            return null;
+        }
+        BlockPos p = world.subtract(new BlockPos(marker.getX(), 0, marker.getZ()));
+        return switch (rotation) {
+            case NORTH -> new BlockPos(-p.getX(), p.getY(), -p.getZ());
+            case WEST -> new BlockPos(p.getZ(), p.getY(), -p.getX());
+            case SOUTH -> p;
+            case EAST -> new BlockPos(-p.getZ(), p.getY(), p.getX());
+        };
+    }
+
     public static void reset() {
         IDENTIFIED.clear();
         retryIn = 0;
+        rotation = null;
+        marker = null;
+        rotationTile = -1;
         current = null;
         tileX = -1;
         tileZ = -1;
@@ -87,10 +154,19 @@ public final class DungeonRooms {
         tileX = tx;
         tileZ = tz;
         int key = tx + tz * GRID;
+        if (rotationTile != key) {
+            // Entered a different room: its orientation has to be found again.
+            rotation = null;
+            marker = null;
+            rotationTile = -1;
+        }
 
         RoomData known = IDENTIFIED.get(key);
         if (known != null) {
             current = known;
+            if (rotation == null) {
+                findRotation(mc, tx, tz);
+            }
             return;
         }
         if (retryIn > 0) {
@@ -100,10 +176,42 @@ public final class DungeonRooms {
         RoomData found = identify(mc, tx, tz);
         if (found != null) {
             IDENTIFIED.put(key, found);
+            findRotation(mc, tx, tz);
         } else {
             retryIn = RETRY_TICKS;
         }
         current = found;
+    }
+
+    /**
+     * Finds the room's orientation by looking for the marker block in each of the four corners.
+     *
+     * <p>The Fairy room is the exception - it has no marker - so its known orientation is used
+     * directly rather than leaving the room unusable.
+     */
+    private static void findRotation(Minecraft mc, int tx, int tz) {
+        int y = highestBlock;
+        if (y <= 0 || mc.level == null) {
+            return;
+        }
+        int originX = tx * 32 - 185;
+        int originZ = tz * 32 - 185;
+
+        if (current != null && "Fairy".equals(current.name())) {
+            rotation = Rotation.SOUTH;
+            marker = new BlockPos(originX + Rotation.SOUTH.dx, y, originZ + Rotation.SOUTH.dz);
+            rotationTile = tx + tz * GRID;
+            return;
+        }
+        for (Rotation r : Rotation.values()) {
+            BlockPos pos = new BlockPos(originX + r.dx, y, originZ + r.dz);
+            if (mc.level.getBlockState(pos).getBlock() == Blocks.BLUE_TERRACOTTA) {
+                rotation = r;
+                marker = pos;
+                rotationTile = tx + tz * GRID;
+                return;
+            }
+        }
     }
 
     /** Scans the room's core column and looks the resulting hash up in the table. */
@@ -127,6 +235,9 @@ public final class DungeonRooms {
      * floor once bedrock has been passed, so only the room's own build contributes. Chests and the
      * planks beside them are left out because they change as a room is looted.
      */
+    /** Y of the first solid block in the last scanned column; the marker sits at that height. */
+    private static int highestBlock;
+
     private static int coreHash(LevelChunk chunk, int x, int z) {
         StringBuilder sb = new StringBuilder(1024);
         boolean foundHighest = false;
@@ -138,6 +249,7 @@ public final class DungeonRooms {
             if (!foundHighest) {
                 if (!state.isAir() && state.getBlock() != Blocks.GOLD_BLOCK) {
                     foundHighest = true;
+                    highestBlock = y;
                 } else {
                     sb.append('0');
                 }
