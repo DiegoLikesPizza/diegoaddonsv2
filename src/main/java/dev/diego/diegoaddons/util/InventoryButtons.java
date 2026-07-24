@@ -11,11 +11,21 @@ import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import com.google.common.collect.LinkedHashMultimap;
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
+import com.mojang.authlib.properties.PropertyMap;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.ResolvableProfile;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.UUID;
 
 import java.util.HashMap;
 import java.util.List;
@@ -47,10 +57,17 @@ public final class InventoryButtons {
         return ConfigManager.get().inventoryButtons;
     }
 
-    /** The icon for a button, resolved from its item id and cached. Falls back to a barrier. */
+    /**
+     * The icon for a button, cached. Either a plain item id, or {@code skull:<texture>} for a custom
+     * player head - the same shorthand SkyBlock-oriented mods use, where the texture is the hash or
+     * full URL from textures.minecraft.net. Falls back to a barrier so a bad id is visible.
+     */
     public static ItemStack icon(String id) {
         return ICONS.computeIfAbsent(id == null ? "" : id, key -> {
             try {
+                if (key.startsWith("skull:")) {
+                    return skull(key.substring(6));
+                }
                 Item item = BuiltInRegistries.ITEM.getValue(Identifier.parse(key));
                 if (item != null && item != Items.AIR) {
                     return new ItemStack(item);
@@ -60,6 +77,28 @@ public final class InventoryButtons {
             }
             return new ItemStack(Items.BARRIER);
         });
+    }
+
+    /**
+     * A player head wearing the given texture. Minecraft wants the profile's texture property as
+     * base64 of the JSON the session server would return, so the hash is wrapped back up into that
+     * shape here.
+     */
+    private static ItemStack skull(String texture) {
+        String url = texture.startsWith("http") ? texture
+                : "http://textures.minecraft.net/texture/" + texture;
+        String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
+        String encoded = Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+
+        PropertyMap props = new PropertyMap(LinkedHashMultimap.create());
+        props.put("textures", new Property("textures", encoded));
+        // A fixed UUID keeps the profile stable; the name is irrelevant for rendering.
+        GameProfile profile = new GameProfile(
+                UUID.nameUUIDFromBytes(texture.getBytes(StandardCharsets.UTF_8)), "DiegoIcon", props);
+
+        ItemStack head = new ItemStack(Items.PLAYER_HEAD);
+        head.set(DataComponents.PROFILE, ResolvableProfile.createResolved(profile));
+        return head;
     }
 
     /** Forget resolved icons, so an edited id is picked up immediately. */
