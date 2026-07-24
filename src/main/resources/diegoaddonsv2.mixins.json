@@ -14,6 +14,7 @@
     "ClientPacketListenerMixin",
     "CustomHeadLayerMixin",
     "EffectsInInventoryMixin",
+    "EtherwarpZoomMixin",
     "FontMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",

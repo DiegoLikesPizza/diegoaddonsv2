@@ -42,6 +42,9 @@ public class AddonConfig {
     /** Find/replace pairs applied to chat and item text (see the Replace Words module). */
     public List<WordReplacement> wordReplacements = new ArrayList<>();
 
+    /** Name-plate terms highlighted by the Custom ESP module, managed with /da esp. */
+    public List<String> espTerms = new ArrayList<>();
+
     /** Commands bound to keys (see the Command Hotkeys module). */
     public List<CommandHotkey> commandHotkeys = new ArrayList<>();
 }

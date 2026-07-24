@@ -38,6 +38,17 @@ public abstract class HudModule extends Module {
     }
 
     /**
+     * A HUD element filed under a different group. The element still draws on the HUD and is placed
+     * in the HUD editor; only where it appears in the menu changes.
+     */
+    protected HudModule(String id, Category category, String name, String description) {
+        super(id, category, name, description);
+        settings.add(accentColour);
+        settings.add(showLabel);
+        settings.add(centered);
+    }
+
+    /**
      * @param textSettings when {@code false}, the {@code Accent colour} / {@code Show label} toggles
      *                     are not added - for custom-drawn HUD elements (e.g. the inventory grid)
      *                     where they don't apply.
