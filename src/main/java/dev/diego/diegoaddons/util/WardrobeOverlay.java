@@ -48,7 +48,7 @@ public final class WardrobeOverlay {
     }
 
     /** Whether {@code title} is one of the wardrobe menus, ignoring page prefix, colour and case. */
-    private static boolean isWardrobe(String title) {
+    public static boolean isWardrobeTitle(String title) {
         String t = title.replaceAll("§.", "").toLowerCase(Locale.ROOT);
         for (String name : TITLES) {
             if (t.contains(name)) {
@@ -63,7 +63,7 @@ public final class WardrobeOverlay {
         if (mod == null || !mod.isEnabled()) {
             return;
         }
-        if (!isWardrobe(screen.getTitle().getString())) {
+        if (!isWardrobeTitle(screen.getTitle().getString())) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
