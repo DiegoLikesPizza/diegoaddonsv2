@@ -22,6 +22,7 @@ import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PartyCommandsModule;
+import dev.diego.diegoaddons.module.modules.PartyFinderModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.ReplaceWordsModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
@@ -30,6 +31,7 @@ import dev.diego.diegoaddons.util.IgnoreList;
 import dev.diego.diegoaddons.util.LegacyText;
 import dev.diego.diegoaddons.util.OldMasterStars;
 import dev.diego.diegoaddons.util.PartyCommands;
+import dev.diego.diegoaddons.util.PartyFinder;
 import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.util.TpsTracker;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -91,6 +93,7 @@ public final class ModuleManager {
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);
         register(new PartyCommandsModule(), false);
+        register(new PartyFinderModule(), false);
         register(new CommandHotkeysModule(), false);
         ConfigManager.save();
 
@@ -142,6 +145,7 @@ public final class ModuleManager {
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
             if (screen instanceof AbstractContainerScreen<?>) {
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
+                    PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                     InventoryButtons.render((AbstractContainerScreen<?>) scr, g, mx, my);
                     Toasts.render(g);
                 });
