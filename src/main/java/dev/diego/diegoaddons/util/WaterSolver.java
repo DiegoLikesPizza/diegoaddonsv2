@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -49,6 +50,8 @@ public final class WaterSolver {
 
         final String key;
         final BlockPos rel;
+        /** How many of this lever's times have already been used, so they stop being shown. */
+        int used;
 
         Lever(String key, int x, int y, int z) {
             this.key = key;
@@ -78,6 +81,9 @@ public final class WaterSolver {
     private static final List<Step> STEPS = new ArrayList<>();
     private static String lastRoom;
     private static boolean scanned;
+    /** Tick the water gate was opened, or -1 while it is still shut. */
+    private static int openedAt = -1;
+    private static int ticks;
 
     private WaterSolver() {
     }
@@ -86,6 +92,31 @@ public final class WaterSolver {
         STEPS.clear();
         lastRoom = null;
         scanned = false;
+        openedAt = -1;
+        ticks = 0;
+        for (Lever l : Lever.values()) {
+            l.used = 0;
+        }
+    }
+
+    /**
+     * Records a lever being pulled: its next time is used up, and the water lever additionally
+     * starts the clock every other time is measured against.
+     */
+    public static void onInteract(BlockPos clicked) {
+        if (STEPS.isEmpty()) {
+            return;
+        }
+        for (Lever l : Lever.values()) {
+            BlockPos pos = DungeonRooms.toWorld(l.rel);
+            if (pos != null && pos.equals(clicked)) {
+                if (l == Lever.WATER && openedAt == -1) {
+                    openedAt = ticks;
+                }
+                l.used++;
+                return;
+            }
+        }
     }
 
     /** Called every client tick while the solver is on. */
@@ -109,14 +140,61 @@ public final class WaterSolver {
         if (!scanned) {
             scan(mc, mod);
         }
-        for (int i = 0; i < STEPS.size(); i++) {
-            BlockPos pos = DungeonRooms.toWorld(STEPS.get(i).lever().rel);
+        ticks++;
+        draw(mc);
+    }
+
+    /**
+     * Draws each lever's remaining times as a countdown above it.
+     *
+     * <p>Before the water is opened a time of zero means "pull it now" and anything else is just how
+     * long after the water it is due. Once the water is running the label counts down against the
+     * clock, and turns into a prompt the moment it reaches zero - which is the whole point of the
+     * puzzle, and what a box on its own cannot say.
+     */
+    private static void draw(Minecraft mc) {
+        int shown = 0;
+        for (Lever lever : Lever.values()) {
+            BlockPos pos = DungeonRooms.toWorld(lever.rel);
             if (pos == null) {
                 return;
             }
-            int color = i == 0 ? FIRST : (i == 1 ? SECOND : LATER);
-            WorldRender.thickBox(new AABB(pos), color, LINE, true);
+            List<Double> times = timesOf(lever);
+            for (int index = lever.used; index < times.size(); index++) {
+                double time = times.get(index);
+                int dueTicks = (int) (time * 20);
+                String text;
+                boolean now;
+                if (openedAt == -1) {
+                    now = dueTicks == 0;
+                    text = now ? "§a§lCLICK ME!" : "§e" + time + "s";
+                } else {
+                    int left = openedAt + dueTicks - ticks;
+                    now = left <= 0;
+                    text = now ? "§a§lCLICK ME!"
+                            : "§e" + String.format(Locale.ROOT, "%.1f", left / 20f) + "s";
+                }
+                WorldRender.text(text, new Vec3(
+                        pos.getX() + 0.5,
+                        pos.getY() + (index - lever.used) * 0.5 + 1.5,
+                        pos.getZ() + 0.5), 1.0f);
+                if (index == lever.used) {
+                    WorldRender.thickBox(new AABB(pos), now ? FIRST : (shown == 0 ? SECOND : LATER), LINE, true);
+                    shown++;
+                }
+            }
         }
+    }
+
+    /** The recorded times for a lever, in order. */
+    private static List<Double> timesOf(Lever lever) {
+        List<Double> out = new ArrayList<>();
+        for (Step s : STEPS) {
+            if (s.lever() == lever) {
+                out.add(s.time());
+            }
+        }
+        return out;
     }
 
     /** Identifies the board, looks the solution up, and announces it once. */
