@@ -43,6 +43,10 @@ public final class DungeonRooms {
     private static Map<Integer, RoomData> byCore;
     /** Rooms already identified this dungeon, keyed by tile index. */
     private static final Map<Integer, RoomData> IDENTIFIED = new HashMap<>();
+    /** Ticks left before retrying a tile that did not resolve, so an unknown room is not rescanned
+     * every tick - the chunk may simply not have arrived yet, but hashing a full column is not free. */
+    private static final int RETRY_TICKS = 20;
+    private static int retryIn;
 
     private static int tileX = -1;
     private static int tileZ = -1;
@@ -62,6 +66,7 @@ public final class DungeonRooms {
 
     public static void reset() {
         IDENTIFIED.clear();
+        retryIn = 0;
         current = null;
         tileX = -1;
         tileZ = -1;
@@ -88,9 +93,15 @@ public final class DungeonRooms {
             current = known;
             return;
         }
+        if (retryIn > 0) {
+            retryIn--;
+            return;
+        }
         RoomData found = identify(mc, tx, tz);
         if (found != null) {
             IDENTIFIED.put(key, found);
+        } else {
+            retryIn = RETRY_TICKS;
         }
         current = found;
     }
