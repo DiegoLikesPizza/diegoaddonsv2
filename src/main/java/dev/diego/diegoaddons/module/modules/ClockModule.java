@@ -14,6 +14,12 @@ public class ClockModule extends HudModule {
         super("clock", "Real-Time Clock", "Your computer's current time.");
     }
 
+    /** Purely numeric, so the digit-normalised chip leaves visible slack unless the text is centred. */
+    @Override
+    protected boolean defaultCentered() {
+        return true;
+    }
+
     @Override
     protected String label() {
         return "Time";

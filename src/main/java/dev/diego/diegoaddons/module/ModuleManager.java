@@ -281,7 +281,13 @@ public final class ModuleManager {
             int slotTop = CHIP_PAD_Y + i * CHIP_LINE_H;
             // Baseline-correct vertical centring (size 10 = Fonts.MEDIUM point-size).
             int ty = Fonts.centerTop(slotTop, CHIP_LINE_H, 10);
-            UiRender.text(g, font, lines.get(i), Fonts.MEDIUM, CHIP_PAD_X, ty, hud.color());
+            // Centring uses the line's real width, not the digit-normalised one, so the slack the
+            // normalisation leaves behind is split evenly instead of piling up on the right.
+            int tx = CHIP_PAD_X;
+            if (hud.isCentered()) {
+                tx = (w - font.width(Fonts.t(lines.get(i), Fonts.MEDIUM))) / 2;
+            }
+            UiRender.text(g, font, lines.get(i), Fonts.MEDIUM, tx, ty, hud.color());
         }
     }
 
