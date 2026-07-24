@@ -16,7 +16,6 @@ import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
-import dev.diego.diegoaddons.module.modules.DungeonRoomsModule;
 import dev.diego.diegoaddons.module.modules.HideEffectsModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
@@ -24,6 +23,7 @@ import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PartyCommandsModule;
 import dev.diego.diegoaddons.module.modules.PartyFinderModule;
+import dev.diego.diegoaddons.module.modules.PuzzleSolversModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.ReplaceWordsModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
@@ -33,6 +33,7 @@ import dev.diego.diegoaddons.util.LegacyText;
 import dev.diego.diegoaddons.util.OldMasterStars;
 import dev.diego.diegoaddons.util.PartyCommands;
 import dev.diego.diegoaddons.util.PartyFinder;
+import dev.diego.diegoaddons.util.PuzzleSolvers;
 import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.util.TpsTracker;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -85,7 +86,6 @@ public final class ModuleManager {
         register(new ClockModule(), false);
         register(new InventoryHudModule(), false);
         register(new MusicDisplayModule(), false);
-        register(new DungeonRoomsModule(), false);
         register(new OldMasterStarsModule(), false);
         register(new InventoryButtonsModule(), false);
         register(new ChatHistoryModule(), false);
@@ -96,6 +96,7 @@ public final class ModuleManager {
         register(new ReplaceWordsModule(), false);
         register(new PartyCommandsModule(), false);
         register(new PartyFinderModule(), false);
+        register(new PuzzleSolversModule(), false);
         register(new CommandHotkeysModule(), false);
         ConfigManager.save();
 
@@ -140,6 +141,7 @@ public final class ModuleManager {
                 String plain = LegacyText.strip(message.getString());
                 IgnoreList.onMessage(plain);
                 PartyCommands.onMessage(plain);
+                PuzzleSolvers.onMessage(plain);
             }
         });
 
@@ -171,7 +173,7 @@ public final class ModuleManager {
             TpsTracker.reset();
             dev.diego.diegoaddons.util.SkyblockHud.reset();
             dev.diego.diegoaddons.util.ChatCompactor.reset();
-            dev.diego.diegoaddons.util.DungeonRooms.reset();
+            PuzzleSolvers.reset();
             PartyCommands.reset();
         });
 
