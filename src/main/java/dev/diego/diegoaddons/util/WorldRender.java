@@ -54,19 +54,44 @@ public final class WorldRender {
         }
     }
 
-    /**
-     * Queues a solid box. Lines render one pixel wide whatever the distance, which is far too faint
-     * to pick out mid-fight, so anything that has to be seen quickly is drawn filled and outlined.
-     */
+    /** Queues a solid box. */
     public static void filledBox(AABB box, int argb, boolean throughWalls) {
         synchronized (QUEUE) {
             QUEUE.add(new Box(box, argb, throughWalls, true));
-            QUEUE.add(new Box(box, opaque(argb), throughWalls, false));
         }
     }
 
-    private static int opaque(int argb) {
-        return 0xFF000000 | (argb & 0x00FFFFFF);
+    /**
+     * Queues an outline of the given thickness, as twelve thin solid edges rather than lines.
+     *
+     * <p>Line primitives render one pixel wide no matter the distance, so they cannot be made
+     * heavier. Building each edge as a thin box gives an outline whose weight is actually visible
+     * and scales with perspective like everything else in the world.
+     *
+     * @param thickness edge width in blocks
+     */
+    public static void thickBox(AABB b, int argb, double thickness, boolean throughWalls) {
+        double t = thickness / 2.0;
+        // Four edges along X, four along Z, four uprights along Y.
+        for (double[] e : new double[][]{
+                {b.minX, b.minY, b.minZ, b.maxX, b.minY, b.minZ},
+                {b.minX, b.minY, b.maxZ, b.maxX, b.minY, b.maxZ},
+                {b.minX, b.maxY, b.minZ, b.maxX, b.maxY, b.minZ},
+                {b.minX, b.maxY, b.maxZ, b.maxX, b.maxY, b.maxZ},
+                {b.minX, b.minY, b.minZ, b.minX, b.minY, b.maxZ},
+                {b.maxX, b.minY, b.minZ, b.maxX, b.minY, b.maxZ},
+                {b.minX, b.maxY, b.minZ, b.minX, b.maxY, b.maxZ},
+                {b.maxX, b.maxY, b.minZ, b.maxX, b.maxY, b.maxZ},
+                {b.minX, b.minY, b.minZ, b.minX, b.maxY, b.minZ},
+                {b.maxX, b.minY, b.minZ, b.maxX, b.maxY, b.minZ},
+                {b.minX, b.minY, b.maxZ, b.minX, b.maxY, b.maxZ},
+                {b.maxX, b.minY, b.maxZ, b.maxX, b.maxY, b.maxZ},
+        }) {
+            filledBox(new AABB(
+                    Math.min(e[0], e[3]) - t, Math.min(e[1], e[4]) - t, Math.min(e[2], e[5]) - t,
+                    Math.max(e[0], e[3]) + t, Math.max(e[1], e[4]) + t, Math.max(e[2], e[5]) + t),
+                    argb, throughWalls);
+        }
     }
 
     /** Queues a one-block box around a position. */

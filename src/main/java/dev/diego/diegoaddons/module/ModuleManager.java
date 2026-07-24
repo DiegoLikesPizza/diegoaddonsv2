@@ -176,6 +176,7 @@ public final class ModuleManager {
             PuzzleSolvers.reset();
             dev.diego.diegoaddons.util.BlazeSolver.reset();
             dev.diego.diegoaddons.util.DungeonRooms.reset();
+            dev.diego.diegoaddons.util.BeamsSolver.reset();
             dev.diego.diegoaddons.util.WorldRender.clear();
             PartyCommands.reset();
         });
