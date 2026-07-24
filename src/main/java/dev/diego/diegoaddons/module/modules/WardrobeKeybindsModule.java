@@ -1,23 +1,20 @@
 package dev.diego.diegoaddons.module.modules;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
+import dev.diego.diegoaddons.module.KeybindSetting;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.util.WardrobeSwapper;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 
 /**
  * Binds a key to each wardrobe set: pressing it opens the wardrobe and equips that set. Two options
  * shape what happens around the swap - whether to close the menu again afterwards, and whether to
  * refuse a swap that would only take the current set off.
  *
- * <p>The keys are registered once at startup (unbound by default, so nothing is stolen from the
- * user's existing binds) and are only acted on while this module is enabled. See
- * {@link WardrobeSwapper} for the actual swap.
+ * <p>The keys are bound in this mod's own settings panel, not Minecraft's controls screen, so every
+ * option for the feature sits in one place. See {@link WardrobeSwapper} for the actual swap.
  */
 public class WardrobeKeybindsModule extends Module {
     /** How many sets can be bound. SkyBlock shows nine per wardrobe page. */
@@ -25,7 +22,7 @@ public class WardrobeKeybindsModule extends Module {
 
     public static WardrobeKeybindsModule INSTANCE;
 
-    private static final KeyMapping[] KEYS = new KeyMapping[SLOTS];
+    private final KeybindSetting[] keys = new KeybindSetting[SLOTS];
 
     private final BooleanSetting closeAfter =
             new BooleanSetting(this, "closeAfter", "Close after swapping", true);
@@ -37,21 +34,11 @@ public class WardrobeKeybindsModule extends Module {
                 "Press a key to open the wardrobe and equip that set.");
         settings.add(closeAfter);
         settings.add(preventUnequip);
-        INSTANCE = this;
-    }
-
-    /**
-     * Registers the nine key mappings. Called once from the client entrypoint - key mappings must
-     * exist before the options screen is built, so this cannot wait until the module is enabled.
-     */
-    public static void registerKeys() {
         for (int i = 0; i < SLOTS; i++) {
-            KEYS[i] = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                    "key.diegoaddonsv2.wardrobe_" + (i + 1),
-                    InputConstants.Type.KEYSYM,
-                    InputConstants.UNKNOWN.getValue(),   // unbound until the user picks a key
-                    KeyMapping.Category.INVENTORY));
+            keys[i] = new KeybindSetting(this, "key" + (i + 1), "Set " + (i + 1) + " key");
+            settings.add(keys[i]);
         }
+        INSTANCE = this;
     }
 
     public boolean closeAfter() {
@@ -65,17 +52,10 @@ public class WardrobeKeybindsModule extends Module {
     @Override
     public void onClientTick(Minecraft mc) {
         WardrobeSwapper.tick(mc);
+        // Only from normal play or from a menu - never while a text field could be taking the key.
+        boolean allowed = mc.screen == null || mc.screen instanceof AbstractContainerScreen<?>;
         for (int i = 0; i < SLOTS; i++) {
-            KeyMapping key = KEYS[i];
-            if (key == null) {
-                continue;
-            }
-            boolean pressed = false;
-            while (key.consumeClick()) {
-                pressed = true;
-            }
-            // Only from normal play or from the wardrobe itself - never while typing in a text box.
-            if (pressed && (mc.screen == null || mc.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>)) {
+            if (keys[i].consumePress() && allowed) {
                 WardrobeSwapper.request(mc, i + 1);
             }
         }
