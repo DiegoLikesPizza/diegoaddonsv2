@@ -15,7 +15,6 @@ import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CoordinatesModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
 import dev.diego.diegoaddons.module.modules.DirectionModule;
-import dev.diego.diegoaddons.module.modules.EquipmentOverlayModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
@@ -23,13 +22,10 @@ import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
 import dev.diego.diegoaddons.module.modules.WardrobeKeybindsModule;
-import dev.diego.diegoaddons.module.modules.WardrobeOverlayModule;
-import dev.diego.diegoaddons.util.EquipmentOverlay;
 import dev.diego.diegoaddons.util.InventoryButtons;
 import dev.diego.diegoaddons.util.OldMasterStars;
 import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.util.TpsTracker;
-import dev.diego.diegoaddons.util.WardrobeOverlay;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -82,8 +78,6 @@ public final class ModuleManager {
         register(new InventoryHudModule(), false);
         register(new MusicDisplayModule(), false);
         register(new OldMasterStarsModule(), false);
-        register(new WardrobeOverlayModule(), false);
-        register(new EquipmentOverlayModule(), false);
         register(new WardrobeKeybindsModule(), false);
         register(new InventoryButtonsModule(), false);
         register(new ChatHistoryModule(), false);
@@ -121,12 +115,10 @@ public final class ModuleManager {
             }
         });
 
-        // Wardrobe / equipment overlays: drawn on top of their menus, after the menu's extract pass.
+        // Inventory buttons and toasts, drawn after a container menu's own extract pass.
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
             if (screen instanceof AbstractContainerScreen<?>) {
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
-                    WardrobeOverlay.render((AbstractContainerScreen<?>) scr, g);
-                    EquipmentOverlay.render((AbstractContainerScreen<?>) scr, g, mx, my);
                     InventoryButtons.render((AbstractContainerScreen<?>) scr, g, mx, my);
                     Toasts.render(g);
                 });

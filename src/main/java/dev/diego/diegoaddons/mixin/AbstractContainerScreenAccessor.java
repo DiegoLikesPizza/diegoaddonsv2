@@ -8,9 +8,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 /**
- * Exposes the container GUI's on-screen origin and size, so the wardrobe overlay can place its
- * mannequins and the equipment overlay can put its card beside the menu, plus the protected
- * slot-click entry point the wardrobe keybinds use.
+ * Exposes the container GUI's on-screen origin, so the inventory buttons can sit beside the menu,
+ * plus the protected slot-click entry point the wardrobe keybinds use.
  */
 @Mixin(AbstractContainerScreen.class)
 public interface AbstractContainerScreenAccessor {
@@ -19,9 +18,6 @@ public interface AbstractContainerScreenAccessor {
 
     @Accessor("topPos")
     int diego$topPos();
-
-    @Accessor("imageWidth")
-    int diego$imageWidth();
 
     /**
      * The screen's own click handler. Going through this rather than crafting a packet means a

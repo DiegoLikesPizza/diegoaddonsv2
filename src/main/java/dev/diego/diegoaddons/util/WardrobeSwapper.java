@@ -33,6 +33,12 @@ public final class WardrobeSwapper {
     private static final int TIMEOUT = 100;
     /** Ticks to wait after clicking before closing, so the click is sent first. */
     private static final int CLOSE_DELAY = 3;
+    /**
+     * Menu titles the wardrobe uses, lower-case. SkyBlock renamed it from "Wardrobe" to "Armor
+     * Sets" and the title carries a page prefix ("(1/3) Armor Sets"), so we match on a substring
+     * and keep the old name for older versions. This is the tuning knob if it is renamed again.
+     */
+    private static final String[] TITLES = {"wardrobe", "armor sets", "armour sets"};
     /** Lore markers on the per-set button: which one is present tells us the set's current state. */
     private static final String EQUIP = "equip";
     private static final String UNEQUIP = "unequip";
@@ -164,8 +170,18 @@ public final class WardrobeSwapper {
     }
 
     private static boolean isWardrobe(Minecraft mc) {
-        return mc.screen instanceof AbstractContainerScreen<?> s
-                && WardrobeOverlay.isWardrobeTitle(s.getTitle().getString());
+        return mc.screen instanceof AbstractContainerScreen<?> s && isWardrobeTitle(s.getTitle().getString());
+    }
+
+    /** Whether {@code title} is the wardrobe, ignoring page prefix, colour codes and case. */
+    private static boolean isWardrobeTitle(String title) {
+        String t = title.replaceAll("§.", "").toLowerCase(Locale.ROOT);
+        for (String name : TITLES) {
+            if (t.contains(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void say(Minecraft mc, String msg) {
