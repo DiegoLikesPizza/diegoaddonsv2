@@ -9,6 +9,7 @@ import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
 import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
+import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CoordinatesModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
@@ -81,6 +82,7 @@ public final class ModuleManager {
         register(new WardrobeKeybindsModule(), false);
         register(new InventoryButtonsModule(), false);
         register(new ChatHistoryModule(), false);
+        register(new ChatSearchModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
