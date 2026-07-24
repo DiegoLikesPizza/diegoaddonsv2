@@ -12,9 +12,9 @@
     "ChatScreenMixin",
     "ClientPacketListenerMixin",
     "EffectsInInventoryMixin",
+    "FontMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",
-    "ItemStackNameMixin",
     "LivingEntitySwingMixin"
   ],
   "injectors": {

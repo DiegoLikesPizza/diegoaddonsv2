@@ -28,8 +28,8 @@ import dev.diego.diegoaddons.module.modules.SkinChangerModule;
 import dev.diego.diegoaddons.module.modules.WardrobeKeybindsModule;
 import dev.diego.diegoaddons.util.InventoryButtons;
 import dev.diego.diegoaddons.util.IgnoreList;
+import dev.diego.diegoaddons.util.LegacyText;
 import dev.diego.diegoaddons.util.OldMasterStars;
-import dev.diego.diegoaddons.util.WordReplacer;
 import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.util.TpsTracker;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -126,19 +126,14 @@ public final class ModuleManager {
             }
         });
 
-        // Rewrite item text through the user's word list.
-        ItemTooltipCallback.EVENT.register((stack, ctx, type, lines) -> {
-            ReplaceWordsModule mod = ReplaceWordsModule.INSTANCE;
-            if (mod == null || !mod.isEnabled() || !mod.inItems()) {
-                return;
-            }
-            // Line 0 is the item's hover name, already rewritten by ItemStackNameMixin - doing it
-            // again here could compound a replacement whose output still contains its own input.
-            for (int i = 1; i < lines.size(); i++) {
-                Component replaced = WordReplacer.apply(lines.get(i));
-                if (replaced != lines.get(i)) {
-                    lines.set(i, replaced);
-                }
+        // The word list is applied when text is drawn (see FontMixin), which covers item names and
+        // lore along with everything else - so there is deliberately no tooltip hook for it here.
+
+        // Watch system messages for blocked players joining the party. Observing only; the message
+        // itself is left alone.
+        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
+            if (!overlay) {
+                IgnoreList.onMessage(LegacyText.strip(message.getString()));
             }
         });
 

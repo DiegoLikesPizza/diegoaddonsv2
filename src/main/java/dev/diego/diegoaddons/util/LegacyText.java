@@ -67,6 +67,11 @@ public final class LegacyText {
         return s == null ? "" : s.replaceAll("§.", "");
     }
 
+    /** The legacy prefix that reproduces this style from a clean slate. */
+    public static String codesOf(Style st) {
+        return codes(st);
+    }
+
     private static String codes(Style st) {
         StringBuilder sb = new StringBuilder();
         TextColor col = st.getColor();
