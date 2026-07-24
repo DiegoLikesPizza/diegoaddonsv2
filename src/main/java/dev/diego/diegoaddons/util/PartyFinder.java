@@ -25,6 +25,10 @@ import java.util.regex.Pattern;
  * Highlights party-finder listings that still have room for a class you want to play, and puts the
  * class toggles into the menu itself so the choice can be changed without leaving it.
  *
+ * <p>Everything here is drawn with the menu <b>background</b>, before the items and their tooltips.
+ * That puts the highlight behind the item instead of over it, and keeps the toggle strip from
+ * covering the tooltip of whatever listing you are hovering.
+ *
  * <p>A listing is recognised by its item <b>name</b> ending in "'s Party", and its members by the
  * line shape Hypixel uses for them, {@code " Name: Class (Level)"}. Reading the members rather than
  * searching the whole lore for class words means a class named in someone's note cannot be mistaken
@@ -44,10 +48,10 @@ public final class PartyFinder {
     private static final int SLOT = 16;
     private static final int PLAYER_INV_SLOTS = 36;
     /**
-     * The same green the feature this imitates uses, but translucent: that one paints behind the
-     * item, and this draws after the menu, so an opaque fill would hide what it is highlighting.
+     * The same green the feature this imitates uses. Fully opaque is fine because this draws with
+     * the menu background, so the item is painted on top of it afterwards.
      */
-    private static final int HIGHLIGHT = 0x8055FF55;
+    private static final int HIGHLIGHT = 0xFF55FF55;
 
     // Toggle strip drawn beside the menu.
     private static final int ROW_H = 14;
@@ -148,7 +152,7 @@ public final class PartyFinder {
             int bx = x + 6;
             int by = ry + (ROW_H - BOX) / 2;
             UiRender.fillRounded(g, bx, by, BOX, BOX, 2,
-                    on ? HIGHLIGHT | 0xFF000000 : Theme.withAlpha(t.textFaint(), 0.35f), sm);
+                    on ? HIGHLIGHT : Theme.withAlpha(t.textFaint(), 0.35f), sm);
             UiRender.strokeRounded(g, bx, by, BOX, BOX, 2, Theme.withAlpha(t.border(), 0.9f), sm);
             UiRender.text(g, mc.font, CLASS_NAMES[i], Fonts.SMALL, bx + BOX + 5, ry + 4,
                     on ? t.text() : t.textMuted());

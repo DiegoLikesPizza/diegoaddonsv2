@@ -16,6 +16,7 @@ import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
+import dev.diego.diegoaddons.module.modules.DungeonRoomsModule;
 import dev.diego.diegoaddons.module.modules.HideEffectsModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
@@ -84,6 +85,7 @@ public final class ModuleManager {
         register(new ClockModule(), false);
         register(new InventoryHudModule(), false);
         register(new MusicDisplayModule(), false);
+        register(new DungeonRoomsModule(), false);
         register(new OldMasterStarsModule(), false);
         register(new InventoryButtonsModule(), false);
         register(new ChatHistoryModule(), false);
@@ -144,8 +146,11 @@ public final class ModuleManager {
         // Inventory buttons and toasts, drawn after a container menu's own extract pass.
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
             if (screen instanceof AbstractContainerScreen<?>) {
+                // The party finder overlay draws with the background, so item tooltips stay on top
+                // of it and the slot highlight sits behind the item rather than over it.
+                ScreenEvents.afterBackground(screen).register((scr, g, mx, my, dt) ->
+                        PartyFinder.render((AbstractContainerScreen<?>) scr, g));
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
-                    PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                     InventoryButtons.render((AbstractContainerScreen<?>) scr, g, mx, my);
                     Toasts.render(g);
                 });
@@ -166,6 +171,7 @@ public final class ModuleManager {
             TpsTracker.reset();
             dev.diego.diegoaddons.util.SkyblockHud.reset();
             dev.diego.diegoaddons.util.ChatCompactor.reset();
+            dev.diego.diegoaddons.util.DungeonRooms.reset();
             PartyCommands.reset();
         });
 
