@@ -22,8 +22,13 @@ import java.util.List;
  *   <li><b>Left</b> - the groups (categories).</li>
  *   <li><b>Middle</b> - the features of the selected group; left-click toggles, right-click opens
  *       that feature's settings.</li>
- *   <li><b>Right</b> - appears on right-click; the selected feature's settings.</li>
+ *   <li><b>Right</b> - the selected feature's settings.</li>
  * </ul>
+ *
+ * <p>The window has a <b>fixed size</b>: it always occupies {@link #W_FRAC} x {@link #H_FRAC} of the
+ * screen (about half its area) and never resizes as you click around. All three columns are always
+ * present and the column widths are derived from the panel, so opening a feature's settings fills
+ * the reserved right column instead of growing the window. Lists that do not fit scroll.
  *
  * <p>Everything is drawn <b>supersampled</b>: we push a pose scaled by {@code 1/}{@link UiRender#SS}
  * and lay the whole window out in "units" (1 unit = 1/SS screen pixel), so corners, strokes and the
@@ -32,6 +37,13 @@ import java.util.List;
 public class ClickGuiScreen extends Screen {
     private static final int S = UiRender.SS;
 
+    /**
+     * Fixed window size as a fraction of the screen. 0.72 x 0.70 is about 50% of the screen area -
+     * big enough to read comfortably, small enough to still see the game behind it.
+     */
+    private static final float W_FRAC = 0.72f;
+    private static final float H_FRAC = 0.70f;
+
     // Layout metrics, all in hi-res units (visual size = unit / SS).
     private static final int PAD = 30;
     private static final int HEADER_H = 84;
@@ -39,17 +51,22 @@ public class ClickGuiScreen extends Screen {
     private static final int ROW_GAP = 8;
     private static final int SET_ROW_H = 52;
     private static final int EYE_H = 34;
-    private static final int CAT_W = 220;
-    private static final int MOD_W = 460;
-    private static final int SET_W = 360;
     private static final int COL_GAP = 30;
     private static final int RAD = 28;
     private static final int CARD_RAD = 14;
     private static final int CLOSE_SZ = 42;
     private static final int HUD_BTN_W = 158;
+    private static final int BAR_W = 8;
+
+    // Relative column weights; the actual widths are these shares of the available inner width.
+    private static final float CAT_SHARE = 220f / 1040f;
+    private static final float SET_SHARE = 360f / 1040f;
 
     private int catIndex = 0;
     private Module settingsModule;
+
+    // Scroll offsets, in whole rows, one per column.
+    private int catScroll, modScroll, setScroll;
 
     private final List<UiButton> headerButtons = new ArrayList<>();
 
@@ -58,7 +75,9 @@ public class ClickGuiScreen extends Screen {
     private List<Module> mods;
     private List<Setting> sets;
     private int panelX, panelY, panelW, panelH;
-    private int catX, modX, setX, bodyTop, listTop;
+    private int catX, modX, setX, bodyTop, listTop, listBottom;
+    private int catW, modW, setW;
+    private int catRows, modRows, setRows;
     private int closeX, closeY, closeSz;
     private int themeX, themeY, themeW, themeH;
 
@@ -80,7 +99,8 @@ public class ClickGuiScreen extends Screen {
         }
         sets = settingsModule != null ? settingsModule.settings() : List.of();
 
-        boolean threeCol = settingsModule != null;
+        int maxW = width * S;
+        int maxH = height * S;
 
         // --- Header cluster sizing (so nothing overlaps, whatever the font metrics) ---
         closeSz = CLOSE_SZ;
@@ -91,29 +111,33 @@ public class ClickGuiScreen extends Screen {
         int brandW = 48 + 18 + titleW;                          // mark + gap + title
         int headerW = PAD + brandW + 56 + rightClusterW + PAD;  // +56 breathing gap between the two
 
-        int twoColW = PAD + CAT_W + COL_GAP + MOD_W + PAD;
-        int contentW = twoColW + (threeCol ? COL_GAP + SET_W : 0);
-        panelW = Math.max(contentW, headerW);
-
-        int catColH = colH(cats.size(), ROW_H);
-        int midColH = colH(mods.size(), ROW_H);
-        int setColH = threeCol ? ROW_H + colH(Math.max(1, sets.size()), SET_ROW_H) : 0;
-        int bodyH = EYE_H + Math.max(catColH, Math.max(midColH, setColH));
-
-        int maxW = width * S;
-        int maxH = height * S;
-        panelH = Math.min(maxH - 40, HEADER_H + 16 + bodyH + PAD);
-
-        // Anchor the column content centred so opening settings grows rightwards.
-        panelX = (maxW - contentW) / 2;
-        panelX = Math.max(20, Math.min(panelX, maxW - 20 - panelW));
+        // Fixed size. The header width is a floor so the brand and the right cluster never collide
+        // on very small screens; otherwise the window is exactly the configured fraction.
+        panelW = Math.min(maxW - 40, Math.max(Math.round(maxW * W_FRAC), headerW));
+        panelH = Math.min(maxH - 40, Math.round(maxH * H_FRAC));
+        panelX = (maxW - panelW) / 2;
         panelY = (maxH - panelH) / 2;
 
+        // All three columns always exist, so the window never has to grow when settings open.
+        int inner = panelW - PAD * 2 - COL_GAP * 2;
+        catW = Math.round(inner * CAT_SHARE);
+        setW = Math.round(inner * SET_SHARE);
+        modW = inner - catW - setW;
+
         catX = panelX + PAD;
-        modX = catX + CAT_W + COL_GAP;
-        setX = modX + MOD_W + COL_GAP;
+        modX = catX + catW + COL_GAP;
+        setX = modX + modW + COL_GAP;
         bodyTop = panelY + HEADER_H + 16;
         listTop = bodyTop + EYE_H;
+        listBottom = panelY + panelH - PAD;
+
+        catRows = fitRows(ROW_H, listTop);
+        modRows = fitRows(ROW_H, listTop);
+        setRows = fitRows(SET_ROW_H, listTop + ROW_H);   // the settings column has a title row first
+
+        catScroll = clampScroll(catScroll, cats.size(), catRows);
+        modScroll = clampScroll(modScroll, mods.size(), modRows);
+        setScroll = clampScroll(setScroll, sets.size(), setRows);
 
         // Header right cluster, laid out from the right edge: [theme chip] [HUD Editor] [x].
         closeX = panelX + panelW - PAD - closeSz;
@@ -132,15 +156,19 @@ public class ClickGuiScreen extends Screen {
         themeX = hudX - 16 - themeW;
     }
 
-    private static int colH(int n, int rowH) {
-        return n <= 0 ? 0 : n * rowH + (n - 1) * ROW_GAP;
+    /** How many rows of height {@code rowH} fit between {@code top} and the bottom of the window. */
+    private int fitRows(int rowH, int top) {
+        return Math.max(1, (listBottom - top + ROW_GAP) / (rowH + ROW_GAP));
+    }
+
+    private static int clampScroll(int scroll, int total, int visible) {
+        return Math.max(0, Math.min(scroll, Math.max(0, total - visible)));
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         Theme t = Themes.current();
         boolean sm = ConfigManager.get().smoothCorners;
-        boolean threeCol = settingsModule != null;
         int mx = mouseX * S, my = mouseY * S;
 
         // Full-screen scrim (normal space), then everything else supersampled.
@@ -160,16 +188,12 @@ public class ClickGuiScreen extends Screen {
         // Column dividers.
         int divTop = bodyTop - 4;
         int divBot = panelY + panelH - PAD;
-        vline(g, catX + CAT_W + COL_GAP / 2, divTop, divBot, Theme.withAlpha(t.border(), 0.8f));
-        if (threeCol) {
-            vline(g, modX + MOD_W + COL_GAP / 2, divTop, divBot, Theme.withAlpha(t.border(), 0.8f));
-        }
+        vline(g, catX + catW + COL_GAP / 2, divTop, divBot, Theme.withAlpha(t.border(), 0.8f));
+        vline(g, modX + modW + COL_GAP / 2, divTop, divBot, Theme.withAlpha(t.border(), 0.8f));
 
         renderGroups(g, t, sm, mx, my);
         renderFeatures(g, t, sm, mx, my);
-        if (threeCol) {
-            renderSettings(g, t, sm, mx, my);
-        }
+        renderSettings(g, t, sm, mx, my);
 
         UiRender.endHiRes(g);
     }
@@ -212,36 +236,39 @@ public class ClickGuiScreen extends Screen {
 
     private void renderGroups(GuiGraphicsExtractor g, Theme t, boolean sm, int mx, int my) {
         eyebrow(g, t, "GROUPS", catX + 4, bodyTop);
-        for (int i = 0; i < cats.size(); i++) {
-            int ry = listTop + i * (ROW_H + ROW_GAP);
+        int end = Math.min(cats.size(), catScroll + catRows);
+        for (int i = catScroll; i < end; i++) {
+            int ry = listTop + (i - catScroll) * (ROW_H + ROW_GAP);
             boolean selected = i == catIndex;
-            boolean hover = UiRender.inside(mx, my, catX, ry, CAT_W, ROW_H);
+            boolean hover = UiRender.inside(mx, my, catX, ry, catW, ROW_H);
             if (selected) {
-                UiRender.fillRounded(g, catX, ry, CAT_W, ROW_H, CARD_RAD, t.elevated(), sm);
+                UiRender.fillRounded(g, catX, ry, catW, ROW_H, CARD_RAD, t.elevated(), sm);
                 UiRender.fillRounded(g, catX, ry + 12, 6, ROW_H - 24, 3, t.accent(), sm);
             } else if (hover) {
-                UiRender.fillRounded(g, catX, ry, CAT_W, ROW_H, CARD_RAD, t.surfaceAlt(), sm);
+                UiRender.fillRounded(g, catX, ry, catW, ROW_H, CARD_RAD, t.surfaceAlt(), sm);
             }
-            int col = selected ? t.text() : (hover ? t.text() : t.textMuted());
+            int col = selected || hover ? t.text() : t.textMuted();
             UiRender.textVC(g, font, cats.get(i).display, Fonts.UI_LABEL, Fonts.UI_LABEL_SZ,
                     catX + (selected ? 22 : 18), ry, ROW_H, col);
         }
+        scrollbar(g, t, sm, catX + catW - BAR_W, listTop, ROW_H, cats.size(), catRows, catScroll);
     }
 
     private void renderFeatures(GuiGraphicsExtractor g, Theme t, boolean sm, int mx, int my) {
         Category cur = cats.isEmpty() ? Category.HUD : cats.get(catIndex);
         eyebrow(g, t, cur.display.toUpperCase(), modX + 4, bodyTop);
-        for (int j = 0; j < mods.size(); j++) {
+        int end = Math.min(mods.size(), modScroll + modRows);
+        for (int j = modScroll; j < end; j++) {
             Module m = mods.get(j);
-            int ry = listTop + j * (ROW_H + ROW_GAP);
-            boolean hover = UiRender.inside(mx, my, modX, ry, MOD_W, ROW_H);
+            int ry = listTop + (j - modScroll) * (ROW_H + ROW_GAP);
+            boolean hover = UiRender.inside(mx, my, modX, ry, modW, ROW_H);
             boolean on = m.isEnabled();
             boolean isSettings = m == settingsModule;
 
-            UiRender.fillRounded(g, modX, ry, MOD_W, ROW_H, CARD_RAD,
+            UiRender.fillRounded(g, modX, ry, modW, ROW_H, CARD_RAD,
                     hover || isSettings ? t.elevated() : t.surfaceAlt(), sm);
             if (isSettings) {
-                UiRender.strokeRoundedThick(g, modX, ry, MOD_W, ROW_H, CARD_RAD, Theme.withAlpha(t.accent(), 0.8f), S, sm);
+                UiRender.strokeRoundedThick(g, modX, ry, modW, ROW_H, CARD_RAD, Theme.withAlpha(t.accent(), 0.8f), S, sm);
             }
             // Status dot.
             int dotC = on ? t.accent() : Theme.withAlpha(t.textFaint(), 0.7f);
@@ -249,12 +276,18 @@ public class ClickGuiScreen extends Screen {
 
             UiRender.textVC(g, font, m.name, Fonts.UI_LABEL, Fonts.UI_LABEL_SZ, modX + 36, ry, ROW_H,
                     on ? t.text() : t.textMuted());
-            pill(g, modX + MOD_W - 20 - 46, ry + (ROW_H - 26) / 2, 46, 26, on, t, sm);
+            pill(g, modX + modW - 20 - 46, ry + (ROW_H - 26) / 2, 46, 26, on, t, sm);
         }
+        scrollbar(g, t, sm, modX + modW - BAR_W, listTop, ROW_H, mods.size(), modRows, modScroll);
     }
 
     private void renderSettings(GuiGraphicsExtractor g, Theme t, boolean sm, int mx, int my) {
         eyebrow(g, t, "SETTINGS", setX + 4, bodyTop);
+        if (settingsModule == null) {
+            UiRender.text(g, font, "Right-click a feature", Fonts.UI_SMALL, setX + 4, listTop + 6, t.textFaint());
+            UiRender.text(g, font, "to see its settings.", Fonts.UI_SMALL, setX + 4, listTop + 32, t.textFaint());
+            return;
+        }
         UiRender.textVC(g, font, settingsModule.name, Fonts.UI_LABEL, Fonts.UI_LABEL_SZ,
                 setX + 4, listTop, ROW_H, t.text());
         int y0 = listTop + ROW_H;
@@ -262,16 +295,34 @@ public class ClickGuiScreen extends Screen {
             UiRender.text(g, font, "No settings for this feature.", Fonts.UI_SMALL, setX + 4, y0 + 6, t.textFaint());
             return;
         }
-        for (int k = 0; k < sets.size(); k++) {
+        int end = Math.min(sets.size(), setScroll + setRows);
+        for (int k = setScroll; k < end; k++) {
             Setting s = sets.get(k);
-            int ry = y0 + k * (SET_ROW_H + ROW_GAP);
-            boolean hover = UiRender.inside(mx, my, setX, ry, SET_W, SET_ROW_H);
-            UiRender.fillRounded(g, setX, ry, SET_W, SET_ROW_H, CARD_RAD, hover ? t.elevated() : t.surfaceAlt(), sm);
+            int ry = y0 + (k - setScroll) * (SET_ROW_H + ROW_GAP);
+            boolean hover = UiRender.inside(mx, my, setX, ry, setW, SET_ROW_H);
+            UiRender.fillRounded(g, setX, ry, setW, SET_ROW_H, CARD_RAD, hover ? t.elevated() : t.surfaceAlt(), sm);
             UiRender.textVC(g, font, s.name, Fonts.UI_BODY, Fonts.UI_BODY_SZ, setX + 18, ry, SET_ROW_H, t.text());
             if (s instanceof BooleanSetting bs) {
-                pill(g, setX + SET_W - 18 - 46, ry + (SET_ROW_H - 26) / 2, 46, 26, bs.get(), t, sm);
+                pill(g, setX + setW - 18 - 46, ry + (SET_ROW_H - 26) / 2, 46, 26, bs.get(), t, sm);
             }
         }
+        scrollbar(g, t, sm, setX + setW - BAR_W, y0, SET_ROW_H, sets.size(), setRows, setScroll);
+    }
+
+    /**
+     * A slim scroll indicator down the right edge of a column, drawn only when the list is longer
+     * than the fixed window can show.
+     */
+    private void scrollbar(GuiGraphicsExtractor g, Theme t, boolean sm, int x, int top, int rowH,
+                           int total, int visible, int scroll) {
+        if (total <= visible) {
+            return;
+        }
+        int h = visible * rowH + (visible - 1) * ROW_GAP;
+        UiRender.fillRounded(g, x, top, BAR_W, h, BAR_W / 2, Theme.withAlpha(t.textFaint(), 0.25f), sm);
+        int thumbH = Math.max(BAR_W * 3, h * visible / total);
+        int thumbY = top + (h - thumbH) * scroll / (total - visible);
+        UiRender.fillRounded(g, x, thumbY, BAR_W, thumbH, BAR_W / 2, Theme.withAlpha(t.accent(), 0.75f), sm);
     }
 
     private void eyebrow(GuiGraphicsExtractor g, Theme t, String s, int x, int y) {
@@ -317,11 +368,14 @@ public class ClickGuiScreen extends Screen {
         }
 
         // Categories.
-        for (int i = 0; i < cats.size(); i++) {
-            if (UiRender.inside(mx, my, catX, listTop + i * (ROW_H + ROW_GAP), CAT_W, ROW_H)) {
+        int catEnd = Math.min(cats.size(), catScroll + catRows);
+        for (int i = catScroll; i < catEnd; i++) {
+            if (UiRender.inside(mx, my, catX, listTop + (i - catScroll) * (ROW_H + ROW_GAP), catW, ROW_H)) {
                 if (btn == 0) {
                     catIndex = i;
                     settingsModule = null;
+                    modScroll = 0;
+                    setScroll = 0;
                     rebuildWidgets();
                 }
                 return true;
@@ -329,11 +383,13 @@ public class ClickGuiScreen extends Screen {
         }
 
         // Features.
-        for (int j = 0; j < mods.size(); j++) {
-            if (UiRender.inside(mx, my, modX, listTop + j * (ROW_H + ROW_GAP), MOD_W, ROW_H)) {
+        int modEnd = Math.min(mods.size(), modScroll + modRows);
+        for (int j = modScroll; j < modEnd; j++) {
+            if (UiRender.inside(mx, my, modX, listTop + (j - modScroll) * (ROW_H + ROW_GAP), modW, ROW_H)) {
                 Module m = mods.get(j);
                 if (btn == 1) {
                     settingsModule = (settingsModule == m) ? null : m;
+                    setScroll = 0;
                     rebuildWidgets();
                 } else if (btn == 0) {
                     ModuleManager.toggle(m);
@@ -345,8 +401,9 @@ public class ClickGuiScreen extends Screen {
         // Settings.
         if (settingsModule != null && btn == 0) {
             int y0 = listTop + ROW_H;
-            for (int k = 0; k < sets.size(); k++) {
-                if (UiRender.inside(mx, my, setX, y0 + k * (SET_ROW_H + ROW_GAP), SET_W, SET_ROW_H)) {
+            int setEnd = Math.min(sets.size(), setScroll + setRows);
+            for (int k = setScroll; k < setEnd; k++) {
+                if (UiRender.inside(mx, my, setX, y0 + (k - setScroll) * (SET_ROW_H + ROW_GAP), setW, SET_ROW_H)) {
                     if (sets.get(k) instanceof BooleanSetting bs) {
                         bs.toggle();
                     }
@@ -356,6 +413,30 @@ public class ClickGuiScreen extends Screen {
         }
 
         return super.mouseClicked(event, doubleClick);
+    }
+
+    /** Scrolls whichever column the cursor is over; the window itself never resizes. */
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int mx = (int) Math.round(mouseX * S);
+        int my = (int) Math.round(mouseY * S);
+        int step = scrollY > 0 ? -1 : (scrollY < 0 ? 1 : 0);
+        if (step == 0 || my < listTop - EYE_H || my > listBottom) {
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        }
+        if (mx >= catX && mx < catX + catW) {
+            catScroll = clampScroll(catScroll + step, cats.size(), catRows);
+            return true;
+        }
+        if (mx >= modX && mx < modX + modW) {
+            modScroll = clampScroll(modScroll + step, mods.size(), modRows);
+            return true;
+        }
+        if (mx >= setX && mx < setX + setW) {
+            setScroll = clampScroll(setScroll + step, sets.size(), setRows);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
