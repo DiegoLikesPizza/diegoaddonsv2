@@ -2,6 +2,7 @@ package dev.diego.diegoaddons.gui;
 
 import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.config.InventoryButton;
+import dev.diego.diegoaddons.util.IconCatalogue;
 import dev.diego.diegoaddons.util.InventoryButtons;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
@@ -49,6 +50,9 @@ public class InventoryButtonsScreen extends Screen {
     /** Every slot a button may occupy, as offsets from the GUI's top-left corner. */
     private final List<int[]> anchors = new ArrayList<>();
     private final List<Item> icons = new ArrayList<>();
+    private final List<IconCatalogue.Entry> presets = new ArrayList<>();
+    /** Picker mode: presets (warps and actions) or the full item registry. */
+    private boolean presetTab = true;
 
     private InventoryButton selected;
     private InventoryButton dragging;
@@ -66,10 +70,10 @@ public class InventoryButtonsScreen extends Screen {
         buttons.clear();
         buildAnchors();
 
-        int totalW = GUI_W + 2 * STRIDE + 24 + PANEL_W;
-        guiX = (width - totalW) / 2 + STRIDE;
+        int totalW = GUI_W + 4 * STRIDE + 24 + PANEL_W;
+        guiX = (width - totalW) / 2 + STRIDE * 2;
         guiY = (height - GUI_H) / 2;
-        panelX = guiX + GUI_W + STRIDE + 24;
+        panelX = guiX + GUI_W + STRIDE * 2 + 24;
         panelY = guiY;
         panelH = GUI_H;
 
@@ -105,22 +109,35 @@ public class InventoryButtonsScreen extends Screen {
         syncBoxes();
     }
 
-    /** The ring of slots around the menu: a column either side, a row above and below. */
+    /** The ring of slots around the menu: two columns either side, two rows above and below. */
     private void buildAnchors() {
         anchors.clear();
         for (int y = 0; y + SIZE <= GUI_H; y += STRIDE) {
-            anchors.add(new int[]{-STRIDE, y});          // left column
-            anchors.add(new int[]{GUI_W + 2, y});        // right column
+            anchors.add(new int[]{-STRIDE, y});              // inner left
+            anchors.add(new int[]{-STRIDE * 2, y});          // outer left
+            anchors.add(new int[]{GUI_W + 2, y});            // inner right
+            anchors.add(new int[]{GUI_W + 2 + STRIDE, y});   // outer right
         }
         for (int x = 0; x + SIZE <= GUI_W; x += STRIDE) {
-            anchors.add(new int[]{x, -STRIDE});          // above
-            anchors.add(new int[]{x, GUI_H + 2});        // below
+            anchors.add(new int[]{x, -STRIDE});              // inner top
+            anchors.add(new int[]{x, -STRIDE * 2});          // outer top
+            anchors.add(new int[]{x, GUI_H + 2});            // inner bottom
+            anchors.add(new int[]{x, GUI_H + 2 + STRIDE});   // outer bottom
         }
     }
 
     private void refreshIcons() {
-        icons.clear();
         String q = searchBox == null ? "" : searchBox.getValue().toLowerCase(Locale.ROOT).trim();
+
+        presets.clear();
+        for (IconCatalogue.Entry e : IconCatalogue.all()) {
+            if (q.isEmpty() || e.name().toLowerCase(Locale.ROOT).contains(q)
+                    || e.command().toLowerCase(Locale.ROOT).contains(q)) {
+                presets.add(e);
+            }
+        }
+
+        icons.clear();
         for (Item item : BuiltInRegistries.ITEM) {
             if (item == Items.AIR) {
                 continue;
@@ -129,6 +146,11 @@ public class InventoryButtonsScreen extends Screen {
                 icons.add(item);
             }
         }
+    }
+
+    /** How many entries the active picker tab holds. */
+    private int pickerSize() {
+        return presetTab ? presets.size() : icons.size();
     }
 
     private void syncBoxes() {
@@ -208,31 +230,48 @@ public class InventoryButtonsScreen extends Screen {
         }
 
         UiRender.text(g, font, "COMMAND", Fonts.SMALL, panelX + PAD, panelY + 12, t.textFaint());
-        UiRender.text(g, font, "ICON", Fonts.SMALL, panelX + PAD, panelY + 48, t.textFaint());
 
-        // Icon grid.
-        int start = iconScroll * ICON_COLS;
-        for (int i = 0; i < gridRows * ICON_COLS; i++) {
-            int idx = start + i;
-            if (idx >= icons.size()) {
-                break;
-            }
-            int col = i % ICON_COLS;
-            int row = i / ICON_COLS;
-            int x = panelX + PAD + col * STRIDE;
-            int y = gridTop + row * STRIDE;
-            Item item = icons.get(idx);
+        // Picker tabs.
+        int tabW = (PANEL_W - PAD * 2) / 2;
+        for (int i = 0; i < 2; i++) {
+            boolean active = (i == 0) == presetTab;
+            int tx = panelX + PAD + i * tabW;
+            int ty = panelY + 46;
+            UiRender.fillRounded(g, tx, ty, tabW - 2, 14, 4,
+                    active ? Theme.withAlpha(t.accent(), 0.30f) : t.surfaceAlt(), sm);
+            UiRender.textCentered(g, font, i == 0 ? "Presets" : "All items", Fonts.SMALL,
+                    tx + (tabW - 2) / 2, ty + 3, active ? t.accent() : t.textMuted());
+        }
+
+        int shown = Math.min(pickerSize() - iconScroll * ICON_COLS, gridRows * ICON_COLS);
+        for (int i = 0; i < Math.max(0, shown); i++) {
+            int idx = iconScroll * ICON_COLS + i;
+            int x = panelX + PAD + (i % ICON_COLS) * STRIDE;
+            int y = gridTop + (i / ICON_COLS) * STRIDE;
             boolean hover = UiRender.inside(mouseX, mouseY, x, y, SIZE, SIZE);
-            boolean current = BuiltInRegistries.ITEM.getKey(item).toString().equals(selected.icon);
+
+            String iconId;
+            if (presetTab) {
+                iconId = presets.get(idx).icon();
+            } else {
+                iconId = BuiltInRegistries.ITEM.getKey(icons.get(idx)).toString();
+            }
+            boolean current = iconId.equals(selected.icon);
             if (hover || current) {
                 UiRender.fillRounded(g, x, y, SIZE, SIZE, 3,
                         current ? Theme.withAlpha(t.accent(), 0.35f) : t.surfaceAlt(), sm);
             }
-            g.item(new ItemStack(item), x + 1, y + 1);
+            g.item(InventoryButtons.icon(iconId), x + 1, y + 1);
+
+            // A preset carries its command, so name it on hover - the grid alone is unreadable.
+            if (hover && presetTab) {
+                UiRender.text(g, font, presets.get(idx).name(), Fonts.SMALL,
+                        panelX + PAD, panelY + panelH - 34, t.text());
+            }
         }
-        if (icons.size() > gridRows * ICON_COLS) {
-            UiRender.text(g, font, "scroll for more", Fonts.SMALL,
-                    panelX + PAD, panelY + panelH - 34, t.textFaint());
+        if (pickerSize() > gridRows * ICON_COLS) {
+            UiRender.textRight(g, font, "scroll", Fonts.SMALL,
+                    panelX + PANEL_W - PAD, panelY + panelH - 34, t.textFaint());
         }
     }
 
@@ -289,21 +328,43 @@ public class InventoryButtonsScreen extends Screen {
     }
 
     private boolean pickIcon(double mx, double my) {
+        // Tabs first.
+        int tabW = (PANEL_W - PAD * 2) / 2;
+        for (int i = 0; i < 2; i++) {
+            if (UiRender.inside(mx, my, panelX + PAD + i * tabW, panelY + 46, tabW - 2, 14)) {
+                presetTab = (i == 0);
+                iconScroll = 0;
+                return true;
+            }
+        }
+
         int start = iconScroll * ICON_COLS;
         for (int i = 0; i < gridRows * ICON_COLS; i++) {
             int idx = start + i;
-            if (idx >= icons.size()) {
+            if (idx >= pickerSize()) {
                 break;
             }
             int x = panelX + PAD + (i % ICON_COLS) * STRIDE;
             int y = gridTop + (i / ICON_COLS) * STRIDE;
-            if (UiRender.inside(mx, my, x, y, SIZE, SIZE)) {
+            if (!UiRender.inside(mx, my, x, y, SIZE, SIZE)) {
+                continue;
+            }
+            if (presetTab) {
+                IconCatalogue.Entry e = presets.get(idx);
+                selected.icon = e.icon();
+                // A preset is icon plus command, so filling an empty command saves a step - but an
+                // edited one is left alone.
+                if (selected.command == null || selected.command.isBlank()) {
+                    selected.command = e.command();
+                    commandBox.setValue(e.command());
+                }
+            } else {
                 Identifier id = BuiltInRegistries.ITEM.getKey(icons.get(idx));
                 selected.icon = id.toString();
-                InventoryButtons.invalidateIcons();
-                ConfigManager.save();
-                return true;
             }
+            InventoryButtons.invalidateIcons();
+            ConfigManager.save();
+            return true;
         }
         return false;
     }
@@ -341,7 +402,7 @@ public class InventoryButtonsScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mx, double my, double dx, double dy) {
         if (selected != null && UiRender.inside(mx, my, panelX, gridTop, PANEL_W, gridRows * STRIDE)) {
-            int maxScroll = Math.max(0, (icons.size() + ICON_COLS - 1) / ICON_COLS - gridRows);
+            int maxScroll = Math.max(0, (pickerSize() + ICON_COLS - 1) / ICON_COLS - gridRows);
             iconScroll = Math.max(0, Math.min(maxScroll, iconScroll - (int) Math.signum(dy)));
             return true;
         }

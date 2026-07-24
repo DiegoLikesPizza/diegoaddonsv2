@@ -36,4 +36,8 @@ public interface ChatComponentAccessor {
 
     @Invoker("getLineHeight")
     int diego$getLineHeight();
+
+    /** Rebuilds the wrapped display lines after a message was removed from the backlog. */
+    @Invoker("refreshTrimmedMessages")
+    void diego$refreshTrimmedMessages();
 }

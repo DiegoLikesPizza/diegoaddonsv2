@@ -9,12 +9,14 @@ import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.modules.AnimationsModule;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
+import dev.diego.diegoaddons.module.modules.ChatCompactModule;
 import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
 import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CoordinatesModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
 import dev.diego.diegoaddons.module.modules.DirectionModule;
+import dev.diego.diegoaddons.module.modules.HideEffectsModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
@@ -82,6 +84,8 @@ public final class ModuleManager {
         register(new InventoryButtonsModule(), false);
         register(new ChatHistoryModule(), false);
         register(new ChatSearchModule(), false);
+        register(new ChatCompactModule(), false);
+        register(new HideEffectsModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
@@ -134,6 +138,7 @@ public final class ModuleManager {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             TpsTracker.reset();
             dev.diego.diegoaddons.util.SkyblockHud.reset();
+            dev.diego.diegoaddons.util.ChatCompactor.reset();
         });
 
         DiegoAddonsV2Client.LOGGER.info("[DiegoAddons V2] {} modules registered", MODULES.size());
