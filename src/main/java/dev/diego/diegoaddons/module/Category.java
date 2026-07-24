@@ -4,6 +4,7 @@ package dev.diego.diegoaddons.module;
 public enum Category {
     RENDER("Render"),
     HUD("HUD"),
+    DUNGEONS("Dungeons"),
     MISC("Misc");
 
     public final String display;
