@@ -44,7 +44,7 @@ public class PuzzleSolversModule extends Module {
     }
 
     public PuzzleSolversModule() {
-        super("puzzlesolvers", Category.MISC, "Puzzle Solvers",
+        super("puzzlesolvers", Category.DUNGEONS, "Puzzle Solvers",
                 "Solve dungeon puzzles that can be answered from chat.");
         settings.add(quiz);
         settings.add(weirdos);
