@@ -17,13 +17,13 @@ import java.util.regex.Pattern;
  * Higher/Lower blaze puzzle: highlights the blaze to shoot next.
  *
  * <p>The blazes carry their health in the name plate above them, so the order itself is read from
- * those. Which <i>end</i> of the order to start at is the hard part: the dungeon tab list only ever
- * calls the puzzle "Higher Or Lower", and there is no sign in the room. It is taken from the
- * instruction hologram instead - SkyBlock writes that kind of text as a named armour stand, which is
- * also how the health plates are drawn.
+ * those. Which <i>end</i> of the order to start at cannot be read anywhere in the room: the tab list
+ * only ever calls the puzzle "Higher Or Lower", and there is no sign or hologram naming the variant.
+ * It comes from identifying the <b>room</b> instead - "Higher Blaze" or "Lower Blaze" - which is how
+ * every established dungeon mod solves this. See {@link DungeonRooms}.
  *
- * <p>Until that text has been seen the solver highlights nothing, rather than guessing an order and
- * being confidently wrong. The manual setting is the escape hatch if the wording ever changes.
+ * <p>Until the room is identified the solver highlights nothing, rather than guessing an order and
+ * being confidently wrong.
  */
 public final class BlazeSolver {
     /** "[Lv15] Blaze 1,234/5,678❤" - the health plate above each blaze. */
@@ -56,11 +56,18 @@ public final class BlazeSolver {
         if (mod == null || !mod.isEnabled() || !mod.blaze() || mc.level == null || mc.player == null) {
             return;
         }
-        List<Blaze> blazes = new ArrayList<>();
-        Boolean order = scan(mc, blazes);
-        if (order != null) {
-            highestFirst = order;
+        DungeonRooms.tick(mc);
+        String room = DungeonRooms.currentRoomName();
+        if (room != null) {
+            if (room.equals("Higher Blaze")) {
+                highestFirst = Boolean.TRUE;
+            } else if (room.equals("Lower Blaze")) {
+                highestFirst = Boolean.FALSE;
+            }
         }
+
+        List<Blaze> blazes = new ArrayList<>();
+        scan(mc, blazes);
         if (blazes.size() < 2) {
             return;   // not the puzzle, or it is already finished
         }
@@ -83,14 +90,8 @@ public final class BlazeSolver {
     private record Blaze(int health, AABB box) {
     }
 
-    /**
-     * One pass over the nearby armour stands: they carry both the health plates and the instruction
-     * hologram, so both come out of the same scan.
-     *
-     * @return the detected order, or null when the instruction text was not among them
-     */
-    private static Boolean scan(Minecraft mc, List<Blaze> out) {
-        Boolean order = null;
+    /** Collects the nearby blazes from their health plates. */
+    private static void scan(Minecraft mc, List<Blaze> out) {
         AABB area = mc.player.getBoundingBox().inflate(RANGE);
         for (Entity e : mc.level.getEntities(mc.player, area)) {
             if (!(e instanceof ArmorStand stand) || !stand.hasCustomName()) {
@@ -109,52 +110,8 @@ public final class BlazeSolver {
                 } catch (NumberFormatException ignored) {
                     // A plate that does not parse is simply not a blaze we can order.
                 }
-                continue;
-            }
-
-            Boolean fromText = readOrder(name);
-            if (fromText != null) {
-                order = fromText;
             }
         }
-        return order;
     }
 
-    /**
-     * Reads the puzzle's instruction text.
-     *
-     * <p>When both directions are named - "from HIGHEST to LOWEST" - the one mentioned <b>first</b>
-     * is where you start, so the earlier word wins rather than the sentence being discarded as
-     * ambiguous.
-     */
-    static Boolean readOrder(String text) {
-        String t = text.toLowerCase(Locale.ROOT);
-        if (!t.contains("blaze") && !t.contains("health") && !t.contains("order")) {
-            return null;   // not the instruction, just some other hologram
-        }
-        int high = firstIndex(t, "highest", "higher");
-        int low = firstIndex(t, "lowest", "lower");
-        if (high < 0 && low < 0) {
-            return null;
-        }
-        if (high < 0) {
-            return Boolean.FALSE;
-        }
-        if (low < 0) {
-            return Boolean.TRUE;
-        }
-        return high < low;
-    }
-
-    /** The earliest position any of the words appears at, or -1. */
-    private static int firstIndex(String text, String... words) {
-        int best = -1;
-        for (String w : words) {
-            int i = text.indexOf(w);
-            if (i >= 0 && (best < 0 || i < best)) {
-                best = i;
-            }
-        }
-        return best;
-    }
 }
