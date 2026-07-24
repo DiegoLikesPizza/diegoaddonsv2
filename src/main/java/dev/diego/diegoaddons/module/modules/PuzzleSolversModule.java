@@ -26,6 +26,8 @@ public class PuzzleSolversModule extends Module {
             new BooleanSetting(this, "blaze", "Higher Or Lower (Blaze)", true);
     private final BooleanSetting blazeShowAll =
             new BooleanSetting(this, "blazeAll", "Blaze: show whole order", true);
+    private final BooleanSetting beams =
+            new BooleanSetting(this, "beams", "Creeper Beams", true);
     /**
      * Only consulted when the puzzle's own instruction text was not found. Off means "do not guess":
      * a wrong order is worse than no highlight, since it reads as confident and is not.
@@ -41,6 +43,7 @@ public class PuzzleSolversModule extends Module {
     @Override
     public void onClientTick(net.minecraft.client.Minecraft mc) {
         dev.diego.diegoaddons.util.BlazeSolver.tick(mc);
+        dev.diego.diegoaddons.util.BeamsSolver.tick(mc);
     }
 
     public PuzzleSolversModule() {
@@ -50,6 +53,7 @@ public class PuzzleSolversModule extends Module {
         settings.add(weirdos);
         settings.add(blaze);
         settings.add(blazeShowAll);
+        settings.add(beams);
         settings.add(blazeGuess);
         settings.add(blazeGuessHighest);
         settings.add(announceToParty);
@@ -66,6 +70,10 @@ public class PuzzleSolversModule extends Module {
 
     public boolean blaze() {
         return blaze.get();
+    }
+
+    public boolean beams() {
+        return beams.get();
     }
 
     public boolean blazeShowAll() {

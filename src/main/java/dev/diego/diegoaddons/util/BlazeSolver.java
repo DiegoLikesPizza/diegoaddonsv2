@@ -31,9 +31,11 @@ public final class BlazeSolver {
     /** How far to look for the blazes and the instruction hologram. */
     private static final double RANGE = 40.0;
 
-    private static final int NEXT = 0x8000FF00;
-    private static final int SECOND = 0x80FFFF00;
-    private static final int REST = 0x30FFFFFF;
+    private static final int NEXT = 0xFF00FF00;
+    private static final int SECOND = 0xFFFFFF00;
+    private static final int REST = 0x80FFFFFF;
+    /** Edge width in blocks. A vanilla line is about an eighth of this at arm's length. */
+    private static final double EDGE = 0.08;
 
     /** True when the room wants the highest health shot first; null until the room says so. */
     private static Boolean highestFirst;
@@ -83,7 +85,7 @@ public final class BlazeSolver {
         int shown = mod.blazeShowAll() ? blazes.size() : Math.min(2, blazes.size());
         for (int i = 0; i < shown; i++) {
             int color = i == 0 ? NEXT : (i == 1 ? SECOND : REST);
-            WorldRender.filledBox(blazes.get(i).box, color, true);
+            WorldRender.thickBox(blazes.get(i).box, color, EDGE, true);
         }
     }
 
