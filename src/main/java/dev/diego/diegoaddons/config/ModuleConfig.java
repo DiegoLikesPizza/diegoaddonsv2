@@ -23,6 +23,9 @@ public class ModuleConfig {
      */
     public Map<String, Integer> keys = new HashMap<>();
 
+    /** Feature-specific numeric settings, keyed by the setting key. */
+    public Map<String, Double> numbers = new HashMap<>();
+
     public ModuleConfig() {
     }
 

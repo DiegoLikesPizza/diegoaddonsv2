@@ -5,6 +5,7 @@ import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.KeybindSetting;
 import dev.diego.diegoaddons.module.Module;
+import dev.diego.diegoaddons.module.NumberSetting;
 import dev.diego.diegoaddons.module.ModuleManager;
 import dev.diego.diegoaddons.module.Setting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -63,6 +64,8 @@ public class ClickGuiScreen extends Screen {
     private static final int CARET_W = 20;      // room for the ▾ marker inside the theme chip
     private static final int MENU_ROW_H = 46;
     private static final int MENU_PAD = 6;
+    private static final int SLIDER_TOP = 26;   // label row height inside a settings row
+    private static final int SLIDER_H = 10;
 
     // Relative column weights; the actual widths are these shares of the available inner width.
     private static final float CAT_SHARE = 220f / 1040f;
@@ -73,6 +76,8 @@ public class ClickGuiScreen extends Screen {
     private boolean themeOpen;
     /** Index into {@code sets} of the keybind row waiting for a key, or -1. */
     private int bindingRow = -1;
+    /** Index into {@code sets} of the slider being dragged, or -1. */
+    private int sliderRow = -1;
 
     // Scroll offsets, in whole rows, one per column.
     private int catScroll, modScroll, setScroll;
@@ -109,6 +114,7 @@ public class ClickGuiScreen extends Screen {
         }
         sets = settingsModule != null ? settingsModule.settings() : List.of();
         bindingRow = -1;
+        sliderRow = -1;
 
         int maxW = width * S;
         int maxH = height * S;
@@ -374,6 +380,8 @@ public class ClickGuiScreen extends Screen {
                 pill(g, setX + setW - 18 - 46, ry + (SET_ROW_H - 26) / 2, 46, 26, bs.get(), t, sm);
             } else if (s instanceof KeybindSetting ks) {
                 keyChip(g, t, sm, ks, ry, k == bindingRow);
+            } else if (s instanceof NumberSetting ns) {
+                slider(g, t, sm, ns, ry, mx, my);
             }
         }
         scrollbar(g, t, sm, setX + setW - BAR_W, y0, SET_ROW_H, sets.size(), setRows, setScroll);
@@ -393,6 +401,37 @@ public class ClickGuiScreen extends Screen {
         int thumbH = Math.max(BAR_W * 3, h * visible / total);
         int thumbY = top + (h - thumbH) * scroll / (total - visible);
         UiRender.fillRounded(g, x, thumbY, BAR_W, thumbH, BAR_W / 2, Theme.withAlpha(t.accent(), 0.75f), sm);
+    }
+
+    /**
+     * A numeric setting: the value right-aligned on the label row, with a full-width track beneath
+     * it. The track spans the whole row so it is easy to hit, rather than a thin handle.
+     */
+    private void slider(GuiGraphicsExtractor g, Theme t, boolean sm, NumberSetting ns, int ry, int mx, int my) {
+        UiRender.textRight(g, font, ns.display(), Fonts.UI_BODY, setX + setW - 18,
+                Fonts.centerTop(ry, SLIDER_TOP, Fonts.UI_BODY_SZ), t.accent());
+
+        int x = setX + 18;
+        int w = setW - 36;
+        int y = ry + SLIDER_TOP + 6;
+        boolean hot = UiRender.inside(mx, my, setX, ry, setW, SET_ROW_H);
+        UiRender.fillRounded(g, x, y, w, SLIDER_H, SLIDER_H / 2,
+                Theme.withAlpha(t.textFaint(), 0.35f), sm);
+        int filled = (int) Math.round(w * ns.fraction());
+        if (filled > 0) {
+            UiRender.fillRoundedGradient(g, x, y, filled, SLIDER_H, SLIDER_H / 2,
+                    t.accent(), t.accentTo(), sm);
+        }
+        int knobR = hot ? 9 : 7;
+        UiRender.circle(g, x + filled, y + SLIDER_H / 2, knobR, t.accentText(), sm);
+        UiRender.circle(g, x + filled, y + SLIDER_H / 2, knobR - 3, t.accent(), sm);
+    }
+
+    /** Drives a slider from a mouse position on its row. */
+    private void dragSlider(NumberSetting ns, int mx) {
+        int x = setX + 18;
+        int w = setW - 36;
+        ns.setFraction(w > 0 ? (mx - x) / (double) w : 0);
     }
 
     /**
@@ -514,6 +553,9 @@ public class ClickGuiScreen extends Screen {
                         bs.toggle();
                     } else if (sets.get(k) instanceof KeybindSetting) {
                         bindingRow = (bindingRow == k) ? -1 : k;   // click again to cancel
+                    } else if (sets.get(k) instanceof NumberSetting ns) {
+                        sliderRow = k;
+                        dragSlider(ns, mx);
                     }
                     return true;
                 }
@@ -545,6 +587,25 @@ public class ClickGuiScreen extends Screen {
             return true;
         }
         return super.keyPressed(event);
+    }
+
+    /** Keeps a slider following the cursor once grabbed, even outside its row. */
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        if (sliderRow >= 0 && sliderRow < sets.size() && sets.get(sliderRow) instanceof NumberSetting ns) {
+            dragSlider(ns, (int) Math.round(event.x() * S));
+            return true;
+        }
+        return super.mouseDragged(event, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        if (sliderRow >= 0) {
+            sliderRow = -1;
+            return true;
+        }
+        return super.mouseReleased(event);
     }
 
     /** Scrolls whichever column the cursor is over; the window itself never resizes. */

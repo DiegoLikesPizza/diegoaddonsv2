@@ -10,7 +10,9 @@
     "ChatComponentMixin",
     "ChatScreenMixin",
     "ClientPacketListenerMixin",
-    "HumanoidArmorLayerMixin"
+    "HumanoidArmorLayerMixin",
+    "ItemInHandRendererMixin",
+    "LivingEntitySwingMixin"
   ],
   "injectors": {
     "defaultRequire": 1
