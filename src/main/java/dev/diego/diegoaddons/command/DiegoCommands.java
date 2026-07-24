@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.diego.diegoaddons.gui.BlockedPlayersScreen;
 import dev.diego.diegoaddons.gui.ClickGuiScreen;
+import dev.diego.diegoaddons.gui.CommandHotkeysScreen;
 import dev.diego.diegoaddons.gui.HudEditorScreen;
 import dev.diego.diegoaddons.gui.InventoryButtonsScreen;
 import dev.diego.diegoaddons.gui.ReplaceWordsScreen;
@@ -41,6 +42,7 @@ public final class DiegoCommands {
             new Help("hud", "Open the HUD editor"),
             new Help("invbuttons", "Open the inventory button editor"),
             new Help("words", "Open the word replacement list"),
+            new Help("hotkeys", "Open the command hotkey list"),
             new Help("blocked", "Open the blocked player list"),
             new Help("block <player> [reason]", "Block a player, optionally with a reason"),
             new Help("unblock <player>", "Unblock a player"));
@@ -67,6 +69,8 @@ public final class DiegoCommands {
                         .executes(c -> open(() -> new InventoryButtonsScreen(null))))
                 .then(ClientCommands.literal("words")
                         .executes(c -> open(() -> new ReplaceWordsScreen(null))))
+                .then(ClientCommands.literal("hotkeys")
+                        .executes(c -> open(() -> new CommandHotkeysScreen(null))))
                 .then(ClientCommands.literal("blocked")
                         .executes(c -> open(() -> new BlockedPlayersScreen(null))))
                 .then(ClientCommands.literal("block")
