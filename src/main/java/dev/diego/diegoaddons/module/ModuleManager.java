@@ -25,6 +25,7 @@ import dev.diego.diegoaddons.module.modules.WardrobeOverlayModule;
 import dev.diego.diegoaddons.util.EquipmentOverlay;
 import dev.diego.diegoaddons.util.InventoryButtons;
 import dev.diego.diegoaddons.util.OldMasterStars;
+import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.util.TpsTracker;
 import dev.diego.diegoaddons.util.WardrobeOverlay;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -123,6 +124,7 @@ public final class ModuleManager {
                     WardrobeOverlay.render((AbstractContainerScreen<?>) scr, g);
                     EquipmentOverlay.render((AbstractContainerScreen<?>) scr, g, mx, my);
                     InventoryButtons.render((AbstractContainerScreen<?>) scr, g, mx, my);
+                    Toasts.render(g);
                 });
                 // Deny the click to the menu when it lands on one of our buttons, so the button
                 // press cannot also be read as a click on the slot behind it.
@@ -332,6 +334,12 @@ public final class ModuleManager {
         Font font = mc.font;
         for (HudModule hud : enabledHudModules()) {
             drawElement(g, font, t, smooth, hud, mc, hudX(hud), hudY(hud), false);
+        }
+        // Toasts, except on the screens that draw them themselves - those sit above the HUD (and
+        // dim it), so drawing here too would show a faded ghost behind the crisp one.
+        if (!(mc.screen instanceof dev.diego.diegoaddons.gui.ChatSearchScreen)
+                && !(mc.screen instanceof AbstractContainerScreen<?>)) {
+            Toasts.render(g);
         }
     }
 }

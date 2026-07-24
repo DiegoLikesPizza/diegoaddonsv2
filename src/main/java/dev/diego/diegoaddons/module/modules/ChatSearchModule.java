@@ -20,18 +20,25 @@ public class ChatSearchModule extends Module {
 
     private final BooleanSetting caseSensitive =
             new BooleanSetting(this, "caseSensitive", "Case sensitive", false);
+    private final BooleanSetting ctrlClickCopy =
+            new BooleanSetting(this, "ctrlClickCopy", "Ctrl+click to copy", true);
 
     private boolean wasDown;
 
     public ChatSearchModule() {
         super("chatsearch", Category.MISC, "Chat Search",
-                "Press Ctrl+F to search everything in your chat history.");
+                "Ctrl+F searches your chat; Ctrl+click a message to copy it.");
         settings.add(caseSensitive);
+        settings.add(ctrlClickCopy);
         INSTANCE = this;
     }
 
     public boolean caseSensitive() {
         return caseSensitive.get();
+    }
+
+    public boolean ctrlClickCopy() {
+        return ctrlClickCopy.get();
     }
 
     @Override
