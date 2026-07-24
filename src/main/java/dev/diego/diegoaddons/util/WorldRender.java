@@ -28,8 +28,8 @@ import java.util.List;
  * is subtracted here so callers can work in plain world coordinates.
  */
 public final class WorldRender {
-    /** One queued box: where, what colour, and whether it shows through walls. */
-    private record Box(AABB box, int argb, boolean throughWalls) {
+    /** One queued box: where, what colour, whether it shows through walls, and whether it is solid. */
+    private record Box(AABB box, int argb, boolean throughWalls, boolean filled) {
     }
 
     private static final List<Box> QUEUE = new ArrayList<>();
@@ -47,11 +47,26 @@ public final class WorldRender {
         LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(WorldRender::draw);
     }
 
-    /** Queues a box for this frame. Call every frame it should stay visible. */
+    /** Queues an outlined box for this frame. Call every frame it should stay visible. */
     public static void box(AABB box, int argb, boolean throughWalls) {
         synchronized (QUEUE) {
-            QUEUE.add(new Box(box, argb, throughWalls));
+            QUEUE.add(new Box(box, argb, throughWalls, false));
         }
+    }
+
+    /**
+     * Queues a solid box. Lines render one pixel wide whatever the distance, which is far too faint
+     * to pick out mid-fight, so anything that has to be seen quickly is drawn filled and outlined.
+     */
+    public static void filledBox(AABB box, int argb, boolean throughWalls) {
+        synchronized (QUEUE) {
+            QUEUE.add(new Box(box, argb, throughWalls, true));
+            QUEUE.add(new Box(box, opaque(argb), throughWalls, false));
+        }
+    }
+
+    private static int opaque(int argb) {
+        return 0xFF000000 | (argb & 0x00FFFFFF);
     }
 
     /** Queues a one-block box around a position. */
@@ -85,11 +100,38 @@ public final class WorldRender {
 
         // Translucent lines ignore depth, which is what "through walls" needs.
         for (Box b : boxes) {
-            VertexConsumer vc = buffers.getBuffer(
-                    b.throughWalls() ? RenderTypes.linesTranslucent() : RenderTypes.lines());
-            ShapeRenderer.renderShape(pose, vc, Shapes.create(b.box()),
-                    -cam.x, -cam.y, -cam.z, b.argb(), 1.0f);
+            if (b.filled()) {
+                fill(pose, buffers.getBuffer(RenderTypes.debugFilledBox()), b.box(), b.argb(), cam);
+            } else {
+                VertexConsumer vc = buffers.getBuffer(
+                        b.throughWalls() ? RenderTypes.linesTranslucent() : RenderTypes.lines());
+                ShapeRenderer.renderShape(pose, vc, Shapes.create(b.box()),
+                        -cam.x, -cam.y, -cam.z, b.argb(), 1.0f);
+            }
         }
         buffers.endBatch();
+    }
+
+    /** The six faces of a box, wound so it is solid from any side. */
+    private static void fill(PoseStack pose, VertexConsumer vc, AABB b, int argb, Vec3 cam) {
+        PoseStack.Pose p = pose.last();
+        float x1 = (float) (b.minX - cam.x), y1 = (float) (b.minY - cam.y), z1 = (float) (b.minZ - cam.z);
+        float x2 = (float) (b.maxX - cam.x), y2 = (float) (b.maxY - cam.y), z2 = (float) (b.maxZ - cam.z);
+
+        quad(vc, p, argb, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1);   // north
+        quad(vc, p, argb, x2, y1, z2, x2, y2, z2, x1, y2, z2, x1, y1, z2);   // south
+        quad(vc, p, argb, x1, y1, z2, x1, y2, z2, x1, y2, z1, x1, y1, z1);   // west
+        quad(vc, p, argb, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2);   // east
+        quad(vc, p, argb, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2);   // bottom
+        quad(vc, p, argb, x1, y2, z2, x2, y2, z2, x2, y2, z1, x1, y2, z1);   // top
+    }
+
+    private static void quad(VertexConsumer vc, PoseStack.Pose p, int argb,
+                             float ax, float ay, float az, float bx, float by, float bz,
+                             float cx, float cy, float cz, float dx, float dy, float dz) {
+        vc.addVertex(p, ax, ay, az).setColor(argb);
+        vc.addVertex(p, bx, by, bz).setColor(argb);
+        vc.addVertex(p, cx, cy, cz).setColor(argb);
+        vc.addVertex(p, dx, dy, dz).setColor(argb);
     }
 }

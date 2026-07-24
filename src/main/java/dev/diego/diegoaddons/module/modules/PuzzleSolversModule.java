@@ -26,9 +26,14 @@ public class PuzzleSolversModule extends Module {
             new BooleanSetting(this, "blaze", "Higher Or Lower (Blaze)", true);
     private final BooleanSetting blazeShowAll =
             new BooleanSetting(this, "blazeAll", "Blaze: show whole order", true);
-    /** Only used when the room's sign could not be read. */
-    private final BooleanSetting blazeHighestFirst =
-            new BooleanSetting(this, "blazeHigh", "Blaze: highest first (fallback)", true);
+    /**
+     * Only consulted when the puzzle's own instruction text was not found. Off means "do not guess":
+     * a wrong order is worse than no highlight, since it reads as confident and is not.
+     */
+    private final BooleanSetting blazeGuess =
+            new BooleanSetting(this, "blazeGuess", "Blaze: guess order if unknown", false);
+    private final BooleanSetting blazeGuessHighest =
+            new BooleanSetting(this, "blazeHigh", "Blaze: guess highest first", true);
     /** Off by default: it speaks in party chat, which is not something to switch on silently. */
     private final BooleanSetting announceToParty =
             new BooleanSetting(this, "announce", "Announce in party chat", false);
@@ -45,7 +50,8 @@ public class PuzzleSolversModule extends Module {
         settings.add(weirdos);
         settings.add(blaze);
         settings.add(blazeShowAll);
-        settings.add(blazeHighestFirst);
+        settings.add(blazeGuess);
+        settings.add(blazeGuessHighest);
         settings.add(announceToParty);
         INSTANCE = this;
     }
@@ -66,8 +72,9 @@ public class PuzzleSolversModule extends Module {
         return blazeShowAll.get();
     }
 
-    public boolean blazeHighestFirst() {
-        return blazeHighestFirst.get();
+    /** The fallback order, or null when guessing is switched off. */
+    public Boolean blazeFallbackOrder() {
+        return blazeGuess.get() ? blazeGuessHighest.get() : null;
     }
 
     public boolean announceToParty() {
