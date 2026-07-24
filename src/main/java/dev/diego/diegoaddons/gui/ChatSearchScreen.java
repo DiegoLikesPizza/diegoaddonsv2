@@ -126,6 +126,8 @@ public class ChatSearchScreen extends Screen {
                     panelX + PAD, panelY + panelH - 12, t.textFaint());
         }
         super.extractRenderState(g, mouseX, mouseY, partialTick);
+        // On top of our own scrim, so the confirmation is not dimmed by it.
+        dev.diego.diegoaddons.util.Toasts.render(g);
     }
 
     /** Cuts a message to the panel width, since results are single-line rows. */
@@ -153,6 +155,7 @@ public class ChatSearchScreen extends Screen {
                 minecraft.keyboardHandler.setClipboard(results.get(i));
                 copied = i;
                 copiedAt = System.currentTimeMillis();
+                dev.diego.diegoaddons.util.Toasts.show("Copied to clipboard", results.get(i));
                 return true;
             }
         }
