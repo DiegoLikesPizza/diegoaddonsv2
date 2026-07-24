@@ -1,0 +1,26 @@
+package dev.diego.diegoaddons.config;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/** Persisted per-module state: enabled flag, HUD position, and arbitrary boolean settings. */
+public class ModuleConfig {
+    public boolean enabled = false;
+
+    /** HUD position in GUI pixels; {@code -1} means "unset" (use the default stacked position). */
+    public int hudX = -1;
+    public int hudY = -1;
+
+    /** HUD chip scale multiplier (1.0 = default), adjusted with the scroll wheel in the HUD editor. */
+    public float hudScale = 1.0f;
+
+    /** Feature-specific boolean settings, keyed by the setting key. */
+    public Map<String, Boolean> options = new HashMap<>();
+
+    public ModuleConfig() {
+    }
+
+    public ModuleConfig(boolean enabled) {
+        this.enabled = enabled;
+    }
+}

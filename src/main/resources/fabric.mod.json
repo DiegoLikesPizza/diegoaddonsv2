@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "diegoaddonsv2",
+  "version": "${version}",
+  "name": "DiegoAddons V2",
+  "description": "A custom themed GUI toolkit with rounded corners, multiple color themes, and a first-run introduction screen.",
+  "authors": [
+    "diego"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.diego.diegoaddons.DiegoAddonsV2Client"
+    ]
+  },
+  "mixins": [
+    "diegoaddonsv2.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.1.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

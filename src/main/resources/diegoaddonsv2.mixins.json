@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.diego.diegoaddons.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "AbstractContainerScreenAccessor",
+    "AvatarRendererMixin",
+    "ClientPacketListenerMixin",
+    "HumanoidArmorLayerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
