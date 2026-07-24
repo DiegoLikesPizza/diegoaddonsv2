@@ -26,9 +26,6 @@ public class HumanoidArmorLayerMixin {
     private void diego$hideArmor(PoseStack pose, SubmitNodeCollector collector, int light,
                                  HumanoidRenderState state, float limbSwing, float limbSwingAmount,
                                  CallbackInfo ci) {
-        if (dev.diego.diegoaddons.util.RenderContext.wardrobePreview) {
-            return; // never hide armour on the wardrobe preview mannequins
-        }
         ArmorHiderModule mod = ArmorHiderModule.INSTANCE;
         if (mod == null || !mod.isEnabled()) {
             return;

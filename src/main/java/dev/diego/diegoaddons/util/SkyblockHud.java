@@ -137,7 +137,7 @@ public final class SkyblockHud {
      * <i>last</i> coloured run of the name, because prefixes such as a pet's grey "[Lvl 100]" come
      * first and would otherwise win. Falls back to white.
      */
-    public static int nameColour(ItemStack stack) {
+    private static int nameColour(ItemStack stack) {
         int[] colour = {0xFFFFFFFF};
         stack.getHoverName().visit((style, text) -> {
             TextColor c = style.getColor();
@@ -147,11 +147,6 @@ public final class SkyblockHud {
             return Optional.empty();
         }, Style.EMPTY);
         return colour[0];
-    }
-
-    /** True for an item marked as belonging to the currently worn equipment set. */
-    public static boolean isEquipped(ItemStack stack) {
-        return loreContains(stack, EQUIPPED_MARKER);
     }
 
     /** "1,234,567" -> "1.2M", so the XP line stays narrow enough for a HUD element. */
@@ -258,11 +253,8 @@ public final class SkyblockHud {
         }
     }
 
-    /** Display names for the equipment categories, indexed like {@link #categoryOf}. */
-    public static final String[] CATEGORY_NAMES = {"Necklace", "Cloak", "Belt", "Gloves"};
-
     /** @return equipment category index (0..3), or -1 if this isn't an equipment piece. */
-    public static int categoryOf(ItemStack stack) {
+    private static int categoryOf(ItemStack stack) {
         List<String> lore = loreOf(stack);
         if (lore.isEmpty()) {
             return -1;
@@ -285,7 +277,7 @@ public final class SkyblockHud {
     }
 
     /** True when any lore line contains {@code needle} (lower-case, colour codes already stripped). */
-    public static boolean loreContains(ItemStack stack, String needle) {
+    private static boolean loreContains(ItemStack stack, String needle) {
         for (String line : loreOf(stack)) {
             if (line.toLowerCase(Locale.ROOT).contains(needle)) {
                 return true;

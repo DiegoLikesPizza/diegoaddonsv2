@@ -24,9 +24,6 @@ public class AvatarRendererMixin {
             at = @At("RETURN"),
             cancellable = true)
     private void diego$replaceSkin(AvatarRenderState state, CallbackInfoReturnable<Identifier> cir) {
-        if (dev.diego.diegoaddons.util.RenderContext.wardrobePreview) {
-            return; // leave the wardrobe preview mannequins with their default skin
-        }
         SkinChangerModule mod = SkinChangerModule.INSTANCE;
         if (mod == null || !mod.isEnabled()) {
             return;
