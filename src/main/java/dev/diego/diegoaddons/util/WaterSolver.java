@@ -28,9 +28,9 @@ import java.util.Locale;
  * of the five wool slots are extended, and which of four board patterns is built - told apart by
  * probing the blocks the patterns differ in.
  *
- * <p>The solution is a list of levers with times, so it is announced <b>in chat as an ordered list
- * with its timings</b> and the levers are boxed in that order, brightest first. Timings matter here
- * as much as order, and a box alone cannot carry "wait 7.9 seconds".
+ * <p>The solution is a list of levers with times. Each lever's remaining times float above it as a
+ * live countdown, measured against the server's own tick clock ({@link ServerTicks}) so it stays
+ * right through lag, and the full order is also announced once in chat.
  */
 public final class WaterSolver {
     private static final double LINE = 0.06;
@@ -81,9 +81,8 @@ public final class WaterSolver {
     private static final List<Step> STEPS = new ArrayList<>();
     private static String lastRoom;
     private static boolean scanned;
-    /** Tick the water gate was opened, or -1 while it is still shut. */
-    private static int openedAt = -1;
-    private static int ticks;
+    /** Server-tick the water gate was opened, or -1 while it is still shut. */
+    private static long openedAt = -1;
 
     private WaterSolver() {
     }
@@ -93,7 +92,6 @@ public final class WaterSolver {
         lastRoom = null;
         scanned = false;
         openedAt = -1;
-        ticks = 0;
         for (Lever l : Lever.values()) {
             l.used = 0;
         }
@@ -111,7 +109,7 @@ public final class WaterSolver {
             BlockPos pos = DungeonRooms.toWorld(l.rel);
             if (pos != null && pos.equals(clicked)) {
                 if (l == Lever.WATER && openedAt == -1) {
-                    openedAt = ticks;
+                    openedAt = ServerTicks.get();
                 }
                 l.used++;
                 return;
@@ -140,7 +138,6 @@ public final class WaterSolver {
         if (!scanned) {
             scan(mc, mod);
         }
-        ticks++;
         draw(mc);
     }
 
@@ -169,7 +166,7 @@ public final class WaterSolver {
                     now = dueTicks == 0;
                     text = now ? "§a§lCLICK ME!" : "§e" + time + "s";
                 } else {
-                    int left = openedAt + dueTicks - ticks;
+                    long left = openedAt + dueTicks - ServerTicks.get();
                     now = left <= 0;
                     text = now ? "§a§lCLICK ME!"
                             : "§e" + String.format(Locale.ROOT, "%.1f", left / 20f) + "s";
