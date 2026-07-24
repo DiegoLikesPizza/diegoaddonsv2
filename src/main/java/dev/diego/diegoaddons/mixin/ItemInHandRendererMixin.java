@@ -19,6 +19,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <p>The transform is wrapped in its own push/pop pair rather than applied in place. Both hands are
  * drawn through this method from a shared pose, so leaking the transform past the first call would
  * apply it twice to the off-hand. The pop runs on every return path, not just the last one.
+ *
+ * <p>With "exclude empty hand" on the transform is skipped for the bare arm. Vanilla only draws the
+ * arm on its own when the hand is empty - every other path here draws an item - so testing the stack
+ * is enough to tell the two apart.
  */
 @Mixin(ItemInHandRenderer.class)
 public class ItemInHandRendererMixin {
@@ -34,6 +38,9 @@ public class ItemInHandRendererMixin {
         AnimationsModule mod = AnimationsModule.INSTANCE;
         if (mod == null || !mod.isEnabled()) {
             return;
+        }
+        if (mod.excludeHand() && stack.isEmpty()) {
+            return;   // bare arm: leave it exactly where vanilla puts it
         }
         pose.translate(mod.x(), mod.y(), mod.z());
         float s = mod.scale();

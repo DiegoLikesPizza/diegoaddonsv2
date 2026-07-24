@@ -1,5 +1,6 @@
 package dev.diego.diegoaddons.module.modules;
 
+import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.NumberSetting;
@@ -24,6 +25,9 @@ public class AnimationsModule extends Module {
     /** 1.0 is vanilla speed, 0.0 stops the swing entirely, 3.0 is three times as fast. */
     private final NumberSetting swingSpeed =
             new NumberSetting(this, "swingSpeed", "Swing speed", 1.0, 0.0, 3.0, 0.05);
+    /** Leaves the bare arm alone, so only held items are moved and resized. */
+    private final BooleanSetting excludeHand =
+            new BooleanSetting(this, "excludeHand", "Exclude empty hand", false);
 
     public AnimationsModule() {
         super("animations", Category.RENDER, "Animations",
@@ -33,6 +37,7 @@ public class AnimationsModule extends Module {
         settings.add(y);
         settings.add(z);
         settings.add(swingSpeed);
+        settings.add(excludeHand);
         INSTANCE = this;
     }
 
@@ -54,5 +59,9 @@ public class AnimationsModule extends Module {
 
     public double swingSpeed() {
         return swingSpeed.get();
+    }
+
+    public boolean excludeHand() {
+        return excludeHand.get();
     }
 }
