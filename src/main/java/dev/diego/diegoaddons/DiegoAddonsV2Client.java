@@ -36,6 +36,7 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
         ConfigManager.load();
         SkinChanger.ensureFolder();
         ModuleManager.init();
+        dev.diego.diegoaddons.util.WorldRender.init();
         dev.diego.diegoaddons.command.DiegoCommands.register();
 
         OPEN_MENU = KeyMappingHelper.registerKeyMapping(new KeyMapping(
