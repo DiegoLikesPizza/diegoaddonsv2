@@ -3,6 +3,7 @@ package dev.diego.diegoaddons.gui;
 import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
+import dev.diego.diegoaddons.module.KeybindSetting;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.ModuleManager;
 import dev.diego.diegoaddons.module.Setting;
@@ -70,6 +71,8 @@ public class ClickGuiScreen extends Screen {
     private int catIndex = 0;
     private Module settingsModule;
     private boolean themeOpen;
+    /** Index into {@code sets} of the keybind row waiting for a key, or -1. */
+    private int bindingRow = -1;
 
     // Scroll offsets, in whole rows, one per column.
     private int catScroll, modScroll, setScroll;
@@ -105,6 +108,7 @@ public class ClickGuiScreen extends Screen {
             settingsModule = null;
         }
         sets = settingsModule != null ? settingsModule.settings() : List.of();
+        bindingRow = -1;
 
         int maxW = width * S;
         int maxH = height * S;
@@ -368,6 +372,8 @@ public class ClickGuiScreen extends Screen {
             UiRender.textVC(g, font, s.name, Fonts.UI_BODY, Fonts.UI_BODY_SZ, setX + 18, ry, SET_ROW_H, t.text());
             if (s instanceof BooleanSetting bs) {
                 pill(g, setX + setW - 18 - 46, ry + (SET_ROW_H - 26) / 2, 46, 26, bs.get(), t, sm);
+            } else if (s instanceof KeybindSetting ks) {
+                keyChip(g, t, sm, ks, ry, k == bindingRow);
             }
         }
         scrollbar(g, t, sm, setX + setW - BAR_W, y0, SET_ROW_H, sets.size(), setRows, setScroll);
@@ -387,6 +393,24 @@ public class ClickGuiScreen extends Screen {
         int thumbH = Math.max(BAR_W * 3, h * visible / total);
         int thumbY = top + (h - thumbH) * scroll / (total - visible);
         UiRender.fillRounded(g, x, thumbY, BAR_W, thumbH, BAR_W / 2, Theme.withAlpha(t.accent(), 0.75f), sm);
+    }
+
+    /**
+     * The key chip on a keybind row: shows the bound key, or "Press a key…" while it is listening.
+     * Clicking it starts listening; the next key pressed is bound (Escape clears it).
+     */
+    private void keyChip(GuiGraphicsExtractor g, Theme t, boolean sm, KeybindSetting ks, int ry, boolean listening) {
+        String label = listening ? "Press a key…" : ks.display();
+        int w = Math.max(96, font.width(Fonts.t(label, Fonts.UI_BODY)) + 28);
+        int h = 32;
+        int x = setX + setW - 18 - w;
+        int y = ry + (SET_ROW_H - h) / 2;
+        UiRender.fillRounded(g, x, y, w, h, 10,
+                listening ? Theme.withAlpha(t.accent(), 0.22f) : t.surface(), sm);
+        UiRender.strokeRoundedThick(g, x, y, w, h, 10,
+                listening ? t.accent() : Theme.withAlpha(t.border(), 0.9f), S, sm);
+        int col = listening ? t.accent() : (ks.isBound() ? t.text() : t.textFaint());
+        UiRender.textCenteredVC(g, font, label, Fonts.UI_BODY, Fonts.UI_BODY_SZ, x + w / 2, y, h, col);
     }
 
     private void eyebrow(GuiGraphicsExtractor g, Theme t, String s, int x, int y) {
@@ -488,6 +512,8 @@ public class ClickGuiScreen extends Screen {
                 if (UiRender.inside(mx, my, setX, y0 + (k - setScroll) * (SET_ROW_H + ROW_GAP), setW, SET_ROW_H)) {
                     if (sets.get(k) instanceof BooleanSetting bs) {
                         bs.toggle();
+                    } else if (sets.get(k) instanceof KeybindSetting) {
+                        bindingRow = (bindingRow == k) ? -1 : k;   // click again to cancel
                     }
                     return true;
                 }
@@ -497,9 +523,23 @@ public class ClickGuiScreen extends Screen {
         return super.mouseClicked(event, doubleClick);
     }
 
-    /** Escape closes the theme dropdown first, and only then the whole screen. */
+    /**
+     * While a keybind row is listening, the next key press is captured as that binding (Escape
+     * clears it) instead of reaching the screen. Otherwise Escape closes the theme dropdown first,
+     * and only then the whole screen.
+     */
     @Override
     public boolean keyPressed(KeyEvent event) {
+        if (bindingRow >= 0 && bindingRow < sets.size()
+                && sets.get(bindingRow) instanceof KeybindSetting ks) {
+            if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+                ks.clear();
+            } else {
+                ks.set(event.key());
+            }
+            bindingRow = -1;
+            return true;
+        }
         if (themeOpen && event.key() == GLFW.GLFW_KEY_ESCAPE) {
             themeOpen = false;
             return true;

@@ -17,6 +17,12 @@ public class ModuleConfig {
     /** Feature-specific boolean settings, keyed by the setting key. */
     public Map<String, Boolean> options = new HashMap<>();
 
+    /**
+     * Feature-specific key bindings, keyed by the setting key, as GLFW key codes. Bound in this
+     * mod's own GUI rather than Minecraft's controls screen, so every setting lives in one place.
+     */
+    public Map<String, Integer> keys = new HashMap<>();
+
     public ModuleConfig() {
     }
 
