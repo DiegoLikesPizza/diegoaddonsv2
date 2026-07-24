@@ -89,9 +89,9 @@ of this mod. The TTFs live at `assets/diegoaddonsv2/font/poppins_*.ttf`.
 
 ## Credits
 
-**Dungeon Rooms** uses the dungeon room grid constants and the map colour table documented by
-[Odin](https://github.com/odtheking/Odin) (BSD-3-Clause, © odtheking and contributors). The
-implementation here is written from scratch against that description rather than ported.
+**Puzzle Solvers** takes its quiz answer table and the Three Weirdos line lists from
+[Odin](https://github.com/odtheking/Odin) (BSD-3-Clause, © odtheking and contributors), whose licence
+permits reuse with attribution. The solver code itself is written for this mod.
 
 **Inventory Buttons** is an independent implementation of an idea popularised by
 [NotEnoughUpdates](https://github.com/NotEnoughUpdates/NotEnoughUpdates) and its Fabric port
