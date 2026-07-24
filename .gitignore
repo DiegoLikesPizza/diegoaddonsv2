@@ -1,0 +1,37 @@
+# --- Gradle / build output ---
+.gradle/
+build/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# --- Loom / Minecraft dev ---
+run/
+remappedSrc/
+.loom-cache/
+*.log
+
+# --- IDEs ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+.eclipse/
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Local-only working material ---
+# Feature research notes on other 1.8.9 mods (NEU / Skytils / SkyHanni).
+# Reference material for planning, deliberately not part of the repo.
+feature-reference/
+
+# Scratch/experiment area.
+scratchpad/
