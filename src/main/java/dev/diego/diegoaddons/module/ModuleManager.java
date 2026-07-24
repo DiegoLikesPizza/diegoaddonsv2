@@ -9,16 +9,22 @@ import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.modules.AnimationsModule;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
+import dev.diego.diegoaddons.module.modules.AutoGfsModule;
 import dev.diego.diegoaddons.module.modules.BetterIgnoreListModule;
 import dev.diego.diegoaddons.module.modules.ChatCompactModule;
 import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
 import dev.diego.diegoaddons.module.modules.ChatSearchModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
+import dev.diego.diegoaddons.module.modules.CustomEspModule;
+import dev.diego.diegoaddons.module.modules.StarredMobEspModule;
+import dev.diego.diegoaddons.module.modules.SecretChimeModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
+import dev.diego.diegoaddons.module.modules.EtherwarpModule;
 import dev.diego.diegoaddons.module.modules.HideEffectsModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
+import dev.diego.diegoaddons.module.modules.MiningAbilityModule;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PartyCommandsModule;
@@ -97,6 +103,12 @@ public final class ModuleManager {
         register(new PartyCommandsModule(), false);
         register(new PartyFinderModule(), false);
         register(new PuzzleSolversModule(), false);
+        register(new StarredMobEspModule(), false);
+        register(new SecretChimeModule(), false);
+        register(new CustomEspModule(), false);
+        register(new EtherwarpModule(), false);
+        register(new MiningAbilityModule(), false);
+        register(new AutoGfsModule(), false);
         register(new CommandHotkeysModule(), false);
         ConfigManager.save();
 
@@ -113,6 +125,8 @@ public final class ModuleManager {
                     m.onClientTick(mc);
                 }
             }
+            // Both ESP features read the same name plates, so they share a single pass.
+            dev.diego.diegoaddons.util.EntityEsp.tick(mc);
         });
         HudElementRegistry.addLast(
                 Identifier.fromNamespaceAndPath(DiegoAddonsV2Client.MOD_ID, "hud"),
@@ -142,6 +156,7 @@ public final class ModuleManager {
                 IgnoreList.onMessage(plain);
                 PartyCommands.onMessage(plain);
                 PuzzleSolvers.onMessage(plain);
+                dev.diego.diegoaddons.util.MiningAbility.onMessage(plain);
             }
         });
 
@@ -177,6 +192,10 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.BlazeSolver.reset();
             dev.diego.diegoaddons.util.DungeonRooms.reset();
             dev.diego.diegoaddons.util.BeamsSolver.reset();
+            dev.diego.diegoaddons.util.SecretChime.reset();
+            dev.diego.diegoaddons.util.MiningAbility.reset();
+            dev.diego.diegoaddons.util.AutoGfs.reset();
+            dev.diego.diegoaddons.util.EtherwarpHelper.reset();
             dev.diego.diegoaddons.util.WorldRender.clear();
             PartyCommands.reset();
         });

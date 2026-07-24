@@ -5,6 +5,7 @@ public enum Category {
     RENDER("Render"),
     HUD("HUD"),
     DUNGEONS("Dungeons"),
+    MINING("Mining"),
     MISC("Misc");
 
     public final String display;

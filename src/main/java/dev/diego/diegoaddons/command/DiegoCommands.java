@@ -9,6 +9,7 @@ import dev.diego.diegoaddons.gui.CommandHotkeysScreen;
 import dev.diego.diegoaddons.gui.HudEditorScreen;
 import dev.diego.diegoaddons.gui.InventoryButtonsScreen;
 import dev.diego.diegoaddons.gui.ReplaceWordsScreen;
+import dev.diego.diegoaddons.util.CustomEsp;
 import dev.diego.diegoaddons.util.IgnoreList;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
@@ -45,7 +46,10 @@ public final class DiegoCommands {
             new Help("hotkeys", "Open the command hotkey list"),
             new Help("blocked", "Open the blocked player list"),
             new Help("block <player> [reason]", "Block a player, optionally with a reason"),
-            new Help("unblock <player>", "Unblock a player"));
+            new Help("unblock <player>", "Unblock a player"),
+            new Help("esp add <text>", "Highlight mobs whose name contains this"),
+            new Help("esp list", "Show the highlight terms"),
+            new Help("esp remove <text>", "Stop highlighting that term"));
 
     private DiegoCommands() {
     }
@@ -80,6 +84,17 @@ public final class DiegoCommands {
                                         .executes(c -> block(c.getSource(),
                                                 StringArgumentType.getString(c, "player"),
                                                 StringArgumentType.getString(c, "reason"))))))
+                .then(ClientCommands.literal("esp")
+                        .then(ClientCommands.literal("list")
+                                .executes(c -> espList(c.getSource())))
+                        .then(ClientCommands.literal("add")
+                                .then(ClientCommands.argument("text", StringArgumentType.greedyString())
+                                        .executes(c -> espAdd(c.getSource(),
+                                                StringArgumentType.getString(c, "text")))))
+                        .then(ClientCommands.literal("remove")
+                                .then(ClientCommands.argument("text", StringArgumentType.greedyString())
+                                        .executes(c -> espRemove(c.getSource(),
+                                                StringArgumentType.getString(c, "text"))))))
                 .then(ClientCommands.literal("unblock")
                         .then(ClientCommands.argument("player", StringArgumentType.word())
                                 .executes(c -> unblock(c.getSource(),
@@ -95,6 +110,37 @@ public final class DiegoCommands {
             source.sendFeedback(Component.literal("  §e" + usage + " §8- §7" + h.description()));
         }
         source.sendFeedback(Component.literal("§7Also available as §e/diego§7, and §e\\§7 opens the menu."));
+        return 1;
+    }
+
+    private static int espAdd(FabricClientCommandSource source, String text) {
+        boolean added = CustomEsp.add(text);
+        source.sendFeedback(Component.literal(added
+                ? "§b[DiegoAddons] §fNow highlighting §e" + text
+                : "§b[DiegoAddons] §e" + text + "§f is already on the list."));
+        return 1;
+    }
+
+    private static int espRemove(FabricClientCommandSource source, String text) {
+        boolean removed = CustomEsp.remove(text);
+        source.sendFeedback(Component.literal(removed
+                ? "§b[DiegoAddons] §fNo longer highlighting §e" + text
+                : "§b[DiegoAddons] §e" + text + "§f was not on the list."));
+        return 1;
+    }
+
+    /** Lists the terms, since they are otherwise only visible by their effect in the world. */
+    private static int espList(FabricClientCommandSource source) {
+        List<String> terms = CustomEsp.all();
+        if (terms.isEmpty()) {
+            source.sendFeedback(Component.literal(
+                    "§b[DiegoAddons] §fNo highlight terms. Add one with §e/da esp add <text>§f."));
+            return 1;
+        }
+        source.sendFeedback(Component.literal("§b[DiegoAddons] §fHighlighting " + terms.size() + ":"));
+        for (String t : terms) {
+            source.sendFeedback(Component.literal("  §7- §e" + t));
+        }
         return 1;
     }
 
