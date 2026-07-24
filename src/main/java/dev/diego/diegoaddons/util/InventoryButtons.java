@@ -43,6 +43,24 @@ import java.util.Map;
 public final class InventoryButtons {
     /** Drawn size of a button, matching a vanilla slot so it sits naturally beside the GUI. */
     public static final int SIZE = 18;
+    /** Gap between two buttons, and the extra a gigantic one spans. */
+    public static final int GAP = 2;
+    public static final int BIG = SIZE * 2 + GAP;
+
+    /** Drawn size of a button, depending on whether it is gigantic. */
+    public static int size(InventoryButton b) {
+        return b.gigantic ? BIG : SIZE;
+    }
+
+    /** Absolute X of a button on screen, resolved against the corner it is anchored to. */
+    public static int screenX(InventoryButton b, int leftPos, int imageWidth) {
+        return b.anchorRight ? leftPos + imageWidth + b.x : leftPos + b.x;
+    }
+
+    /** Absolute Y of a button on screen, resolved against the corner it is anchored to. */
+    public static int screenY(InventoryButton b, int topPos, int imageHeight) {
+        return b.anchorBottom ? topPos + imageHeight + b.y : topPos + b.y;
+    }
 
     private static final Map<String, ItemStack> ICONS = new HashMap<>();
 
@@ -115,14 +133,18 @@ public final class InventoryButtons {
         }
         Minecraft mc = Minecraft.getInstance();
         Theme t = Themes.current();
-        int leftPos = ((AbstractContainerScreenAccessor) screen).diego$leftPos();
-        int topPos = ((AbstractContainerScreenAccessor) screen).diego$topPos();
+        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
+        int leftPos = acc.diego$leftPos();
+        int topPos = acc.diego$topPos();
+        int iw = acc.diego$imageWidth();
+        int ih = acc.diego$imageHeight();
 
         InventoryButton hovered = null;
         for (InventoryButton b : all()) {
-            int x = leftPos + b.x;
-            int y = topPos + b.y;
-            boolean hover = UiRender.inside(mouseX, mouseY, x, y, SIZE, SIZE);
+            int x = screenX(b, leftPos, iw);
+            int y = screenY(b, topPos, ih);
+            int size = size(b);
+            boolean hover = UiRender.inside(mouseX, mouseY, x, y, size, size);
             draw(g, mc, t, b, x, y, hover, false);
             if (hover) {
                 hovered = b;
@@ -137,12 +159,22 @@ public final class InventoryButtons {
     public static void draw(GuiGraphicsExtractor g, Minecraft mc, Theme t, InventoryButton b,
                             int x, int y, boolean hover, boolean ghost) {
         boolean sm = ConfigManager.get().smoothCorners;
+        int size = size(b);
         int fill = hover ? t.elevated() : t.surfaceAlt();
-        UiRender.fillRounded(g, x, y, SIZE, SIZE, 4,
+        UiRender.fillRounded(g, x, y, size, size, 4,
                 ghost ? Theme.withAlpha(fill, 0.5f) : fill, sm);
-        UiRender.strokeRounded(g, x, y, SIZE, SIZE, 4,
+        UiRender.strokeRounded(g, x, y, size, size, 4,
                 hover ? t.accent() : Theme.withAlpha(t.border(), 0.9f), sm);
-        g.item(icon(b.icon), x + 1, y + 1);
+        // A gigantic button scales its icon with it, drawn around the cell centre.
+        if (b.gigantic) {
+            g.pose().pushMatrix();
+            g.pose().translate(x + size / 2f, y + size / 2f);
+            g.pose().scale(2f);
+            g.item(icon(b.icon), -8, -8);
+            g.pose().popMatrix();
+        } else {
+            g.item(icon(b.icon), x + 1, y + 1);
+        }
     }
 
     /** A themed one-line tooltip, so the buttons explain themselves on hover. */
@@ -167,10 +199,14 @@ public final class InventoryButtons {
         if (mod == null || !mod.isEnabled() || button != 0 || !visible(mod)) {
             return false;
         }
-        int leftPos = ((AbstractContainerScreenAccessor) screen).diego$leftPos();
-        int topPos = ((AbstractContainerScreenAccessor) screen).diego$topPos();
+        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
+        int leftPos = acc.diego$leftPos();
+        int topPos = acc.diego$topPos();
+        int iw = acc.diego$imageWidth();
+        int ih = acc.diego$imageHeight();
         for (InventoryButton b : all()) {
-            if (UiRender.inside(mouseX, mouseY, leftPos + b.x, topPos + b.y, SIZE, SIZE)) {
+            int size = size(b);
+            if (UiRender.inside(mouseX, mouseY, screenX(b, leftPos, iw), screenY(b, topPos, ih), size, size)) {
                 run(b);
                 return true;
             }

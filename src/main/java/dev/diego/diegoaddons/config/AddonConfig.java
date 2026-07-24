@@ -35,4 +35,10 @@ public class AddonConfig {
 
     /** User-defined buttons drawn beside container GUIs (see the Inventory Buttons module). */
     public List<InventoryButton> inventoryButtons = new ArrayList<>();
+
+    /** Players you have blocked, with the reason (see the Better Ignore List module). */
+    public List<BlockedPlayer> blockedPlayers = new ArrayList<>();
+
+    /** Find/replace pairs applied to chat and item text (see the Replace Words module). */
+    public List<WordReplacement> wordReplacements = new ArrayList<>();
 }

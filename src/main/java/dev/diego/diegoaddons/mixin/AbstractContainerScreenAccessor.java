@@ -19,6 +19,12 @@ public interface AbstractContainerScreenAccessor {
     @Accessor("topPos")
     int diego$topPos();
 
+    @Accessor("imageWidth")
+    int diego$imageWidth();
+
+    @Accessor("imageHeight")
+    int diego$imageHeight();
+
     /**
      * The screen's own click handler. Going through this rather than crafting a packet means a
      * keybind press behaves exactly like the user clicking that slot themselves.
