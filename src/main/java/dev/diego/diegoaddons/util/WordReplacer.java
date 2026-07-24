@@ -51,6 +51,23 @@ public final class WordReplacer {
         return out.equals(legacy) ? text : LegacyText.fromLegacy(out);
     }
 
+    /**
+     * Like {@link #apply}, but keeps the original in brackets after the replacement - so a renamed
+     * player still shows their real IGN where you need to recognise the account, not the nickname.
+     * Returns the component untouched when nothing was replaced.
+     */
+    public static Component applyWithOriginal(Component text) {
+        if (text == null || !active()) {
+            return text;
+        }
+        String legacy = LegacyText.toLegacy(text);
+        String out = replace(legacy);
+        if (out.equals(legacy)) {
+            return text;
+        }
+        return LegacyText.fromLegacy(out + "§7 (" + LegacyText.strip(legacy) + ")");
+    }
+
     /** Rewrites a plain string. */
     public static String replace(String text) {
         if (text == null || text.isEmpty()) {
