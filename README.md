@@ -89,6 +89,10 @@ of this mod. The TTFs live at `assets/diegoaddonsv2/font/poppins_*.ttf`.
 
 ## Credits
 
+**Dungeon Rooms** uses the dungeon room grid constants and the map colour table documented by
+[Odin](https://github.com/odtheking/Odin) (BSD-3-Clause, © odtheking and contributors). The
+implementation here is written from scratch against that description rather than ported.
+
 **Inventory Buttons** is an independent implementation of an idea popularised by
 [NotEnoughUpdates](https://github.com/NotEnoughUpdates/NotEnoughUpdates) and its Fabric port
 [Inventory-Buttons](https://github.com/afranz29/Inventory-Buttons). No code or artwork is taken from
