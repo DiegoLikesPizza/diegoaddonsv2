@@ -16,6 +16,22 @@ import java.util.List;
 public abstract class HudModule extends Module {
     protected final BooleanSetting accentColour = new BooleanSetting(this, "accentColour", "Accent colour", true);
     protected final BooleanSetting showLabel = new BooleanSetting(this, "showLabel", "Show label", true);
+    protected final BooleanSetting centered = new BooleanSetting(this, "centered", "Centered", defaultCentered());
+
+    /**
+     * Whether this element's text starts out centred in its chip rather than left-aligned. Worth
+     * turning on for purely numeric elements: their chip is sized to the widest digit glyph so it
+     * cannot jitter as the value changes, which leaves slack that would otherwise all sit on the
+     * right. Overridden per module; the user can still flip it in the ClickGUI.
+     */
+    protected boolean defaultCentered() {
+        return false;
+    }
+
+    /** Whether to centre the chip's text this frame. */
+    public boolean isCentered() {
+        return centered.get();
+    }
 
     protected HudModule(String id, String name, String description) {
         this(id, name, description, true);
@@ -31,6 +47,7 @@ public abstract class HudModule extends Module {
         if (textSettings) {
             settings.add(accentColour);
             settings.add(showLabel);
+            settings.add(centered);
         }
     }
 
