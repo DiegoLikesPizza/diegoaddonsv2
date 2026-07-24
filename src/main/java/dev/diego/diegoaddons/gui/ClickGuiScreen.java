@@ -8,8 +8,10 @@ import dev.diego.diegoaddons.module.ModuleManager;
 import dev.diego.diegoaddons.module.Setting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +59,9 @@ public class ClickGuiScreen extends Screen {
     private static final int CLOSE_SZ = 42;
     private static final int HUD_BTN_W = 158;
     private static final int BAR_W = 8;
+    private static final int CARET_W = 20;      // room for the ▾ marker inside the theme chip
+    private static final int MENU_ROW_H = 46;
+    private static final int MENU_PAD = 6;
 
     // Relative column weights; the actual widths are these shares of the available inner width.
     private static final float CAT_SHARE = 220f / 1040f;
@@ -64,6 +69,7 @@ public class ClickGuiScreen extends Screen {
 
     private int catIndex = 0;
     private Module settingsModule;
+    private boolean themeOpen;
 
     // Scroll offsets, in whole rows, one per column.
     private int catScroll, modScroll, setScroll;
@@ -80,6 +86,7 @@ public class ClickGuiScreen extends Screen {
     private int catRows, modRows, setRows;
     private int closeX, closeY, closeSz;
     private int themeX, themeY, themeW, themeH;
+    private int menuX, menuY, menuW, menuH;
 
     public ClickGuiScreen() {
         super(Component.literal("DiegoAddons"));
@@ -104,8 +111,12 @@ public class ClickGuiScreen extends Screen {
 
         // --- Header cluster sizing (so nothing overlaps, whatever the font metrics) ---
         closeSz = CLOSE_SZ;
-        int nameW = font.width(Fonts.t(Themes.current().name(), Fonts.UI_LABEL));
-        themeW = 20 + 26 + 12 + nameW + 20;                    // padL + swatch + gap + name + padR
+        // Sized to the longest theme name, so picking a different theme never reflows the header.
+        int nameW = 0;
+        for (Theme th : Themes.ALL) {
+            nameW = Math.max(nameW, font.width(Fonts.t(th.name(), Fonts.UI_LABEL)));
+        }
+        themeW = 20 + 26 + 12 + nameW + CARET_W + 16;          // padL + swatch + gap + name + caret + padR
         int rightClusterW = themeW + 16 + HUD_BTN_W + 16 + closeSz;
         int titleW = font.width(Fonts.t("DiegoAddons", Fonts.UI_TITLE));
         int brandW = 48 + 18 + titleW;                          // mark + gap + title
@@ -154,6 +165,12 @@ public class ClickGuiScreen extends Screen {
         themeH = bh;
         themeY = by;
         themeX = hudX - 16 - themeW;
+
+        // The dropdown hangs under the chip, aligned to it.
+        menuX = themeX;
+        menuY = themeY + themeH + 8;
+        menuW = themeW;
+        menuH = MENU_PAD * 2 + Themes.ALL.size() * MENU_ROW_H;
     }
 
     /** How many rows of height {@code rowH} fit between {@code top} and the bottom of the window. */
@@ -195,6 +212,9 @@ public class ClickGuiScreen extends Screen {
         renderFeatures(g, t, sm, mx, my);
         renderSettings(g, t, sm, mx, my);
 
+        // Last, so the open dropdown floats above the columns instead of being drawn under them.
+        renderThemeMenu(g, t, sm, mx, my);
+
         UiRender.endHiRes(g);
     }
 
@@ -211,14 +231,19 @@ public class ClickGuiScreen extends Screen {
         UiRender.textVC(g, font, "DiegoAddons", Fonts.UI_TITLE, Fonts.UI_TITLE_SZ, tx,
                 panelY, HEADER_H, t.text());
 
-        // Theme chip.
+        // Theme chip - the closed state of the theme dropdown.
         boolean themeHover = UiRender.inside(mx, my, themeX, themeY, themeW, themeH);
-        UiRender.fillRounded(g, themeX, themeY, themeW, themeH, 22, themeHover ? t.elevated() : t.surfaceAlt(), sm);
-        UiRender.strokeRoundedThick(g, themeX, themeY, themeW, themeH, 22, t.border(), S, sm);
+        UiRender.fillRounded(g, themeX, themeY, themeW, themeH, 22,
+                themeHover || themeOpen ? t.elevated() : t.surfaceAlt(), sm);
+        UiRender.strokeRoundedThick(g, themeX, themeY, themeW, themeH, 22,
+                themeOpen ? Theme.withAlpha(t.accent(), 0.8f) : t.border(), S, sm);
         int sw = 26, swx = themeX + 18, swy = themeY + (themeH - sw) / 2;
         UiRender.fillRoundedGradient(g, swx, swy, sw, sw, 8, t.accent(), t.accentTo(), sm);
         UiRender.textVC(g, font, Themes.current().name(), Fonts.UI_LABEL, Fonts.UI_LABEL_SZ,
                 swx + sw + 12, themeY, themeH, t.text());
+        UiRender.textCenteredVC(g, font, themeOpen ? "▴" : "▾", Fonts.UI_LABEL, Fonts.UI_LABEL_SZ,
+                themeX + themeW - 16 - CARET_W / 2, themeY, themeH,
+                themeOpen ? t.accent() : t.textMuted());
 
         for (UiButton b : headerButtons) {
             b.render(g, mx, my, t, font, sm);
@@ -232,6 +257,45 @@ public class ClickGuiScreen extends Screen {
         }
         UiRender.textCenteredVC(g, font, "×", Fonts.UI_TITLE, Fonts.UI_TITLE_SZ,
                 closeX + closeSz / 2, closeY, closeSz, closeHover ? t.text() : t.textMuted());
+    }
+
+    /**
+     * The open theme dropdown: one row per theme, each showing that theme's own accent swatch so the
+     * list previews what you are picking. The active theme is marked with an accent bar and a tick.
+     */
+    private void renderThemeMenu(GuiGraphicsExtractor g, Theme t, boolean sm, int mx, int my) {
+        if (!themeOpen) {
+            return;
+        }
+        UiRender.dropShadow(g, menuX, menuY, menuW, menuH, 16, t.shadow(), 12, 6);
+        UiRender.fillRounded(g, menuX, menuY, menuW, menuH, 16, t.elevated(), sm);
+        UiRender.strokeRoundedThick(g, menuX, menuY, menuW, menuH, 16, t.border(), S, sm);
+
+        Theme cur = Themes.current();
+        for (int i = 0; i < Themes.ALL.size(); i++) {
+            Theme th = Themes.ALL.get(i);
+            int ry = menuY + MENU_PAD + i * MENU_ROW_H;
+            boolean hover = UiRender.inside(mx, my, menuX + MENU_PAD, ry, menuW - MENU_PAD * 2, MENU_ROW_H);
+            boolean active = th == cur;
+            if (hover || active) {
+                UiRender.fillRounded(g, menuX + MENU_PAD, ry, menuW - MENU_PAD * 2, MENU_ROW_H, 10,
+                        active ? t.surfaceAlt() : Theme.withAlpha(t.surfaceAlt(), 0.6f), sm);
+            }
+            if (active) {
+                UiRender.fillRounded(g, menuX + MENU_PAD, ry + 10, 5, MENU_ROW_H - 20, 3, t.accent(), sm);
+            }
+            // Each row previews its own theme's accent, not the active one.
+            int sw = 22;
+            int swx = menuX + MENU_PAD + 16;
+            UiRender.fillRoundedGradient(g, swx, ry + (MENU_ROW_H - sw) / 2, sw, sw, 7,
+                    th.accent(), th.accentTo(), sm);
+            UiRender.textVC(g, font, th.name(), Fonts.UI_LABEL, Fonts.UI_LABEL_SZ,
+                    swx + sw + 12, ry, MENU_ROW_H, active || hover ? t.text() : t.textMuted());
+            if (active) {
+                UiRender.textCenteredVC(g, font, "✓", Fonts.UI_LABEL, Fonts.UI_LABEL_SZ,
+                        menuX + menuW - MENU_PAD - 18, ry, MENU_ROW_H, t.accent());
+            }
+        }
     }
 
     private void renderGroups(GuiGraphicsExtractor g, Theme t, boolean sm, int mx, int my) {
@@ -350,15 +414,33 @@ public class ClickGuiScreen extends Screen {
         int my = (int) Math.round(event.y() * S);
         int btn = event.button();
 
+        // While the dropdown is open it owns the next click: either a pick, or a click-away to close.
+        if (themeOpen) {
+            if (UiRender.inside(mx, my, menuX, menuY, menuW, menuH)) {
+                for (int i = 0; i < Themes.ALL.size(); i++) {
+                    int ry = menuY + MENU_PAD + i * MENU_ROW_H;
+                    if (UiRender.inside(mx, my, menuX + MENU_PAD, ry, menuW - MENU_PAD * 2, MENU_ROW_H)) {
+                        Themes.select(Themes.ALL.get(i));
+                        themeOpen = false;
+                        rebuildWidgets();
+                        break;
+                    }
+                }
+                return true;
+            }
+            themeOpen = false;
+            if (UiRender.inside(mx, my, themeX, themeY, themeW, themeH)) {
+                return true;   // clicking the chip again just closes it
+            }
+            // Otherwise fall through, so the click still lands on whatever was under it.
+        }
+
         if (UiRender.inside(mx, my, closeX, closeY, closeSz, closeSz)) {
             onClose();
             return true;
         }
         if (UiRender.inside(mx, my, themeX, themeY, themeW, themeH)) {
-            List<Theme> all = Themes.ALL;
-            int i = all.indexOf(Themes.current());
-            Themes.select(all.get((i + 1) % all.size()));
-            rebuildWidgets();
+            themeOpen = true;
             return true;
         }
         for (UiButton b : headerButtons) {
@@ -413,6 +495,16 @@ public class ClickGuiScreen extends Screen {
         }
 
         return super.mouseClicked(event, doubleClick);
+    }
+
+    /** Escape closes the theme dropdown first, and only then the whole screen. */
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (themeOpen && event.key() == GLFW.GLFW_KEY_ESCAPE) {
+            themeOpen = false;
+            return true;
+        }
+        return super.keyPressed(event);
     }
 
     /** Scrolls whichever column the cursor is over; the window itself never resizes. */
