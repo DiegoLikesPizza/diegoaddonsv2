@@ -33,6 +33,9 @@ public final class ConfigManager {
             config.modules = new java.util.LinkedHashMap<>();
         }
         ModuleConfig mc = config.modules.computeIfAbsent(id, k -> new ModuleConfig());
+        if (mc.numbers == null) {
+            mc.numbers = new java.util.HashMap<>();
+        }
         if (mc.keys == null) {
             mc.keys = new java.util.HashMap<>();
         }

@@ -7,6 +7,7 @@ import dev.diego.diegoaddons.gui.Fonts;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
+import dev.diego.diegoaddons.module.modules.AnimationsModule;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
 import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
 import dev.diego.diegoaddons.module.modules.ChatSearchModule;
@@ -71,6 +72,7 @@ public final class ModuleManager {
         // Everything ships disabled by default; the user enables what they want.
         register(new CustomF5(), false);
         register(new ArmorHiderModule(), false);
+        register(new AnimationsModule(), false);
         register(new SkinChangerModule(), false);
         register(new PerformanceModule(), false);
         register(new CoordinatesModule(), false);
