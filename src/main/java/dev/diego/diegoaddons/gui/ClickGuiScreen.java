@@ -1,6 +1,7 @@
 package dev.diego.diegoaddons.gui;
 
 import dev.diego.diegoaddons.config.ConfigManager;
+import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.KeybindSetting;
@@ -382,6 +383,8 @@ public class ClickGuiScreen extends Screen {
                 keyChip(g, t, sm, ks, ry, k == bindingRow);
             } else if (s instanceof NumberSetting ns) {
                 slider(g, t, sm, ns, ry, mx, my);
+            } else if (s instanceof ActionSetting as) {
+                actionChip(g, t, sm, as, ry, mx, my);
             }
         }
         scrollbar(g, t, sm, setX + setW - BAR_W, y0, SET_ROW_H, sets.size(), setRows, setScroll);
@@ -432,6 +435,20 @@ public class ClickGuiScreen extends Screen {
         int x = setX + 18;
         int w = setW - 36;
         ns.setFraction(w > 0 ? (mx - x) / (double) w : 0);
+    }
+
+    /** An action row: a small primary-styled button that runs the setting when clicked. */
+    private void actionChip(GuiGraphicsExtractor g, Theme t, boolean sm, ActionSetting as, int ry, int mx, int my) {
+        int w = Math.max(90, font.width(Fonts.t(as.action, Fonts.UI_BODY)) + 32);
+        int h = 34;
+        int x = setX + setW - 18 - w;
+        int y = ry + (SET_ROW_H - h) / 2;
+        boolean hover = UiRender.inside(mx, my, x, y, w, h);
+        UiRender.fillRoundedGradient(g, x, y, w, h, 12,
+                hover ? Theme.lighten(t.accent(), 0.08f) : t.accent(),
+                hover ? Theme.lighten(t.accentTo(), 0.08f) : t.accentTo(), sm);
+        UiRender.textCenteredVC(g, font, as.action, Fonts.UI_BODY, Fonts.UI_BODY_SZ,
+                x + w / 2, y, h, t.accentText());
     }
 
     /**
@@ -556,6 +573,8 @@ public class ClickGuiScreen extends Screen {
                     } else if (sets.get(k) instanceof NumberSetting ns) {
                         sliderRow = k;
                         dragSlider(ns, mx);
+                    } else if (sets.get(k) instanceof ActionSetting as) {
+                        as.run();
                     }
                     return true;
                 }

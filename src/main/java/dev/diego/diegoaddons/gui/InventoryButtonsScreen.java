@@ -8,39 +8,53 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Editor for the inventory buttons: a stand-in for the container GUI sits in the middle, and the
- * buttons are dragged around it exactly where they will appear in game. The selected button's
- * command and icon are edited in the side panel.
+ * Editor for the inventory buttons.
  *
- * <p>Positions are relative to the stand-in's corner, which is what gets saved - so what you arrange
- * here is what you get beside any real menu, at any GUI scale.
+ * <p>Buttons snap to a fixed ring of slots around a stand-in for the container GUI, the way the
+ * feature this is modelled on works: click a free slot to place a button there, click one to select
+ * it, drag it to another slot, right-click to remove it. There is no free positioning, so buttons
+ * always line up with the menu instead of landing a pixel off.
+ *
+ * <p>The icon is chosen from a searchable grid of items rather than typed as an id.
  */
 public class InventoryButtonsScreen extends Screen {
-    /** Vanilla container GUI size, used for the stand-in so the layout matches the real thing. */
+    /** Vanilla container GUI size, so the layout matches the real thing. */
     private static final int GUI_W = 176;
     private static final int GUI_H = 166;
-    private static final int GRID = 20;   // 18px button + 2px gap
-    private static final int PANEL_W = 190;
+    private static final int SIZE = InventoryButtons.SIZE;
+    private static final int STRIDE = SIZE + 2;
+    private static final int PANEL_W = 208;
+    private static final int PAD = 8;
+    private static final int ICON_COLS = 9;
 
     private final Screen parent;
 
     private EditBox commandBox;
-    private EditBox iconBox;
+    private EditBox searchBox;
     private final List<UiButton> buttons = new ArrayList<>();
+
+    /** Every slot a button may occupy, as offsets from the GUI's top-left corner. */
+    private final List<int[]> anchors = new ArrayList<>();
+    private final List<Item> icons = new ArrayList<>();
 
     private InventoryButton selected;
     private InventoryButton dragging;
-    private int dragDX, dragDY;
-    private boolean snap = true;
+    private int iconScroll;
 
-    private int guiX, guiY, panelX, panelY, panelH;
+    private int guiX, guiY, panelX, panelY, panelH, gridTop, gridRows;
 
     public InventoryButtonsScreen(Screen parent) {
         super(Component.literal("Inventory Buttons"));
@@ -50,14 +64,16 @@ public class InventoryButtonsScreen extends Screen {
     @Override
     protected void init() {
         buttons.clear();
-        // The stand-in sits slightly left of centre so the side panel has room.
-        guiX = (width - GUI_W - PANEL_W - 24) / 2;
+        buildAnchors();
+
+        int totalW = GUI_W + 2 * STRIDE + 24 + PANEL_W;
+        guiX = (width - totalW) / 2 + STRIDE;
         guiY = (height - GUI_H) / 2;
-        panelX = guiX + GUI_W + 24;
+        panelX = guiX + GUI_W + STRIDE + 24;
         panelY = guiY;
         panelH = GUI_H;
 
-        commandBox = new EditBox(font, panelX + 12, panelY + 46, PANEL_W - 24, 18,
+        commandBox = new EditBox(font, panelX + PAD, panelY + 26, PANEL_W - PAD * 2, 16,
                 Component.literal("Command"));
         commandBox.setMaxLength(128);
         commandBox.setHint(Component.literal("ah"));
@@ -67,69 +83,67 @@ public class InventoryButtonsScreen extends Screen {
             }
         });
 
-        iconBox = new EditBox(font, panelX + 12, panelY + 96, PANEL_W - 24, 18,
-                Component.literal("Icon"));
-        iconBox.setMaxLength(128);
-        iconBox.setHint(Component.literal("minecraft:chest"));
-        iconBox.setResponder(v -> {
-            if (selected != null) {
-                selected.icon = v;
-                InventoryButtons.invalidateIcons();
-            }
+        searchBox = new EditBox(font, panelX + PAD, panelY + 62, PANEL_W - PAD * 2, 16,
+                Component.literal("Search"));
+        searchBox.setMaxLength(64);
+        searchBox.setHint(Component.literal("Search icons…"));
+        searchBox.setResponder(v -> {
+            iconScroll = 0;
+            refreshIcons();
         });
         addRenderableWidget(commandBox);
-        addRenderableWidget(iconBox);
+        addRenderableWidget(searchBox);
 
-        int by = panelY + panelH - 30;
-        UiButton add = new UiButton(panelX + 12, by, 54, 20, "Add", UiButton.Kind.PRIMARY, this::addButton);
-        UiButton del = new UiButton(add.x + 60, by, 60, 20, "Delete", UiButton.Kind.SECONDARY, this::deleteSelected);
-        UiButton done = new UiButton(panelX + PANEL_W - 12 - 54, by, 54, 20, "Done",
-                UiButton.Kind.SECONDARY, this::onClose);
-        buttons.add(add);
-        buttons.add(del);
+        gridTop = panelY + 96;
+        gridRows = Math.max(1, (panelY + panelH - 30 - gridTop) / STRIDE);
+
+        UiButton done = new UiButton(panelX + PANEL_W - PAD - 54, panelY + panelH - 24, 54, 20,
+                "Done", UiButton.Kind.PRIMARY, this::onClose);
         buttons.add(done);
 
+        refreshIcons();
         syncBoxes();
     }
 
-    private void addButton() {
-        // New buttons land in the first free cell of the column left of the GUI.
-        int y = 0;
-        while (occupied(-22, y) && y < GUI_H) {
-            y += GRID;
+    /** The ring of slots around the menu: a column either side, a row above and below. */
+    private void buildAnchors() {
+        anchors.clear();
+        for (int y = 0; y + SIZE <= GUI_H; y += STRIDE) {
+            anchors.add(new int[]{-STRIDE, y});          // left column
+            anchors.add(new int[]{GUI_W + 2, y});        // right column
         }
-        InventoryButton b = new InventoryButton(-22, y, "", "minecraft:chest");
-        InventoryButtons.all().add(b);
-        selected = b;
-        syncBoxes();
-        ConfigManager.save();
+        for (int x = 0; x + SIZE <= GUI_W; x += STRIDE) {
+            anchors.add(new int[]{x, -STRIDE});          // above
+            anchors.add(new int[]{x, GUI_H + 2});        // below
+        }
     }
 
-    private boolean occupied(int x, int y) {
-        for (InventoryButton b : InventoryButtons.all()) {
-            if (b.x == x && b.y == y) {
-                return true;
+    private void refreshIcons() {
+        icons.clear();
+        String q = searchBox == null ? "" : searchBox.getValue().toLowerCase(Locale.ROOT).trim();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (item == Items.AIR) {
+                continue;
+            }
+            if (q.isEmpty() || BuiltInRegistries.ITEM.getKey(item).getPath().contains(q)) {
+                icons.add(item);
             }
         }
-        return false;
     }
 
-    private void deleteSelected() {
-        if (selected != null) {
-            InventoryButtons.all().remove(selected);
-            selected = null;
-            syncBoxes();
-            ConfigManager.save();
-        }
-    }
-
-    /** Push the selected button's values into the text boxes (and disable them when nothing is selected). */
     private void syncBoxes() {
         boolean has = selected != null;
         commandBox.setValue(has ? selected.command : "");
-        iconBox.setValue(has ? selected.icon : "");
         commandBox.active = has;
-        iconBox.active = has;
+    }
+
+    private InventoryButton buttonAt(int ax, int ay) {
+        for (InventoryButton b : InventoryButtons.all()) {
+            if (b.x == ax && b.y == ay) {
+                return b;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -145,38 +159,80 @@ public class InventoryButtonsScreen extends Screen {
         UiRender.textCentered(g, font, "Your menu goes here", Fonts.SMALL,
                 guiX + GUI_W / 2, guiY + GUI_H / 2 - 4, t.textFaint());
 
-        // The buttons, positioned exactly as they will be in game.
-        for (InventoryButton b : InventoryButtons.all()) {
-            int x = guiX + b.x;
-            int y = guiY + b.y;
-            boolean hover = UiRender.inside(mouseX, mouseY, x, y, InventoryButtons.SIZE, InventoryButtons.SIZE);
-            InventoryButtons.draw(g, minecraft, t, b, x, y, hover, false);
-            if (b == selected) {
-                UiRender.strokeRounded(g, x - 2, y - 2, InventoryButtons.SIZE + 4,
-                        InventoryButtons.SIZE + 4, 6, t.accent(), sm);
+        // Free slots, so it is obvious where a button can go.
+        for (int[] a : anchors) {
+            if (buttonAt(a[0], a[1]) != null) {
+                continue;
+            }
+            int x = guiX + a[0];
+            int y = guiY + a[1];
+            boolean hover = UiRender.inside(mouseX, mouseY, x, y, SIZE, SIZE);
+            UiRender.strokeRounded(g, x, y, SIZE, SIZE, 4,
+                    Theme.withAlpha(hover ? t.accent() : t.textFaint(), hover ? 0.9f : 0.3f), sm);
+            if (hover) {
+                UiRender.textCentered(g, font, "+", Fonts.SMALL, x + SIZE / 2, y + 5, t.accent());
             }
         }
 
-        // Side panel.
-        UiRender.dropShadow(g, panelX, panelY, PANEL_W, panelH, 10, t.shadow(), 8, 4);
-        UiRender.fillRounded(g, panelX, panelY, PANEL_W, panelH, 10, t.surface(), sm);
-        UiRender.strokeRounded(g, panelX, panelY, PANEL_W, panelH, 10, t.border(), sm);
-        UiRender.text(g, font, "INVENTORY BUTTONS", Fonts.SMALL, panelX + 12, panelY + 12, t.textFaint());
-        if (selected == null) {
-            UiRender.text(g, font, "Select or add a button.", Fonts.MEDIUM,
-                    panelX + 12, panelY + 30, t.textMuted());
-        } else {
-            UiRender.text(g, font, "Command", Fonts.SMALL, panelX + 12, panelY + 34, t.textMuted());
-            UiRender.text(g, font, "Icon (item id)", Fonts.SMALL, panelX + 12, panelY + 84, t.textMuted());
+        for (InventoryButton b : InventoryButtons.all()) {
+            int x = guiX + b.x;
+            int y = guiY + b.y;
+            boolean hover = UiRender.inside(mouseX, mouseY, x, y, SIZE, SIZE);
+            InventoryButtons.draw(g, minecraft, t, b, x, y, hover, false);
+            if (b == selected) {
+                UiRender.strokeRounded(g, x - 2, y - 2, SIZE + 4, SIZE + 4, 6, t.accent(), sm);
+            }
         }
-        UiRender.text(g, font, "Drag buttons around the menu.", Fonts.SMALL,
-                panelX + 12, panelY + 128, t.textFaint());
-        UiRender.text(g, font, snap ? "Grid snap: on (G)" : "Grid snap: off (G)", Fonts.SMALL,
-                panelX + 12, panelY + 142, t.textFaint());
 
+        renderPanel(g, t, sm, mouseX, mouseY);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
         for (UiButton b : buttons) {
             b.render(g, mouseX, mouseY, t, font, sm);
+        }
+    }
+
+    private void renderPanel(GuiGraphicsExtractor g, Theme t, boolean sm, int mouseX, int mouseY) {
+        UiRender.dropShadow(g, panelX, panelY, PANEL_W, panelH, 10, t.shadow(), 8, 4);
+        UiRender.fillRounded(g, panelX, panelY, PANEL_W, panelH, 10, t.surface(), sm);
+        UiRender.strokeRounded(g, panelX, panelY, PANEL_W, panelH, 10, t.border(), sm);
+
+        if (selected == null) {
+            UiRender.text(g, font, "INVENTORY BUTTONS", Fonts.SMALL, panelX + PAD, panelY + 8, t.textFaint());
+            UiRender.text(g, font, "Click a free slot to add", Fonts.SMALL,
+                    panelX + PAD, panelY + 28, t.textMuted());
+            UiRender.text(g, font, "a button to the menu.", Fonts.SMALL,
+                    panelX + PAD, panelY + 40, t.textMuted());
+            UiRender.text(g, font, "Right-click one to remove it.", Fonts.SMALL,
+                    panelX + PAD, panelY + 60, t.textFaint());
+            return;
+        }
+
+        UiRender.text(g, font, "COMMAND", Fonts.SMALL, panelX + PAD, panelY + 12, t.textFaint());
+        UiRender.text(g, font, "ICON", Fonts.SMALL, panelX + PAD, panelY + 48, t.textFaint());
+
+        // Icon grid.
+        int start = iconScroll * ICON_COLS;
+        for (int i = 0; i < gridRows * ICON_COLS; i++) {
+            int idx = start + i;
+            if (idx >= icons.size()) {
+                break;
+            }
+            int col = i % ICON_COLS;
+            int row = i / ICON_COLS;
+            int x = panelX + PAD + col * STRIDE;
+            int y = gridTop + row * STRIDE;
+            Item item = icons.get(idx);
+            boolean hover = UiRender.inside(mouseX, mouseY, x, y, SIZE, SIZE);
+            boolean current = BuiltInRegistries.ITEM.getKey(item).toString().equals(selected.icon);
+            if (hover || current) {
+                UiRender.fillRounded(g, x, y, SIZE, SIZE, 3,
+                        current ? Theme.withAlpha(t.accent(), 0.35f) : t.surfaceAlt(), sm);
+            }
+            g.item(new ItemStack(item), x + 1, y + 1);
+        }
+        if (icons.size() > gridRows * ICON_COLS) {
+            UiRender.text(g, font, "scroll for more", Fonts.SMALL,
+                    panelX + PAD, panelY + panelH - 34, t.textFaint());
         }
     }
 
@@ -184,46 +240,97 @@ public class InventoryButtonsScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         double mx = event.x();
         double my = event.y();
-        if (event.button() == 0) {
+        int btn = event.button();
+
+        if (btn == 0) {
             for (UiButton b : buttons) {
                 if (b.mouseClicked(mx, my, 0)) {
                     return true;
                 }
             }
-            for (InventoryButton b : InventoryButtons.all()) {
-                if (UiRender.inside(mx, my, guiX + b.x, guiY + b.y,
-                        InventoryButtons.SIZE, InventoryButtons.SIZE)) {
+        }
+
+        // Existing buttons: left selects and starts a drag, right removes.
+        for (InventoryButton b : new ArrayList<>(InventoryButtons.all())) {
+            if (UiRender.inside(mx, my, guiX + b.x, guiY + b.y, SIZE, SIZE)) {
+                if (btn == 1) {
+                    InventoryButtons.all().remove(b);
+                    if (selected == b) {
+                        selected = null;
+                    }
+                    ConfigManager.save();
+                } else if (btn == 0) {
                     selected = b;
                     dragging = b;
-                    dragDX = (int) (mx - (guiX + b.x));
-                    dragDY = (int) (my - (guiY + b.y));
+                }
+                syncBoxes();
+                return true;
+            }
+        }
+
+        if (btn == 0) {
+            // A free slot: place a new button there.
+            for (int[] a : anchors) {
+                if (UiRender.inside(mx, my, guiX + a[0], guiY + a[1], SIZE, SIZE)) {
+                    InventoryButton b = new InventoryButton(a[0], a[1], "", "minecraft:chest");
+                    InventoryButtons.all().add(b);
+                    selected = b;
                     syncBoxes();
+                    ConfigManager.save();
                     return true;
                 }
+            }
+            // The icon grid.
+            if (selected != null && pickIcon(mx, my)) {
+                return true;
             }
         }
         return super.mouseClicked(event, doubleClick);
     }
 
-    @Override
-    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
-        if (dragging != null) {
-            int nx = (int) Math.round(event.x() - dragDX) - guiX;
-            int ny = (int) Math.round(event.y() - dragDY) - guiY;
-            if (snap) {
-                nx = Math.round(nx / (float) GRID) * GRID;
-                ny = Math.round(ny / (float) GRID) * GRID;
+    private boolean pickIcon(double mx, double my) {
+        int start = iconScroll * ICON_COLS;
+        for (int i = 0; i < gridRows * ICON_COLS; i++) {
+            int idx = start + i;
+            if (idx >= icons.size()) {
+                break;
             }
-            dragging.x = nx;
-            dragging.y = ny;
-            return true;
+            int x = panelX + PAD + (i % ICON_COLS) * STRIDE;
+            int y = gridTop + (i / ICON_COLS) * STRIDE;
+            if (UiRender.inside(mx, my, x, y, SIZE, SIZE)) {
+                Identifier id = BuiltInRegistries.ITEM.getKey(icons.get(idx));
+                selected.icon = id.toString();
+                InventoryButtons.invalidateIcons();
+                ConfigManager.save();
+                return true;
+            }
         }
-        return super.mouseDragged(event, dx, dy);
+        return false;
     }
 
+    /** Dropping a dragged button snaps it to the nearest free slot. */
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         if (dragging != null) {
+            int[] best = null;
+            double bestDist = Double.MAX_VALUE;
+            for (int[] a : anchors) {
+                InventoryButton occupant = buttonAt(a[0], a[1]);
+                if (occupant != null && occupant != dragging) {
+                    continue;
+                }
+                double dx = event.x() - (guiX + a[0] + SIZE / 2.0);
+                double dy = event.y() - (guiY + a[1] + SIZE / 2.0);
+                double d = dx * dx + dy * dy;
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = a;
+                }
+            }
+            if (best != null) {
+                dragging.x = best[0];
+                dragging.y = best[1];
+            }
             dragging = null;
             ConfigManager.save();
             return true;
@@ -232,15 +339,23 @@ public class InventoryButtonsScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
-        // Only when no text box has focus, so typing "g" into a command still works.
-        boolean typing = commandBox.isFocused() || iconBox.isFocused();
-        if (!typing && event.key() == GLFW.GLFW_KEY_G) {
-            snap = !snap;
+    public boolean mouseScrolled(double mx, double my, double dx, double dy) {
+        if (selected != null && UiRender.inside(mx, my, panelX, gridTop, PANEL_W, gridRows * STRIDE)) {
+            int maxScroll = Math.max(0, (icons.size() + ICON_COLS - 1) / ICON_COLS - gridRows);
+            iconScroll = Math.max(0, Math.min(maxScroll, iconScroll - (int) Math.signum(dy)));
             return true;
         }
-        if (!typing && event.key() == GLFW.GLFW_KEY_DELETE) {
-            deleteSelected();
+        return super.mouseScrolled(mx, my, dx, dy);
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        boolean typing = commandBox.isFocused() || searchBox.isFocused();
+        if (!typing && event.key() == GLFW.GLFW_KEY_DELETE && selected != null) {
+            InventoryButtons.all().remove(selected);
+            selected = null;
+            syncBoxes();
+            ConfigManager.save();
             return true;
         }
         return super.keyPressed(event);

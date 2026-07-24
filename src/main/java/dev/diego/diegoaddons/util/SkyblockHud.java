@@ -1,12 +1,17 @@
 package dev.diego.diegoaddons.util;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import dev.diego.diegoaddons.DiegoAddonsV2Client;
+import dev.diego.diegoaddons.config.ConfigManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemLore;
@@ -44,6 +49,9 @@ public final class SkyblockHud {
     private static final ItemStack[] equipment = new ItemStack[4];
     private static boolean equipmentLocked = false;   // true once the *equipped* set has been captured
     private static ItemStack pet = ItemStack.EMPTY;
+
+    /** False until the persisted equipment/pet have been restored this session. */
+    private static boolean restored = false;
 
     /** When on, the contents of any open container are dumped to the log (name + lore per slot). */
     public static boolean debug = false;
@@ -171,8 +179,71 @@ public final class SkyblockHud {
         return s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
     }
 
+    /**
+     * Item stacks are stored as JSON so the equipment and pet survive a restart - they only exist
+     * inside server-side menus, so otherwise the HUD is blank until those menus are opened again.
+     * Encoding needs the server's registries, so this can only run once connected.
+     */
+    private static RegistryOps<JsonElement> ops(Minecraft mc) {
+        if (mc.getConnection() == null) {
+            return null;
+        }
+        return RegistryOps.create(JsonOps.INSTANCE, mc.getConnection().registryAccess());
+    }
+
+    private static String encode(Minecraft mc, ItemStack stack) {
+        RegistryOps<JsonElement> ops = ops(mc);
+        if (ops == null || stack == null || stack.isEmpty()) {
+            return null;
+        }
+        return ItemStack.CODEC.encodeStart(ops, stack).result().map(JsonElement::toString).orElse(null);
+    }
+
+    private static ItemStack decode(Minecraft mc, String json) {
+        RegistryOps<JsonElement> ops = ops(mc);
+        if (ops == null || json == null || json.isBlank()) {
+            return ItemStack.EMPTY;
+        }
+        try {
+            return ItemStack.CODEC.parse(ops, JsonParser.parseString(json)).result().orElse(ItemStack.EMPTY);
+        } catch (Exception e) {
+            return ItemStack.EMPTY;
+        }
+    }
+
+    /** Write the current cache to the config so it outlives this session. */
+    private static void persist(Minecraft mc) {
+        for (int i = 0; i < 4; i++) {
+            ConfigManager.get().savedEquipment[i] = encode(mc, equipment[i]);
+        }
+        ConfigManager.get().savedPet = encode(mc, pet);
+        ConfigManager.save();
+    }
+
+    /** Load what the last session saw, so the HUD shows something before any menu is opened. */
+    private static void restore(Minecraft mc) {
+        if (restored || mc.getConnection() == null) {
+            return;
+        }
+        restored = true;
+        String[] saved = ConfigManager.get().savedEquipment;
+        if (saved != null) {
+            for (int i = 0; i < 4 && i < saved.length; i++) {
+                ItemStack st = decode(mc, saved[i]);
+                if (!st.isEmpty()) {
+                    equipment[i] = st;
+                }
+            }
+        }
+        ItemStack p = decode(mc, ConfigManager.get().savedPet);
+        if (!p.isEmpty()) {
+            pet = p;
+        }
+    }
+
     /** Called each client tick: if a matching SkyBlock menu is open, refresh the cache from it. */
     public static void tick(Minecraft mc) {
+        restore(mc);
         if (!(mc.screen instanceof AbstractContainerScreen<?> screen)) {
             lastDumped = null;
             return;
@@ -190,8 +261,10 @@ public final class SkyblockHud {
 
         if (title.contains(EQUIPMENT_TITLE)) {
             scanEquipment(slots, limit);
+            persist(mc);
         } else if (title.contains(PETS_TITLE)) {
             scanPets(slots, limit);
+            persist(mc);
         }
     }
 
@@ -293,6 +366,7 @@ public final class SkyblockHud {
         pet = ItemStack.EMPTY;
         petInfoSource = null;
         petInfoCache = null;
+        restored = false;   // the saved copy stays; it is restored again on the next join
     }
 
     private static List<String> loreOf(ItemStack stack) {
