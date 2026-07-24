@@ -10,10 +10,9 @@ import dev.diego.diegoaddons.util.PuzzleSolvers;
  *
  * <p>Only display: a solver tells you the answer, it never clicks or moves for you.
  *
- * <p>Two are decided entirely in chat and answer there; the blaze puzzle reads the blazes themselves
- * and marks the next target in the world. The remaining puzzles (Creeper Beams, Water Board, Boulder,
- * Ice Fill, Teleport Maze) are solved from fixed coordinates inside a room, so they still need room
- * identification with rotation - see {@link PuzzleSolvers}.
+ * <p>Quiz and Three Weirdos are decided entirely in chat and answer there. The rest read the room:
+ * blaze from the mobs themselves, and Creeper Beams, Boulder, Ice Fill, Water Board and Teleport Maze
+ * from positions recorded relative to a room and turned to its rotation.
  */
 public class PuzzleSolversModule extends Module {
     public static PuzzleSolversModule INSTANCE;
@@ -28,6 +27,22 @@ public class PuzzleSolversModule extends Module {
             new BooleanSetting(this, "blazeAll", "Blaze: show whole order", true);
     private final BooleanSetting beams =
             new BooleanSetting(this, "beams", "Creeper Beams", true);
+    private final BooleanSetting boulder =
+            new BooleanSetting(this, "boulder", "Boulder", true);
+    private final BooleanSetting boulderShowAll =
+            new BooleanSetting(this, "boulderAll", "Boulder: show all pushes", false);
+    private final BooleanSetting iceFill =
+            new BooleanSetting(this, "iceFill", "Ice Fill", true);
+    private final BooleanSetting iceFillShort =
+            new BooleanSetting(this, "iceFillShort", "Ice Fill: short route", false);
+    private final BooleanSetting waterBoard =
+            new BooleanSetting(this, "water", "Water Board", true);
+    private final BooleanSetting waterShort =
+            new BooleanSetting(this, "waterShort", "Water Board: short route", false);
+    private final BooleanSetting tpMaze =
+            new BooleanSetting(this, "tpMaze", "Teleport Maze", true);
+    private final BooleanSetting tpMazeShowVisited =
+            new BooleanSetting(this, "tpMazeVisited", "Maze: show visited pads", true);
     /**
      * Only consulted when the puzzle's own instruction text was not found. Off means "do not guess":
      * a wrong order is worse than no highlight, since it reads as confident and is not.
@@ -44,6 +59,10 @@ public class PuzzleSolversModule extends Module {
     public void onClientTick(net.minecraft.client.Minecraft mc) {
         dev.diego.diegoaddons.util.BlazeSolver.tick(mc);
         dev.diego.diegoaddons.util.BeamsSolver.tick(mc);
+        dev.diego.diegoaddons.util.BoulderSolver.tick(mc);
+        dev.diego.diegoaddons.util.IceFillSolver.tick(mc);
+        dev.diego.diegoaddons.util.WaterSolver.tick(mc);
+        dev.diego.diegoaddons.util.TpMazeSolver.tick(mc);
     }
 
     public PuzzleSolversModule() {
@@ -54,6 +73,14 @@ public class PuzzleSolversModule extends Module {
         settings.add(blaze);
         settings.add(blazeShowAll);
         settings.add(beams);
+        settings.add(boulder);
+        settings.add(boulderShowAll);
+        settings.add(iceFill);
+        settings.add(iceFillShort);
+        settings.add(waterBoard);
+        settings.add(waterShort);
+        settings.add(tpMaze);
+        settings.add(tpMazeShowVisited);
         settings.add(blazeGuess);
         settings.add(blazeGuessHighest);
         settings.add(announceToParty);
@@ -74,6 +101,38 @@ public class PuzzleSolversModule extends Module {
 
     public boolean beams() {
         return beams.get();
+    }
+
+    public boolean boulder() {
+        return boulder.get();
+    }
+
+    public boolean boulderShowAll() {
+        return boulderShowAll.get();
+    }
+
+    public boolean iceFill() {
+        return iceFill.get();
+    }
+
+    public boolean iceFillShortRoute() {
+        return iceFillShort.get();
+    }
+
+    public boolean waterBoard() {
+        return waterBoard.get();
+    }
+
+    public boolean waterShortRoute() {
+        return waterShort.get();
+    }
+
+    public boolean tpMaze() {
+        return tpMaze.get();
+    }
+
+    public boolean tpMazeShowVisited() {
+        return tpMazeShowVisited.get();
     }
 
     public boolean blazeShowAll() {
