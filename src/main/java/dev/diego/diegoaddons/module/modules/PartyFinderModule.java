@@ -10,7 +10,8 @@ import dev.diego.diegoaddons.util.PartyFinder;
  * can actually join stands out instead of having to read every listing.
  *
  * <p>Any number of classes can be selected: a listing lights up when it is missing <b>any</b> of
- * them, which is what makes "I'll play healer or mage" a single pass down the menu.
+ * them, which is what makes "I'll play healer or mage" a single pass down the menu. The same toggles
+ * are drawn beside the party finder itself, so the choice can be changed without leaving the menu.
  *
  * <p>See {@link PartyFinder} for how a listing's classes are read.
  */
@@ -28,6 +29,13 @@ public class PartyFinderModule extends Module {
             settings.add(classes[i]);
         }
         INSTANCE = this;
+    }
+
+    /** Flips a class on or off - used by the toggle strip inside the party finder menu. */
+    public void toggle(int index) {
+        if (index >= 0 && index < classes.length) {
+            classes[index].toggle();
+        }
     }
 
     /** Whether the class at {@code index} is one you are looking to play. */

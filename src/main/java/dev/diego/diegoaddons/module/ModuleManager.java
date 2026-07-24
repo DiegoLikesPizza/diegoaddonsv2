@@ -151,8 +151,12 @@ public final class ModuleManager {
                 });
                 // Deny the click to the menu when it lands on one of our buttons, so the button
                 // press cannot also be read as a click on the slot behind it.
-                ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) ->
-                        !InventoryButtons.click((AbstractContainerScreen<?>) scr, ev.x(), ev.y(), ev.button()));
+                ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) -> {
+                    AbstractContainerScreen<?> cs = (AbstractContainerScreen<?>) scr;
+                    boolean ours = PartyFinder.click(cs, ev.x(), ev.y(), ev.button())
+                            || InventoryButtons.click(cs, ev.x(), ev.y(), ev.button());
+                    return !ours;
+                });
             }
         });
 
