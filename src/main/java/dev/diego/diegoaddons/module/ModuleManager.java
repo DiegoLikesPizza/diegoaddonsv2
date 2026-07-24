@@ -17,6 +17,7 @@ import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
+import dev.diego.diegoaddons.module.modules.WardrobeKeybindsModule;
 import dev.diego.diegoaddons.module.modules.WardrobeOverlayModule;
 import dev.diego.diegoaddons.util.EquipmentOverlay;
 import dev.diego.diegoaddons.util.OldMasterStars;
@@ -73,6 +74,7 @@ public final class ModuleManager {
         register(new OldMasterStarsModule(), false);
         register(new WardrobeOverlayModule(), false);
         register(new EquipmentOverlayModule(), false);
+        register(new WardrobeKeybindsModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
