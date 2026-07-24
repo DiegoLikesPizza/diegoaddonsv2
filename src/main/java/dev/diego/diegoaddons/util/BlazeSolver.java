@@ -16,22 +16,26 @@ import java.util.regex.Pattern;
 /**
  * Higher/Lower blaze puzzle: highlights the blaze to shoot next.
  *
- * <p>The blazes carry their health in the name plate above them, so the order is read from those
- * rather than from anything about the room. Which end of the order to start at is the one thing the
- * name plates cannot say - the dungeon tab list only ever calls the puzzle "Higher Or Lower" - so it
- * is read from the sign hanging in the room, with a manual override for the case where that fails.
+ * <p>The blazes carry their health in the name plate above them, so the order itself is read from
+ * those. Which <i>end</i> of the order to start at is the hard part: the dungeon tab list only ever
+ * calls the puzzle "Higher Or Lower", and there is no sign in the room. It is taken from the
+ * instruction hologram instead - SkyBlock writes that kind of text as a named armour stand, which is
+ * also how the health plates are drawn.
+ *
+ * <p>Until that text has been seen the solver highlights nothing, rather than guessing an order and
+ * being confidently wrong. The manual setting is the escape hatch if the wording ever changes.
  */
 public final class BlazeSolver {
     /** "[Lv15] Blaze 1,234/5,678❤" - the health plate above each blaze. */
     private static final Pattern HEALTH = Pattern.compile("Blaze\\s+[\\d,]+/([\\d,]+)");
-    /** How far to look for the blazes and the sign. */
+    /** How far to look for the blazes and the instruction hologram. */
     private static final double RANGE = 40.0;
 
-    private static final int NEXT = 0xFF00FF00;
-    private static final int SECOND = 0xFFFFFF00;
-    private static final int REST = 0x60FFFFFF;
+    private static final int NEXT = 0x8000FF00;
+    private static final int SECOND = 0x80FFFF00;
+    private static final int REST = 0x30FFFFFF;
 
-    /** True when the room wants the highest health shot first. Sticky once detected. */
+    /** True when the room wants the highest health shot first; null until the room says so. */
     private static Boolean highestFirst;
 
     private BlazeSolver() {
@@ -41,31 +45,38 @@ public final class BlazeSolver {
         highestFirst = null;
     }
 
+    /** What the solver currently believes, for the readout in chat. */
+    public static Boolean detectedOrder() {
+        return highestFirst;
+    }
+
     /** Called every client tick while the solver is on. */
     public static void tick(Minecraft mc) {
         PuzzleSolversModule mod = PuzzleSolversModule.INSTANCE;
         if (mod == null || !mod.isEnabled() || !mod.blaze() || mc.level == null || mc.player == null) {
             return;
         }
-        List<Blaze> blazes = findBlazes(mc);
+        List<Blaze> blazes = new ArrayList<>();
+        Boolean order = scan(mc, blazes);
+        if (order != null) {
+            highestFirst = order;
+        }
         if (blazes.size() < 2) {
-            return;   // not the puzzle, or it is already done
+            return;   // not the puzzle, or it is already finished
         }
-        if (highestFirst == null) {
-            highestFirst = detectOrder(mc);
+        Boolean useHighest = highestFirst != null ? highestFirst : mod.blazeFallbackOrder();
+        if (useHighest == null) {
+            return;
         }
-        boolean highFirst = highestFirst != null ? highestFirst : mod.blazeHighestFirst();
 
-        blazes.sort(highFirst
+        blazes.sort(useHighest
                 ? Comparator.comparingInt((Blaze b) -> b.health).reversed()
                 : Comparator.comparingInt(b -> b.health));
 
-        for (int i = 0; i < blazes.size(); i++) {
+        int shown = mod.blazeShowAll() ? blazes.size() : Math.min(2, blazes.size());
+        for (int i = 0; i < shown; i++) {
             int color = i == 0 ? NEXT : (i == 1 ? SECOND : REST);
-            if (i > 1 && !mod.blazeShowAll()) {
-                break;
-            }
-            WorldRender.box(blazes.get(i).box, color, true);
+            WorldRender.filledBox(blazes.get(i).box, color, true);
         }
     }
 
@@ -73,68 +84,77 @@ public final class BlazeSolver {
     }
 
     /**
-     * The blazes around the player, with the health from their name plate. The plate is an armour
-     * stand riding the blaze, so its position is used and lifted back down to the blaze's body.
+     * One pass over the nearby armour stands: they carry both the health plates and the instruction
+     * hologram, so both come out of the same scan.
+     *
+     * @return the detected order, or null when the instruction text was not among them
      */
-    private static List<Blaze> findBlazes(Minecraft mc) {
-        List<Blaze> out = new ArrayList<>();
+    private static Boolean scan(Minecraft mc, List<Blaze> out) {
+        Boolean order = null;
         AABB area = mc.player.getBoundingBox().inflate(RANGE);
         for (Entity e : mc.level.getEntities(mc.player, area)) {
             if (!(e instanceof ArmorStand stand) || !stand.hasCustomName()) {
                 continue;
             }
             String name = LegacyText.strip(stand.getCustomName().getString());
+
             Matcher m = HEALTH.matcher(name);
-            if (!m.find()) {
+            if (m.find()) {
+                try {
+                    int max = Integer.parseInt(m.group(1).replace(",", ""));
+                    // The plate floats above the blaze; drop it back onto the body.
+                    out.add(new Blaze(max, new AABB(
+                            stand.getX() - 0.5, stand.getY() - 2.2, stand.getZ() - 0.5,
+                            stand.getX() + 0.5, stand.getY() - 0.4, stand.getZ() + 0.5)));
+                } catch (NumberFormatException ignored) {
+                    // A plate that does not parse is simply not a blaze we can order.
+                }
                 continue;
             }
-            int max;
-            try {
-                max = Integer.parseInt(m.group(1).replace(",", ""));
-            } catch (NumberFormatException ex) {
-                continue;
+
+            Boolean fromText = readOrder(name);
+            if (fromText != null) {
+                order = fromText;
             }
-            // The plate floats above the blaze; drop it back onto the body.
-            AABB box = new AABB(stand.getX() - 0.5, stand.getY() - 2.2, stand.getZ() - 0.5,
-                    stand.getX() + 0.5, stand.getY() - 0.4, stand.getZ() + 0.5);
-            out.add(new Blaze(max, box));
         }
-        return out;
+        return order;
     }
 
     /**
-     * Reads the room's sign to decide which end of the health order to start at. Returns null when
-     * no sign is in range, leaving the caller to fall back to the manual setting.
+     * Reads the puzzle's instruction text.
+     *
+     * <p>When both directions are named - "from HIGHEST to LOWEST" - the one mentioned <b>first</b>
+     * is where you start, so the earlier word wins rather than the sentence being discarded as
+     * ambiguous.
      */
-    private static Boolean detectOrder(Minecraft mc) {
-        var level = mc.level;
-        var origin = mc.player.blockPosition();
-        int r = 24;
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dy = -8; dy <= 8; dy++) {
-                for (int dz = -r; dz <= r; dz++) {
-                    var pos = origin.offset(dx, dy, dz);
-                    if (!(level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign)) {
-                        continue;
-                    }
-                    String text = signText(sign).toLowerCase(Locale.ROOT);
-                    if (text.contains("highest")) {
-                        return Boolean.TRUE;
-                    }
-                    if (text.contains("lowest")) {
-                        return Boolean.FALSE;
-                    }
-                }
-            }
+    static Boolean readOrder(String text) {
+        String t = text.toLowerCase(Locale.ROOT);
+        if (!t.contains("blaze") && !t.contains("health") && !t.contains("order")) {
+            return null;   // not the instruction, just some other hologram
         }
-        return null;
+        int high = firstIndex(t, "highest", "higher");
+        int low = firstIndex(t, "lowest", "lower");
+        if (high < 0 && low < 0) {
+            return null;
+        }
+        if (high < 0) {
+            return Boolean.FALSE;
+        }
+        if (low < 0) {
+            return Boolean.TRUE;
+        }
+        return high < low;
     }
 
-    private static String signText(net.minecraft.world.level.block.entity.SignBlockEntity sign) {
-        StringBuilder sb = new StringBuilder();
-        for (var line : sign.getFrontText().getMessages(false)) {
-            sb.append(LegacyText.strip(line.getString())).append(' ');
+    /** The earliest position any of the words appears at, or -1. */
+    private static int firstIndex(String text, String... words) {
+        int best = -1;
+        for (String w : words) {
+            int i = text.indexOf(w);
+            if (i >= 0 && (best < 0 || i < best)) {
+                best = i;
+            }
         }
-        return sb.toString();
+        return best;
     }
 }
