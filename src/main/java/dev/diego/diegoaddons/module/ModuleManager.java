@@ -175,6 +175,7 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.ChatCompactor.reset();
             PuzzleSolvers.reset();
             dev.diego.diegoaddons.util.BlazeSolver.reset();
+            dev.diego.diegoaddons.util.DungeonRooms.reset();
             dev.diego.diegoaddons.util.WorldRender.clear();
             PartyCommands.reset();
         });
