@@ -94,6 +94,24 @@ public final class WorldRender {
         }
     }
 
+    /**
+     * Queues a path as a chain of thin boxes between consecutive points.
+     *
+     * <p>Segments are axis-aligned in every puzzle that uses this, so a box spanning two points is
+     * exactly the line between them - and unlike a line primitive it has a width worth seeing.
+     */
+    public static void path(java.util.List<net.minecraft.world.phys.Vec3> points, int argb, double thickness) {
+        double t = thickness / 2.0;
+        for (int i = 0; i + 1 < points.size(); i++) {
+            Vec3 a = points.get(i);
+            Vec3 b = points.get(i + 1);
+            filledBox(new AABB(
+                    Math.min(a.x, b.x) - t, Math.min(a.y, b.y) - t, Math.min(a.z, b.z) - t,
+                    Math.max(a.x, b.x) + t, Math.max(a.y, b.y) + t, Math.max(a.z, b.z) + t),
+                    argb, true);
+        }
+    }
+
     /** Queues a one-block box around a position. */
     public static void blockBox(double x, double y, double z, int argb, boolean throughWalls) {
         box(new AABB(x, y, z, x + 1, y + 1, z + 1), argb, throughWalls);

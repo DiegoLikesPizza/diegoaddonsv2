@@ -1,0 +1,250 @@
+package dev.diego.diegoaddons.util;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import dev.diego.diegoaddons.DiegoAddonsV2Client;
+import dev.diego.diegoaddons.module.modules.PuzzleSolversModule;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Water Board: works out which levers to pull, in what order, and when.
+ *
+ * <p>The room has a fixed set of levers and a variable puzzle. Two things pick the solution: which
+ * of the five wool slots are extended, and which of four board patterns is built - told apart by
+ * probing the blocks the patterns differ in.
+ *
+ * <p>The solution is a list of levers with times, so it is announced <b>in chat as an ordered list
+ * with its timings</b> and the levers are boxed in that order, brightest first. Timings matter here
+ * as much as order, and a box alone cannot carry "wait 7.9 seconds".
+ */
+public final class WaterSolver {
+    private static final double LINE = 0.06;
+    private static final int FIRST = 0xFF00FF00;
+    private static final int SECOND = 0xFFFFFF00;
+    private static final int LATER = 0x60FFFFFF;
+
+    /** The levers, relative to the room. Order matters: it breaks ties between equal times. */
+    private enum Lever {
+        COAL("coal_block", 20, 61, 10),
+        GOLD("gold_block", 20, 61, 15),
+        QUARTZ("quartz_block", 20, 61, 20),
+        DIAMOND("diamond_block", 10, 61, 20),
+        EMERALD("emerald_block", 10, 61, 15),
+        CLAY("hardened_clay", 10, 61, 10),
+        WATER("water", 15, 60, 5);
+
+        final String key;
+        final BlockPos rel;
+
+        Lever(String key, int x, int y, int z) {
+            this.key = key;
+            this.rel = new BlockPos(x, y, z);
+        }
+
+        static Lever byKey(String k) {
+            for (Lever l : values()) {
+                if (l.key.equals(k)) {
+                    return l;
+                }
+            }
+            return null;
+        }
+    }
+
+    /** The five wool slots; which are extended is half of what picks the solution. */
+    private static final BlockPos[] WOOL = {
+            new BlockPos(15, 56, 19), new BlockPos(15, 56, 18), new BlockPos(15, 56, 17),
+            new BlockPos(15, 56, 16), new BlockPos(15, 56, 15),
+    };
+
+    private record Step(Lever lever, double time) {
+    }
+
+    private static JsonObject data;
+    private static final List<Step> STEPS = new ArrayList<>();
+    private static String lastRoom;
+    private static boolean scanned;
+
+    private WaterSolver() {
+    }
+
+    public static void reset() {
+        STEPS.clear();
+        lastRoom = null;
+        scanned = false;
+    }
+
+    /** Called every client tick while the solver is on. */
+    public static void tick(Minecraft mc) {
+        PuzzleSolversModule mod = PuzzleSolversModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || !mod.waterBoard() || mc.level == null) {
+            return;
+        }
+        String room = DungeonRooms.currentRoomName();
+        if (!"Water Board".equals(room)) {
+            if (lastRoom != null) {
+                reset();
+            }
+            return;
+        }
+        if (!room.equals(lastRoom)) {
+            lastRoom = room;
+            scanned = false;
+            STEPS.clear();
+        }
+        if (!scanned) {
+            scan(mc, mod);
+        }
+        for (int i = 0; i < STEPS.size(); i++) {
+            BlockPos pos = DungeonRooms.toWorld(STEPS.get(i).lever().rel);
+            if (pos == null) {
+                return;
+            }
+            int color = i == 0 ? FIRST : (i == 1 ? SECOND : LATER);
+            WorldRender.thickBox(new AABB(pos), color, LINE, true);
+        }
+    }
+
+    /** Identifies the board, looks the solution up, and announces it once. */
+    private static void scan(Minecraft mc, PuzzleSolversModule mod) {
+        load();
+        if (data == null) {
+            scanned = true;
+            return;
+        }
+        String extended = extendedSlots(mc);
+        if (extended == null) {
+            return;   // rotation not known yet, or the slots could not be read
+        }
+        // Three extended slots is what every recorded solution assumes; anything else means the
+        // puzzle has already been started and the board no longer matches what was recorded.
+        if (extended.length() != 3) {
+            scanned = true;
+            say(mc, "Water Board: already started, cannot read the board");
+            return;
+        }
+        Integer pattern = patternOf(mc);
+        if (pattern == null) {
+            scanned = true;
+            say(mc, "Water Board: could not identify the pattern");
+            return;
+        }
+        scanned = true;
+
+        JsonObject byPattern = child(data, mod.waterShortRoute() ? "true" : "false");
+        JsonObject bySlots = byPattern == null ? null : child(byPattern, String.valueOf(pattern));
+        JsonObject levers = bySlots == null ? null : child(bySlots, extended);
+        if (levers == null) {
+            say(mc, "Water Board: no recorded solution for this board");
+            return;
+        }
+
+        STEPS.clear();
+        for (var e : levers.entrySet()) {
+            Lever lever = Lever.byKey(e.getKey());
+            if (lever == null) {
+                continue;
+            }
+            for (JsonElement t : e.getValue().getAsJsonArray()) {
+                STEPS.add(new Step(lever, t.getAsDouble()));
+            }
+        }
+        // Everything at 0 goes first, in lever order; the rest follows by its time.
+        STEPS.sort(Comparator
+                .comparingInt((Step s) -> s.time() == 0.0 ? 0 : 1)
+                .thenComparingDouble(s -> s.time() == 0.0 ? s.lever().ordinal() : s.time()));
+
+        StringBuilder sb = new StringBuilder("Water Board: ");
+        for (int i = 0; i < STEPS.size(); i++) {
+            Step s = STEPS.get(i);
+            if (i > 0) {
+                sb.append(" -> ");
+            }
+            sb.append(s.lever().name().toLowerCase(Locale.ROOT));
+            if (s.time() > 0) {
+                sb.append(" (").append(s.time()).append("s)");
+            }
+        }
+        say(mc, sb.toString());
+    }
+
+    /** The indices of the extended wool slots, e.g. "013". */
+    private static String extendedSlots(Minecraft mc) {
+        StringBuilder sb = new StringBuilder(3);
+        for (int i = 0; i < WOOL.length; i++) {
+            BlockPos pos = DungeonRooms.toWorld(WOOL[i]);
+            if (pos == null) {
+                return null;
+            }
+            if (!mc.level.getBlockState(pos).isAir()) {
+                sb.append(i);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Which of the four boards is built, told apart by the blocks they differ in. */
+    private static Integer patternOf(Minecraft mc) {
+        BlockPos a = DungeonRooms.toWorld(new BlockPos(14, 77, 27));
+        BlockPos b = DungeonRooms.toWorld(new BlockPos(16, 78, 27));
+        BlockPos c = DungeonRooms.toWorld(new BlockPos(14, 78, 27));
+        if (a == null || b == null || c == null) {
+            return null;
+        }
+        if (mc.level.getBlockState(a).getBlock() == Blocks.TERRACOTTA) {
+            return 0;
+        }
+        if (mc.level.getBlockState(b).getBlock() == Blocks.EMERALD_BLOCK) {
+            return 1;
+        }
+        if (mc.level.getBlockState(c).getBlock() == Blocks.DIAMOND_BLOCK) {
+            return 2;
+        }
+        if (mc.level.getBlockState(c).getBlock() == Blocks.QUARTZ_BLOCK) {
+            return 3;
+        }
+        return null;
+    }
+
+    private static JsonObject child(JsonObject o, String key) {
+        return o.has(key) && o.get(key).isJsonObject() ? o.getAsJsonObject(key) : null;
+    }
+
+    private static void say(Minecraft mc, String text) {
+        if (mc.gui != null) {
+            mc.gui.getChat().addClientSystemMessage(Component.literal("§b[DiegoAddons] §a" + text));
+        }
+    }
+
+    private static void load() {
+        if (data != null) {
+            return;
+        }
+        Identifier id = Identifier.fromNamespaceAndPath(DiegoAddonsV2Client.MOD_ID, "puzzles/water_board.json");
+        try {
+            var resource = Minecraft.getInstance().getResourceManager().getResource(id);
+            if (resource.isPresent()) {
+                try (InputStream in = resource.get().open();
+                     InputStreamReader r = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+                    data = JsonParser.parseReader(r).getAsJsonObject();
+                }
+            }
+        } catch (Exception e) {
+            DiegoAddonsV2Client.LOGGER.warn("[DiegoAddons] Could not load water solutions: {}", e.toString());
+        }
+    }
+}

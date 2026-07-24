@@ -148,6 +148,14 @@ public final class ModuleManager {
         // The word list is applied when text is drawn (see FontMixin), which covers item names and
         // lore along with everything else - so there is deliberately no tooltip hook for it here.
 
+        // Tick a boulder push off the list once the player has actually made it.
+        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (level.isClientSide()) {
+                dev.diego.diegoaddons.util.BoulderSolver.onInteract(hit.getBlockPos());
+            }
+            return net.minecraft.world.InteractionResult.PASS;
+        });
+
         // Watch system messages: blocked players joining the party, and party chat triggers.
         // Observing only; the message itself is left alone.
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
@@ -192,6 +200,10 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.BlazeSolver.reset();
             dev.diego.diegoaddons.util.DungeonRooms.reset();
             dev.diego.diegoaddons.util.BeamsSolver.reset();
+            dev.diego.diegoaddons.util.BoulderSolver.reset();
+            dev.diego.diegoaddons.util.IceFillSolver.reset();
+            dev.diego.diegoaddons.util.WaterSolver.reset();
+            dev.diego.diegoaddons.util.TpMazeSolver.reset();
             dev.diego.diegoaddons.util.SecretChime.reset();
             dev.diego.diegoaddons.util.MiningAbility.reset();
             dev.diego.diegoaddons.util.AutoGfs.reset();
