@@ -12,11 +12,13 @@ import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CoordinatesModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
 import dev.diego.diegoaddons.module.modules.DirectionModule;
+import dev.diego.diegoaddons.module.modules.EquipmentOverlayModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
 import dev.diego.diegoaddons.module.modules.WardrobeOverlayModule;
+import dev.diego.diegoaddons.util.EquipmentOverlay;
 import dev.diego.diegoaddons.util.OldMasterStars;
 import dev.diego.diegoaddons.util.TpsTracker;
 import dev.diego.diegoaddons.util.WardrobeOverlay;
@@ -70,6 +72,7 @@ public final class ModuleManager {
         register(new InventoryHudModule(), false);
         register(new OldMasterStarsModule(), false);
         register(new WardrobeOverlayModule(), false);
+        register(new EquipmentOverlayModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
@@ -103,11 +106,13 @@ public final class ModuleManager {
             }
         });
 
-        // Wardrobe overlay: draw a model per set on top of the wardrobe menu (after its extract pass).
+        // Wardrobe / equipment overlays: drawn on top of their menus, after the menu's extract pass.
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
             if (screen instanceof AbstractContainerScreen<?>) {
-                ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) ->
-                        WardrobeOverlay.render((AbstractContainerScreen<?>) scr, g));
+                ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
+                    WardrobeOverlay.render((AbstractContainerScreen<?>) scr, g);
+                    EquipmentOverlay.render((AbstractContainerScreen<?>) scr, g, mx, my);
+                });
             }
         });
 
