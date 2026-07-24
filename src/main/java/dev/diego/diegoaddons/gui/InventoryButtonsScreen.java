@@ -24,12 +24,16 @@ import java.util.Locale;
 /**
  * Editor for the inventory buttons.
  *
- * <p>Buttons snap to a fixed ring of slots around a stand-in for the container GUI, the way the
- * feature this is modelled on works: click a free slot to place a button there, click one to select
- * it, drag it to another slot, right-click to remove it. There is no free positioning, so buttons
- * always line up with the menu instead of landing a pixel off.
+ * <p>Buttons are placed freely around a stand-in for the container GUI: drag to move, right-click to
+ * remove, and the "Add" button drops a new one beside the menu.
  *
- * <p>The icon is chosen from a searchable grid of items rather than typed as an id.
+ * <p>On release a button anchors itself to whichever <b>corner of the menu it is nearest</b>, and its
+ * position is stored relative to that corner. That is what keeps it in place across menus of
+ * different sizes - a button parked under a six-row chest stays under a three-row one instead of
+ * floating in the middle of it.
+ *
+ * <p>The icon is chosen from a searchable grid - warps and common actions as presets, or the full
+ * item list - rather than typed as an id.
  */
 public class InventoryButtonsScreen extends Screen {
     /** Vanilla container GUI size, so the layout matches the real thing. */
@@ -47,8 +51,6 @@ public class InventoryButtonsScreen extends Screen {
     private EditBox searchBox;
     private final List<UiButton> buttons = new ArrayList<>();
 
-    /** Every slot a button may occupy, as offsets from the GUI's top-left corner. */
-    private final List<int[]> anchors = new ArrayList<>();
     private final List<Item> icons = new ArrayList<>();
     private final List<IconCatalogue.Entry> presets = new ArrayList<>();
     /** Picker mode: presets (warps and actions) or the full item registry. */
@@ -56,6 +58,8 @@ public class InventoryButtonsScreen extends Screen {
 
     private InventoryButton selected;
     private InventoryButton dragging;
+    private int dragDX, dragDY;
+    private boolean snap = true;
     private int iconScroll;
 
     private int guiX, guiY, panelX, panelY, panelH, gridTop, gridRows;
@@ -68,7 +72,6 @@ public class InventoryButtonsScreen extends Screen {
     @Override
     protected void init() {
         buttons.clear();
-        buildAnchors();
 
         int totalW = GUI_W + 4 * STRIDE + 24 + PANEL_W;
         guiX = (width - totalW) / 2 + STRIDE * 2;
@@ -101,28 +104,51 @@ public class InventoryButtonsScreen extends Screen {
         gridTop = panelY + 96;
         gridRows = Math.max(1, (panelY + panelH - 30 - gridTop) / STRIDE);
 
-        UiButton done = new UiButton(panelX + PANEL_W - PAD - 54, panelY + panelH - 24, 54, 20,
+        int by = panelY + panelH - 24;
+        UiButton add = new UiButton(panelX + PAD, by, 44, 20, "Add", UiButton.Kind.PRIMARY, this::addButton);
+        UiButton big = new UiButton(add.x + 48, by, 52, 20, "2x", UiButton.Kind.SECONDARY, this::toggleGigantic);
+        UiButton del = new UiButton(big.x + 56, by, 52, 20, "Delete", UiButton.Kind.SECONDARY, this::deleteSelected);
+        UiButton done = new UiButton(panelX + PANEL_W - PAD - 44, by, 44, 20,
                 "Done", UiButton.Kind.PRIMARY, this::onClose);
+        buttons.add(add);
+        buttons.add(big);
+        buttons.add(del);
         buttons.add(done);
 
         refreshIcons();
         syncBoxes();
     }
 
-    /** The ring of slots around the menu: two columns either side, two rows above and below. */
-    private void buildAnchors() {
-        anchors.clear();
-        for (int y = 0; y + SIZE <= GUI_H; y += STRIDE) {
-            anchors.add(new int[]{-STRIDE, y});              // inner left
-            anchors.add(new int[]{-STRIDE * 2, y});          // outer left
-            anchors.add(new int[]{GUI_W + 2, y});            // inner right
-            anchors.add(new int[]{GUI_W + 2 + STRIDE, y});   // outer right
+    /** Drops a new button beside the menu, left of the top-left corner. */
+    private void addButton() {
+        int y = 0;
+        while (occupied(-STRIDE, y) && y + SIZE < GUI_H) {
+            y += STRIDE;
         }
-        for (int x = 0; x + SIZE <= GUI_W; x += STRIDE) {
-            anchors.add(new int[]{x, -STRIDE});              // inner top
-            anchors.add(new int[]{x, -STRIDE * 2});          // outer top
-            anchors.add(new int[]{x, GUI_H + 2});            // inner bottom
-            anchors.add(new int[]{x, GUI_H + 2 + STRIDE});   // outer bottom
+        InventoryButton b = new InventoryButton(-STRIDE, y, "", "minecraft:chest");
+        InventoryButtons.all().add(b);
+        selected = b;
+        syncBoxes();
+        ConfigManager.save();
+    }
+
+    private boolean occupied(int x, int y) {
+        return buttonAt(x, y) != null;
+    }
+
+    private void toggleGigantic() {
+        if (selected != null) {
+            selected.gigantic = !selected.gigantic;
+            ConfigManager.save();
+        }
+    }
+
+    private void deleteSelected() {
+        if (selected != null) {
+            InventoryButtons.all().remove(selected);
+            selected = null;
+            syncBoxes();
+            ConfigManager.save();
         }
     }
 
@@ -159,6 +185,27 @@ public class InventoryButtonsScreen extends Screen {
         commandBox.active = has;
     }
 
+    /** Where a button sits inside the editor, resolved against the corner it is anchored to. */
+    private int buttonX(InventoryButton b) {
+        return b.anchorRight ? guiX + GUI_W + b.x : guiX + b.x;
+    }
+
+    private int buttonY(InventoryButton b) {
+        return b.anchorBottom ? guiY + GUI_H + b.y : guiY + b.y;
+    }
+
+    /**
+     * Re-anchors a button to the menu corner it is nearest and rewrites its offset to match, so the
+     * stored position means the same thing at any menu size.
+     */
+    private void reanchor(InventoryButton b, int screenX, int screenY) {
+        int size = InventoryButtons.size(b);
+        b.anchorRight = screenX + size / 2 > guiX + GUI_W / 2;
+        b.anchorBottom = screenY + size / 2 > guiY + GUI_H / 2;
+        b.x = screenX - (b.anchorRight ? guiX + GUI_W : guiX);
+        b.y = screenY - (b.anchorBottom ? guiY + GUI_H : guiY);
+    }
+
     private InventoryButton buttonAt(int ax, int ay) {
         for (InventoryButton b : InventoryButtons.all()) {
             if (b.x == ax && b.y == ay) {
@@ -181,28 +228,14 @@ public class InventoryButtonsScreen extends Screen {
         UiRender.textCentered(g, font, "Your menu goes here", Fonts.SMALL,
                 guiX + GUI_W / 2, guiY + GUI_H / 2 - 4, t.textFaint());
 
-        // Free slots, so it is obvious where a button can go.
-        for (int[] a : anchors) {
-            if (buttonAt(a[0], a[1]) != null) {
-                continue;
-            }
-            int x = guiX + a[0];
-            int y = guiY + a[1];
-            boolean hover = UiRender.inside(mouseX, mouseY, x, y, SIZE, SIZE);
-            UiRender.strokeRounded(g, x, y, SIZE, SIZE, 4,
-                    Theme.withAlpha(hover ? t.accent() : t.textFaint(), hover ? 0.9f : 0.3f), sm);
-            if (hover) {
-                UiRender.textCentered(g, font, "+", Fonts.SMALL, x + SIZE / 2, y + 5, t.accent());
-            }
-        }
-
         for (InventoryButton b : InventoryButtons.all()) {
-            int x = guiX + b.x;
-            int y = guiY + b.y;
-            boolean hover = UiRender.inside(mouseX, mouseY, x, y, SIZE, SIZE);
+            int x = buttonX(b);
+            int y = buttonY(b);
+            int size = InventoryButtons.size(b);
+            boolean hover = UiRender.inside(mouseX, mouseY, x, y, size, size);
             InventoryButtons.draw(g, minecraft, t, b, x, y, hover, false);
             if (b == selected) {
-                UiRender.strokeRounded(g, x - 2, y - 2, SIZE + 4, SIZE + 4, 6, t.accent(), sm);
+                UiRender.strokeRounded(g, x - 2, y - 2, size + 4, size + 4, 6, t.accent(), sm);
             }
         }
 
@@ -291,7 +324,9 @@ public class InventoryButtonsScreen extends Screen {
 
         // Existing buttons: left selects and starts a drag, right removes.
         for (InventoryButton b : new ArrayList<>(InventoryButtons.all())) {
-            if (UiRender.inside(mx, my, guiX + b.x, guiY + b.y, SIZE, SIZE)) {
+            int bx = buttonX(b);
+            int by = buttonY(b);
+            if (UiRender.inside(mx, my, bx, by, InventoryButtons.size(b), InventoryButtons.size(b))) {
                 if (btn == 1) {
                     InventoryButtons.all().remove(b);
                     if (selected == b) {
@@ -301,28 +336,16 @@ public class InventoryButtonsScreen extends Screen {
                 } else if (btn == 0) {
                     selected = b;
                     dragging = b;
+                    dragDX = (int) (mx - bx);
+                    dragDY = (int) (my - by);
                 }
                 syncBoxes();
                 return true;
             }
         }
 
-        if (btn == 0) {
-            // A free slot: place a new button there.
-            for (int[] a : anchors) {
-                if (UiRender.inside(mx, my, guiX + a[0], guiY + a[1], SIZE, SIZE)) {
-                    InventoryButton b = new InventoryButton(a[0], a[1], "", "minecraft:chest");
-                    InventoryButtons.all().add(b);
-                    selected = b;
-                    syncBoxes();
-                    ConfigManager.save();
-                    return true;
-                }
-            }
-            // The icon grid.
-            if (selected != null && pickIcon(mx, my)) {
-                return true;
-            }
+        if (btn == 0 && selected != null && pickIcon(mx, my)) {
+            return true;
         }
         return super.mouseClicked(event, doubleClick);
     }
@@ -369,29 +392,26 @@ public class InventoryButtonsScreen extends Screen {
         return false;
     }
 
-    /** Dropping a dragged button snaps it to the nearest free slot. */
+    /** Dragging moves the button freely; the grid keeps it tidy. */
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        if (dragging != null) {
+            int nx = (int) Math.round(event.x() - dragDX);
+            int ny = (int) Math.round(event.y() - dragDY);
+            if (snap) {
+                nx = guiX + Math.round((nx - guiX) / (float) STRIDE) * STRIDE;
+                ny = guiY + Math.round((ny - guiY) / (float) STRIDE) * STRIDE;
+            }
+            reanchor(dragging, nx, ny);
+            return true;
+        }
+        return super.mouseDragged(event, dx, dy);
+    }
+
+    /** On release the button keeps whichever corner it ended up nearest. */
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         if (dragging != null) {
-            int[] best = null;
-            double bestDist = Double.MAX_VALUE;
-            for (int[] a : anchors) {
-                InventoryButton occupant = buttonAt(a[0], a[1]);
-                if (occupant != null && occupant != dragging) {
-                    continue;
-                }
-                double dx = event.x() - (guiX + a[0] + SIZE / 2.0);
-                double dy = event.y() - (guiY + a[1] + SIZE / 2.0);
-                double d = dx * dx + dy * dy;
-                if (d < bestDist) {
-                    bestDist = d;
-                    best = a;
-                }
-            }
-            if (best != null) {
-                dragging.x = best[0];
-                dragging.y = best[1];
-            }
             dragging = null;
             ConfigManager.save();
             return true;

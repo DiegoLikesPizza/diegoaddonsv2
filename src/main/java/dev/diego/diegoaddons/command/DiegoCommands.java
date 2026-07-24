@@ -1,15 +1,19 @@
 package dev.diego.diegoaddons.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.diego.diegoaddons.gui.ClickGuiScreen;
 import dev.diego.diegoaddons.gui.HudEditorScreen;
+import dev.diego.diegoaddons.gui.BlockedPlayersScreen;
 import dev.diego.diegoaddons.gui.InventoryButtonsScreen;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import dev.diego.diegoaddons.util.IgnoreList;
 
 import java.util.function.Supplier;
 
@@ -38,8 +42,36 @@ public final class DiegoCommands {
                 .then(ClientCommands.literal("hud")
                         .executes(c -> open(HudEditorScreen::new)))
                 .then(ClientCommands.literal("invbuttons")
-                        .executes(c -> open(() -> new InventoryButtonsScreen(null))));
+                        .executes(c -> open(() -> new InventoryButtonsScreen(null))))
+                .then(ClientCommands.literal("blocked")
+                        .executes(c -> open(() -> new BlockedPlayersScreen(null))))
+                .then(ClientCommands.literal("block")
+                        .then(ClientCommands.argument("player", StringArgumentType.word())
+                                .executes(c -> block(c.getSource(), StringArgumentType.getString(c, "player"), ""))
+                                .then(ClientCommands.argument("reason", StringArgumentType.greedyString())
+                                        .executes(c -> block(c.getSource(),
+                                                StringArgumentType.getString(c, "player"),
+                                                StringArgumentType.getString(c, "reason"))))))
+                .then(ClientCommands.literal("unblock")
+                        .then(ClientCommands.argument("player", StringArgumentType.word())
+                                .executes(c -> unblock(c.getSource(),
+                                        StringArgumentType.getString(c, "player")))));
         dispatcher.register(cmd);
+    }
+
+    private static int block(FabricClientCommandSource source, String player, String reason) {
+        IgnoreList.block(player, reason);
+        source.sendFeedback(Component.literal("§b[DiegoAddons] §fBlocked §e" + player
+                + (reason.isBlank() ? "" : " §7(" + reason + ")")));
+        return 1;
+    }
+
+    private static int unblock(FabricClientCommandSource source, String player) {
+        boolean removed = IgnoreList.unblock(player);
+        source.sendFeedback(Component.literal(removed
+                ? "§b[DiegoAddons] §fUnblocked §e" + player
+                : "§b[DiegoAddons] §e" + player + "§f was not blocked."));
+        return 1;
     }
 
     /**

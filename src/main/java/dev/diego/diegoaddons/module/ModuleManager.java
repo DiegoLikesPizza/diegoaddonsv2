@@ -9,6 +9,7 @@ import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.modules.AnimationsModule;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
+import dev.diego.diegoaddons.module.modules.BetterIgnoreListModule;
 import dev.diego.diegoaddons.module.modules.ChatCompactModule;
 import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
 import dev.diego.diegoaddons.module.modules.ChatSearchModule;
@@ -22,14 +23,18 @@ import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
 import dev.diego.diegoaddons.module.modules.OldMasterStarsModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
+import dev.diego.diegoaddons.module.modules.ReplaceWordsModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
 import dev.diego.diegoaddons.module.modules.WardrobeKeybindsModule;
 import dev.diego.diegoaddons.util.InventoryButtons;
+import dev.diego.diegoaddons.util.IgnoreList;
 import dev.diego.diegoaddons.util.OldMasterStars;
+import dev.diego.diegoaddons.util.WordReplacer;
 import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.util.TpsTracker;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -86,6 +91,8 @@ public final class ModuleManager {
         register(new ChatSearchModule(), false);
         register(new ChatCompactModule(), false);
         register(new HideEffectsModule(), false);
+        register(new BetterIgnoreListModule(), false);
+        register(new ReplaceWordsModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
@@ -116,6 +123,20 @@ public final class ModuleManager {
             Component converted = OldMasterStars.transform(name);
             if (converted != name) {
                 lines.set(0, converted);
+            }
+        });
+
+        // Rewrite item text through the user's word list.
+        ItemTooltipCallback.EVENT.register((stack, ctx, type, lines) -> {
+            ReplaceWordsModule mod = ReplaceWordsModule.INSTANCE;
+            if (mod == null || !mod.isEnabled() || !mod.inItems()) {
+                return;
+            }
+            for (int i = 0; i < lines.size(); i++) {
+                Component replaced = WordReplacer.apply(lines.get(i));
+                if (replaced != lines.get(i)) {
+                    lines.set(i, replaced);
+                }
             }
         });
 
