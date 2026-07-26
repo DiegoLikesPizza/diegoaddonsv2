@@ -104,7 +104,7 @@ public class HudEditorScreen extends Screen {
         drawGrid(g, t);
 
         // The elements live in real screen pixels - this is a preview of the actual HUD.
-        List<HudModule> huds = ModuleManager.enabledHudModules();
+        List<HudModule> huds = legacyHudModules();
         for (HudModule hud : huds) {
             float s = ModuleManager.hudScale(hud);
             int sw = Math.round(hud.hudWidth(font, minecraft, true) * s);
@@ -266,7 +266,7 @@ public class HudEditorScreen extends Screen {
                 return true;
             }
 
-            List<HudModule> huds = ModuleManager.enabledHudModules();
+            List<HudModule> huds = legacyHudModules();
             for (int i = huds.size() - 1; i >= 0; i--) {
                 HudModule hud = huds.get(i);
                 float s = ModuleManager.hudScale(hud);
@@ -345,5 +345,19 @@ public class HudEditorScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    /**
+     * The elements this editor still owns: the ones RenderLib's managed HUD layout has not taken
+     * over. Managed elements are moved and scaled in RenderLib's placement screen instead.
+     */
+    private static List<HudModule> legacyHudModules() {
+        List<HudModule> out = new java.util.ArrayList<>();
+        for (HudModule hud : ModuleManager.enabledHudModules()) {
+            if (!dev.diego.diegoaddons.hud.HudElements.isManaged(hud)) {
+                out.add(hud);
+            }
+        }
+        return out;
     }
 }

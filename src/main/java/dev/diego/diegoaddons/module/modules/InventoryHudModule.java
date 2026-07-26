@@ -141,6 +141,12 @@ public class InventoryHudModule extends HudModule {
         return naturalH > 0 ? contentH() / (float) naturalH : 1f;
     }
 
+    /** Custom-drawn; not yet rebuilt out of RenderLib components. */
+    @Override
+    public boolean managedHud() {
+        return false;
+    }
+
     @Override
     public int hudWidth(Font font, Minecraft mc, boolean editor) {
         int w = 0;

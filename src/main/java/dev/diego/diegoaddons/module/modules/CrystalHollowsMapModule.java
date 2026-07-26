@@ -50,6 +50,12 @@ public class CrystalHollowsMapModule extends HudModule {
         return null;
     }
 
+    /** Custom-drawn; not yet rebuilt out of RenderLib components. */
+    @Override
+    public boolean managedHud() {
+        return false;
+    }
+
     @Override
     public int hudWidth(Font font, Minecraft mc, boolean editor) {
         return PAD * 2 + MAP;

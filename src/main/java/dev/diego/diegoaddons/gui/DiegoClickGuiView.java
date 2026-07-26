@@ -172,6 +172,12 @@ public class DiegoClickGuiView extends GuiView {
         }));
         right.add(pill("HUD Editor", () -> {
             close();
+            dev.diego.diegoaddons.hud.HudElements.openPlacementScreen();
+        }));
+        // Elements not yet rebuilt on RenderLib are still placed in the old editor; this goes away
+        // with the last of them.
+        right.add(pill("HUD (legacy)", () -> {
+            close();
             Minecraft.getInstance().setScreen(new HudEditorScreen());
         }));
         right.add(pill("✕", this::close));

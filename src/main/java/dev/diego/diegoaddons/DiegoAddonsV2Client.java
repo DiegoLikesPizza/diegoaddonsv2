@@ -36,6 +36,7 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
         ConfigManager.load();
         SkinChanger.ensureFolder();
         ModuleManager.init();
+        dev.diego.diegoaddons.hud.HudElements.init();
         dev.diego.diegoaddons.util.WorldRender.init();
         dev.diego.diegoaddons.command.DiegoCommands.register();
 
@@ -47,6 +48,7 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             dev.diego.diegoaddons.util.AccessibilityDefaults.tick(client);
+            dev.diego.diegoaddons.hud.HudElements.tick(client);
 
             while (OPEN_MENU.consumeClick()) {
                 if (client.screen == null) {
