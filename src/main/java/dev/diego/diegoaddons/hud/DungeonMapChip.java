@@ -92,7 +92,7 @@ public class DungeonMapChip extends HudChip {
         applyTheme();
 
         field = new ContainerComponent();
-        field.size(size, size);
+        field.size(size, size).position(GuiPositionType.RELATIVE);
         root.add(field);
 
         buildSeams(mc);
@@ -149,7 +149,14 @@ public class DungeonMapChip extends HudChip {
                             DungeonMapModule.colorOfDoor(down));
                 }
 
-                if (map.centreFillAt(rx, rz)) {
+                // The diagonal gap inside a 2x2 (or larger) room: filled whenever the room
+                // continues both right and down, otherwise the room is drawn with a hole in it.
+                boolean interior = right == DungeonMapModule.MAP_SEP
+                        && down == DungeonMapModule.MAP_SEP
+                        && rx + 1 < rooms && rz + 1 < rooms
+                        && map.downSeamAt(rx + 1, rz) == DungeonMapModule.MAP_SEP
+                        && map.rightSeamAt(rx, rz + 1) == DungeonMapModule.MAP_SEP;
+                if (interior || map.centreFillAt(rx, rz)) {
                     add(x + room, y + room, gap, gap, 0f,
                             DungeonMapModule.colorOfType(map.seamType(mc, primary, rx + 1, rz + 1)));
                 }
@@ -172,7 +179,8 @@ public class DungeonMapChip extends HudChip {
                 }
                 float x = roomX(rx);
                 float y = roomY(rz);
-                add(x, y, room, room, 2f, DungeonMapModule.colorOfType(data.type()));
+                // Square corners: rooms butt up against their seams on the real map.
+                add(x, y, room, room, 0f, DungeonMapModule.colorOfType(data.type()));
 
                 if (!map.roomCorner(rx, rz)) {
                     continue;

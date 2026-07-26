@@ -28,12 +28,15 @@ public class HudChip {
     public static final float PAD_Y = 5f;
     public static final float TEXT_PX = 10f;
     /** Breathing room between stacked rows; the old chip renderer used a 12px stride for 10px text. */
-    public static final float ROW_GAP = 2f;
+    public static final float ROW_GAP = 1f;
+    /** Height of one row's box - the old chip renderer used a 12px stride for 10px text. */
+    public static final float ROW_H = 12f;
 
     protected final HudModule module;
     protected final ContainerComponent root;
 
     private final List<TextComponent> rows = new ArrayList<>();
+    private final List<ContainerComponent> rowBoxes = new ArrayList<>();
     private List<String> lastLines = List.of();
     private int lastColor;
     private boolean lastCentered;
@@ -86,12 +89,24 @@ public class HudChip {
         root.alignItems(centered ? GuiAlignment.CENTER : GuiAlignment.START);
 
         while (rows.size() > lines.size()) {
-            root.remove(rows.remove(rows.size() - 1));
+            rows.remove(rows.size() - 1);
+            root.remove(rowBoxes.remove(rowBoxes.size() - 1));
         }
         while (rows.size() < lines.size()) {
+            // A row lives in a box of its own with a real height: left to size themselves the text
+            // boxes collapse and every line lands on top of the last one.
+            ContainerComponent box = new ContainerComponent();
+            box.size(width, ROW_H).display(GuiDisplay.FLEX)
+                    .flexDirection(GuiFlexDirection.ROW)
+                    .alignItems(GuiAlignment.CENTER);
             TextComponent row = new TextComponent().font(HudText.MEDIUM).textScalePixels(TEXT_PX);
+            box.add(row);
             rows.add(row);
-            root.add(row);
+            rowBoxes.add(box);
+            root.add(box);
+        }
+        for (ContainerComponent box : rowBoxes) {
+            box.size(width, ROW_H);
         }
         for (int i = 0; i < lines.size(); i++) {
             rows.get(i).text(lines.get(i)).color(color).width(width);

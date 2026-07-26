@@ -208,13 +208,18 @@ public class InventoryChip extends HudChip {
     private Slot slot(float size) {
         Theme t = Themes.current();
         ContainerComponent box = new ContainerComponent();
-        box.size(size, size).cornerRadius(3f);
+        box.size(size, size).cornerRadius(3f)
+                .position(GuiPositionType.RELATIVE)   // anchors the absolute count label below
+                .display(GuiDisplay.FLEX)
+                .flexDirection(GuiFlexDirection.ROW)
+                .alignItems(GuiAlignment.CENTER)
+                .justifyContent(GuiAlignment.CENTER);
         if (inv.showSlotBoxes()) {
             box.backgroundColor(Theme.withAlpha(t.textFaint(), 0.16f));
         }
 
         ItemModelComponent model = new ItemModelComponent();
-        model.size(size, size).position(GuiPositionType.ABSOLUTE).x(0f).y(0f).visible(false);
+        model.size(size, size).visible(false);
         box.add(model);
 
         TextComponent count = new TextComponent().font(HudText.MEDIUM)
