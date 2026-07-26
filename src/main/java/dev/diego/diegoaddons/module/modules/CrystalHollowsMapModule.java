@@ -50,10 +50,23 @@ public class CrystalHollowsMapModule extends HudModule {
         return null;
     }
 
-    /** Custom-drawn; not yet rebuilt out of RenderLib components. */
+    // --- read by the RenderLib element -----------------------------------------------------------
+
+    public boolean showRegions() {
+        return showRegions.get();
+    }
+
+    public boolean showWaypoints() {
+        return showWaypoints.get();
+    }
+
+    public boolean showCoords() {
+        return showCoords.get();
+    }
+
     @Override
-    public boolean managedHud() {
-        return false;
+    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.CrystalMapChip(this, root);
     }
 
     @Override

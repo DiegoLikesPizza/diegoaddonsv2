@@ -141,10 +141,53 @@ public class InventoryHudModule extends HudModule {
         return naturalH > 0 ? contentH() / (float) naturalH : 1f;
     }
 
-    /** Custom-drawn; not yet rebuilt out of RenderLib components. */
+    // --- read by the RenderLib element -----------------------------------------------------------
+
+    public boolean showBackground() {
+        return background.get();
+    }
+
+    public boolean showSlotBoxes() {
+        return slotBoxes.get();
+    }
+
+    public boolean showHotbar() {
+        return hotbar.get();
+    }
+
+    public boolean showArmor() {
+        return armor.get();
+    }
+
+    public boolean showPlayerModel() {
+        return playerModel.get();
+    }
+
+    public boolean showEquipment() {
+        return equipment.get();
+    }
+
+    public boolean showPet() {
+        return pet.get();
+    }
+
+    /** The pet's level line, shared with the RenderLib element. */
+    public String levelText(SkyblockHud.PetInfo info) {
+        return levelLine(info);
+    }
+
+    /**
+     * Which sections are on, as a string - the element rebuilds its tree when this changes and
+     * leaves it alone otherwise.
+     */
+    public String sectionSignature() {
+        return "" + background.get() + slotBoxes.get() + hotbar.get() + armor.get()
+                + playerModel.get() + equipment.get() + pet.get();
+    }
+
     @Override
-    public boolean managedHud() {
-        return false;
+    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.InventoryChip(this, root);
     }
 
     @Override

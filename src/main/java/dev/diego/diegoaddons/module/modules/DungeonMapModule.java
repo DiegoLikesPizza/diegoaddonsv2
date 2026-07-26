@@ -236,10 +236,114 @@ public class DungeonMapModule extends HudModule {
         return n;
     }
 
-    /** Custom-drawn; not yet rebuilt out of RenderLib components. */
+    // --- view model for the RenderLib element ------------------------------------------------------
+
+    /** Grid geometry, shared with the element that draws it. */
+    public static final int MAP_ROOMS = ROOMS;
+    public static final int MAP_ROOM = ROOM;
+    public static final int MAP_GAP = GAP;
+    public static final int MAP_SIZE = SIZE;
+    public static final int MAP_PAD = PAD;
+    public static final int MAP_DOOR_BAR = DOOR_BAR;
+    public static final byte MAP_SEP = SEP;
+    public static final byte MAP_DOOR_NORMAL = DOOR_NORMAL;
+
+    /** One line of the stats block under the map. */
+    public record StatLine(String label, String value, int color) {
+    }
+
+    public boolean showChecks() {
+        return showChecks.get();
+    }
+
+    public boolean showPlayers() {
+        return showPlayers.get();
+    }
+
+    public boolean showNames() {
+        return showNames.get();
+    }
+
+    public boolean showSecrets() {
+        return showSecrets.get();
+    }
+
+    public byte rightSeamAt(int rx, int rz) {
+        return rightSeam[rx + rz * ROOMS];
+    }
+
+    public byte downSeamAt(int rx, int rz) {
+        return downSeam[rx + rz * ROOMS];
+    }
+
+    public boolean centreFillAt(int rx, int rz) {
+        return centreFill[rx + rz * ROOMS];
+    }
+
+    public boolean roomCorner(int rx, int rz) {
+        return isRoomCorner(rx, rz);
+    }
+
+    public static int colorOfType(String type) {
+        return typeColor(type);
+    }
+
+    public static int colorOfDoor(byte kind) {
+        return doorColor(kind);
+    }
+
+    /** The room type to paint a seam fill with, preferring the primary tile. */
+    public String seamType(Minecraft mc, DungeonRooms.RoomData primary, int nx, int nz) {
+        return colorRoom(mc, primary, nx, nz);
+    }
+
+    /** The stats block as data, so the element can lay it out as text components. */
+    public List<StatLine> statLines() {
+        List<StatLine> out = new ArrayList<>();
+        dev.diego.diegoaddons.gui.Theme t = dev.diego.diegoaddons.gui.Themes.current();
+        if (statSecrets.get()) {
+            out.add(new StatLine("Secrets", String.valueOf(DungeonState.secretsFound()), t.text()));
+        }
+        if (statScore.get()) {
+            out.add(new StatLine("Score", DungeonState.score() + " (" + DungeonState.scoreLabel() + ")",
+                    DungeonState.scoreColor()));
+        }
+        if (statCrypts.get()) {
+            out.add(new StatLine("Crypts", String.valueOf(DungeonState.crypts()), t.text()));
+        }
+        if (statMimic.get()) {
+            boolean dead = DungeonState.mimicKilled();
+            out.add(new StatLine("Mimic", dead ? "✔" : "✖", dead ? 0xFF55FF55 : 0xFFFF5555));
+        }
+        if (statPrince.get()) {
+            boolean dead = DungeonState.princeKilled();
+            out.add(new StatLine("Prince", dead ? "✔" : "✖", dead ? 0xFF55FF55 : 0xFFFF5555));
+        }
+        return out;
+    }
+
+    /**
+     * A short description of the room layout: the element rebuilds its tiles when this changes and
+     * leaves them alone on every other tick.
+     */
+    public String layoutSignature(Minecraft mc) {
+        StringBuilder sb = new StringBuilder(ROOMS * ROOMS * 3);
+        for (int rz = 0; rz < ROOMS; rz++) {
+            for (int rx = 0; rx < ROOMS; rx++) {
+                DungeonRooms.RoomData room = DungeonRooms.roomAt(mc, rx, rz);
+                sb.append(room == null ? '-' : room.type() == null ? '?' : room.type().charAt(0));
+                sb.append((char) ('a' + rightSeamAt(rx, rz)));
+                sb.append((char) ('a' + downSeamAt(rx, rz)));
+                sb.append(centreFillAt(rx, rz) ? '#' : '.');
+            }
+        }
+        sb.append(showChecks()).append(showNames()).append(showSecrets());
+        return sb.toString();
+    }
+
     @Override
-    public boolean managedHud() {
-        return false;
+    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.DungeonMapChip(this, root);
     }
 
     @Override
