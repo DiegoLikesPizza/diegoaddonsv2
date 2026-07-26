@@ -170,7 +170,7 @@ public class ClickGuiScreen extends Screen {
         int by = panelY + (HEADER_H - bh) / 2;
         int hudX = closeX - 16 - HUD_BTN_W;
         UiButton hud = new UiButton(hudX, by, HUD_BTN_W, bh, "HUD Editor", UiButton.Kind.SECONDARY,
-                () -> minecraft.setScreen(new HudEditorScreen()));
+                () -> dev.diego.diegoaddons.hud.HudElements.openPlacementScreen());
         hud.hiRes = true;
         headerButtons.add(hud);
 

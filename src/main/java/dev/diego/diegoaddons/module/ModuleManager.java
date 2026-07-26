@@ -496,18 +496,12 @@ public final class ModuleManager {
 
     private static void renderHud(GuiGraphicsExtractor g, DeltaTracker delta) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.options.hideGui || mc.screen instanceof dev.diego.diegoaddons.gui.HudEditorScreen) {
-            return; // the editor draws its own elements
+        if (mc.options.hideGui) {
+            return;
         }
         Theme t = Themes.current();
         boolean smooth = ConfigManager.get().smoothCorners;
         Font font = mc.font;
-        for (HudModule hud : enabledHudModules()) {
-            if (dev.diego.diegoaddons.hud.HudElements.isManaged(hud)) {
-                continue;   // RenderLib's managed HUD layout draws this one
-            }
-            drawElement(g, font, t, smooth, hud, mc, hudX(hud), hudY(hud), false);
-        }
         dev.diego.diegoaddons.util.ItemRarity.renderHotbar(g, mc);
         dev.diego.diegoaddons.util.CustomScoreboard.render(g, mc);
         dev.diego.diegoaddons.util.AbilityCooldown.renderHotbar(g, mc);

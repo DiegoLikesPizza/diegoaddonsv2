@@ -25,6 +25,12 @@ public final class HudText {
 
     /** Natural pixel size of the resource fonts above, as Minecraft rasterises them. */
     private static final float NATURAL_PX = 10f;
+    /**
+     * RenderLib shapes these faces wider than Minecraft's own metric reports - measured against a
+     * running client, a label needs about a quarter more room than {@code Font.width} suggests, and
+     * a label that runs out of room wraps and spills out of its chip.
+     */
+    private static final float SLACK = 1.25f;
 
     private HudText() {
     }
@@ -42,7 +48,7 @@ public final class HudText {
             return s.length() * scale * 0.6f;
         }
         float natural = mc.font.width(Fonts.t(s, Fonts.MEDIUM));
-        return natural * (scale / NATURAL_PX) * 1.06f + 4f;
+        return natural * (scale / NATURAL_PX) * SLACK + 6f;
     }
 
     /**

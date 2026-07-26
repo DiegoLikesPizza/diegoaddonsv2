@@ -142,10 +142,24 @@ public class MusicDisplayModule extends HudModule {
         return w;
     }
 
-    /** Custom-drawn; not yet rebuilt out of RenderLib components. */
+    /** Whether the cover art is on; read by the RenderLib element. */
+    public boolean showCover() {
+        return cover.get();
+    }
+
+    /** Whether the progress bar is on; read by the RenderLib element. */
+    public boolean showProgress() {
+        return progress.get();
+    }
+
+    /** Whether this element needs the cover/bar layout rather than the shared text chip. */
+    public boolean customLayout() {
+        return custom();
+    }
+
     @Override
-    public boolean managedHud() {
-        return false;
+    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.MusicChip(this, root);
     }
 
     @Override

@@ -6,7 +6,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.diego.diegoaddons.gui.BlockedPlayersScreen;
 import dev.diego.diegoaddons.gui.DiegoClickGuiView;
 import dev.diego.diegoaddons.gui.CommandHotkeysScreen;
-import dev.diego.diegoaddons.gui.HudEditorScreen;
 import dev.diego.diegoaddons.gui.InventoryButtonsScreen;
 import dev.diego.diegoaddons.gui.ReplaceWordsScreen;
 import dev.diego.diegoaddons.config.MiningRoute;
@@ -77,7 +76,11 @@ public final class DiegoCommands {
                 .then(ClientCommands.literal("help")
                         .executes(c -> help(c.getSource(), name)))
                 .then(ClientCommands.literal("hud")
-                        .executes(c -> open(HudEditorScreen::new)))
+                        .executes(c -> {
+                            Minecraft.getInstance().execute(
+                                    dev.diego.diegoaddons.hud.HudElements::openPlacementScreen);
+                            return 1;
+                        }))
                 .then(ClientCommands.literal("invbuttons")
                         .executes(c -> open(() -> new InventoryButtonsScreen(null))))
                 .then(ClientCommands.literal("words")
