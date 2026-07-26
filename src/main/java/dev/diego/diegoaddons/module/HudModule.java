@@ -69,6 +69,20 @@ public abstract class HudModule extends Module {
         }
     }
 
+    /**
+     * Whether this element is drawn by RenderLib's managed HUD layout ({@code HudElements}) rather
+     * than the old chip renderer. Custom-drawn elements return {@code false} until their drawing has
+     * been rebuilt out of RenderLib components.
+     */
+    public boolean managedHud() {
+        return true;
+    }
+
+    /** Builds the RenderLib component tree for this element inside {@code root}. */
+    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.HudChip(this, root);
+    }
+
     public int color() {
         return accentColour.get() ? Themes.current().accent() : Themes.current().text();
     }
