@@ -48,7 +48,7 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (OPEN_MENU.consumeClick()) {
                 if (client.screen == null) {
-                    client.setScreen(new ClickGuiScreen());
+                    new dev.diego.diegoaddons.gui.DiegoClickGuiView().open();
                 }
             }
 

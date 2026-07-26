@@ -42,7 +42,7 @@ public final class DungeonRooms {
     private static final int ROOM_SHIFT = 5;
 
     /** One entry of the room table. */
-    public record RoomData(String name, String type, String shape) {
+    public record RoomData(String name, String type, String shape, int secrets) {
     }
 
     /**
@@ -128,6 +128,28 @@ public final class DungeonRooms {
         };
     }
 
+    /**
+     * Identify the room occupying an arbitrary tile, for the dungeon map's whole-grid scan. Uses and
+     * fills the same per-dungeon cache as {@link #tick}, but touches none of the current-room or
+     * rotation state, so it is safe to call for every tile each frame. Returns null while the tile's
+     * chunk has not loaded or the room is unknown.
+     */
+    public static RoomData roomAt(Minecraft mc, int tx, int tz) {
+        if (mc == null || mc.level == null || tx < 0 || tx >= GRID || tz < 0 || tz >= GRID) {
+            return null;
+        }
+        int key = tx + tz * GRID;
+        RoomData known = IDENTIFIED.get(key);
+        if (known != null) {
+            return known;
+        }
+        RoomData found = identify(mc, tx, tz);
+        if (found != null) {
+            IDENTIFIED.put(key, found);
+        }
+        return found;
+    }
+
     public static void reset() {
         IDENTIFIED.clear();
         retryIn = 0;
@@ -190,28 +212,70 @@ public final class DungeonRooms {
      * directly rather than leaving the room unusable.
      */
     private static void findRotation(Minecraft mc, int tx, int tz) {
-        int y = highestBlock;
-        if (y <= 0 || mc.level == null) {
+        if (mc.level == null) {
             return;
         }
         int originX = tx * 32 - 185;
         int originZ = tz * 32 - 185;
+        int key = tx + tz * GRID;
 
         if (current != null && "Fairy".equals(current.name())) {
             rotation = Rotation.SOUTH;
-            marker = new BlockPos(originX + Rotation.SOUTH.dx, y, originZ + Rotation.SOUTH.dz);
-            rotationTile = tx + tz * GRID;
+            marker = new BlockPos(originX + Rotation.SOUTH.dx, 70, originZ + Rotation.SOUTH.dz);
+            rotationTile = key;
             return;
         }
+        // Scan each corner's whole column for the marker rather than probing one guessed height. The
+        // marker sits at the room's roof, but the roof height varies room to room and a single wrong
+        // guess left the rotation - and every coordinate solver that depends on it - dead. Only the
+        // marker's X/Z matter to {@link #toWorld}, so the exact Y found here is unimportant. Of the
+        // corners with a terracotta, the one whose block is highest is the real roof marker (any
+        // decorative terracotta sits lower), so that corner wins.
+        Rotation best = null;
+        BlockPos bestPos = null;
         for (Rotation r : Rotation.values()) {
-            BlockPos pos = new BlockPos(originX + r.dx, y, originZ + r.dz);
-            if (mc.level.getBlockState(pos).getBlock() == Blocks.BLUE_TERRACOTTA) {
-                rotation = r;
-                marker = pos;
-                rotationTile = tx + tz * GRID;
-                return;
+            BlockPos found = markerInColumn(mc, originX + r.dx, originZ + r.dz);
+            if (found != null && (bestPos == null || found.getY() > bestPos.getY())) {
+                best = r;
+                bestPos = found;
             }
         }
+        if (best != null) {
+            rotation = best;
+            marker = bestPos;
+            rotationTile = key;
+        }
+    }
+
+    /** The highest blue-terracotta block down a column, or null - the room's rotation marker. */
+    private static BlockPos markerInColumn(Minecraft mc, int x, int z) {
+        for (int y = 150; y >= 60; y--) {
+            BlockPos pos = new BlockPos(x, y, z);
+            if (mc.level.getBlockState(pos).getBlock() == Blocks.BLUE_TERRACOTTA) {
+                return pos;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Diagnostic: the core hash and matched name for the tile the player is standing in. Used to fix
+     * up the room table when a room resolves to the wrong name (e.g. a blaze variant reading as the
+     * opposite order). Returns null while the tile is outside the grid or its chunk has not loaded.
+     */
+    public static String debugCurrentTile(Minecraft mc) {
+        if (mc == null || mc.level == null || tileX < 0 || tileZ < 0) {
+            return null;
+        }
+        int chunkX = (tileX - GRID) * 2;
+        int chunkZ = (tileZ - GRID) * 2;
+        LevelChunk chunk = mc.level.getChunk(chunkX, chunkZ);
+        if (chunk == null) {
+            return null;
+        }
+        int hash = coreHash(chunk, chunkX * 16 + 7, chunkZ * 16 + 7);
+        RoomData d = table().get(hash);
+        return "hash=" + hash + " name=" + (d == null ? "UNKNOWN" : d.name());
     }
 
     /** Scans the room's core column and looks the resulting hash up in the table. */
@@ -295,7 +359,8 @@ public final class DungeonRooms {
                         RoomData data = new RoomData(
                                 o.get("name").getAsString(),
                                 o.has("type") ? o.get("type").getAsString() : "NORMAL",
-                                o.has("shape") ? o.get("shape").getAsString() : "1x1");
+                                o.has("shape") ? o.get("shape").getAsString() : "1x1",
+                                o.has("secrets") ? o.get("secrets").getAsInt() : 0);
                         for (JsonElement core : o.getAsJsonArray("cores")) {
                             byCore.put(core.getAsInt(), data);
                         }

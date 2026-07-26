@@ -18,10 +18,12 @@
   "mixins": [
     "diegoaddonsv2.mixins.json"
   ],
+  "accessWidener": "diegoaddonsv2.accesswidener",
   "depends": {
     "fabricloader": ">=0.19.3",
     "minecraft": "~26.1.2",
     "java": ">=25",
-    "fabric-api": "*"
+    "fabric-api": "*",
+    "render-lib": ">=2.1.4"
   }
 }

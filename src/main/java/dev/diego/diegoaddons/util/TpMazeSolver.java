@@ -4,21 +4,23 @@ import dev.diego.diegoaddons.module.modules.PuzzleSolversModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
- * Teleport Maze: marks the pads you have not stepped on yet.
+ * Teleport Maze: highlights the single correct pad to step on next.
  *
- * <p>The maze is a fixed set of pads and the puzzle is purely about not going in circles, so the
- * useful thing to show is not a route but <b>which pads are still unexplored</b>. Pads are recorded
- * relative to the room and turned to its rotation like every other solver here.
+ * <p>The maze is a fixed set of pads with a route that changes each run, and nothing in the world
+ * labels the route. The one tell is the teleport itself: when a pad throws you, Hypixel snaps your
+ * view to face the <b>correct next pad</b> so you know where to go. So the solver watches for the
+ * position jump a teleport makes, waits a tick for that forced rotation to land, then picks the pad
+ * your look vector is pointing at and marks only it. Nothing is drawn until the first teleport, since
+ * that is the first moment the game reveals a direction.
  *
- * <p>A pad counts as visited when you stand on it, which is also the only moment the game gives you:
- * the teleport is what moves you, so there is nothing to intercept beforehand.
+ * <p>The pad positions are recorded relative to the room and turned to its rotation like every other
+ * solver here; only <i>which</i> of them is correct comes from the look angle.
  */
 public final class TpMazeSolver {
     /** The pads, relative to the room. */
@@ -34,22 +36,33 @@ public final class TpMazeSolver {
     };
 
     private static final double LINE = 0.06;
-    private static final int UNVISITED = 0xFF00FF00;
-    private static final int VISITED = 0x50FFFFFF;
-    /** How close you have to be to a pad to count as standing on it. */
-    private static final double REACH = 1.2;
+    private static final int CORRECT = 0xFF00FF00;
+
+    /** A one-tick position jump larger than this is a teleport, not walking or a sprint-jump. */
+    private static final double TP_JUMP = 1.5;
+    /** Skip pads nearer than this (the one under your feet) or farther than this when aiming. */
+    private static final double MIN_DIST = 1.5;
+    private static final double MAX_DIST = 16.0;
+    /** Minimum look-to-pad alignment (cosine) to accept a pad as the one being faced (~0.85 = 32deg). */
+    private static final double MIN_ALIGN = 0.85;
+    /** Ticks to wait after a teleport before reading the rotation, so the forced turn has applied. */
+    private static final int SETTLE_TICKS = 2;
 
     private static final List<BlockPos> WORLD_PADS = new ArrayList<>();
-    private static final Set<BlockPos> VISITED_PADS = new HashSet<>();
     private static String lastRoom;
+    private static Vec3 lastPos;
+    private static int computeIn;
+    private static BlockPos correctPad;
 
     private TpMazeSolver() {
     }
 
     public static void reset() {
         WORLD_PADS.clear();
-        VISITED_PADS.clear();
         lastRoom = null;
+        lastPos = null;
+        computeIn = 0;
+        correctPad = null;
     }
 
     /** Called every client tick while the solver is on. */
@@ -67,6 +80,9 @@ public final class TpMazeSolver {
         }
         if (!room.equals(lastRoom)) {
             lastRoom = room;
+            correctPad = null;
+            lastPos = null;
+            computeIn = 0;
             place();
         }
         if (WORLD_PADS.isEmpty()) {
@@ -74,27 +90,51 @@ public final class TpMazeSolver {
             return;
         }
 
-        BlockPos standing = mc.player.blockPosition();
-        for (BlockPos pad : WORLD_PADS) {
-            if (Math.abs(pad.getX() - standing.getX()) <= REACH
-                    && Math.abs(pad.getZ() - standing.getZ()) <= REACH
-                    && Math.abs(pad.getY() - standing.getY()) <= 2) {
-                VISITED_PADS.add(pad);
-            }
+        // A teleport moves you several blocks in one tick; walking never does. When one happens, the
+        // game has just turned you to face the correct pad - read it a couple ticks later once applied.
+        Vec3 pos = mc.player.position();
+        if (lastPos != null && pos.distanceTo(lastPos) > TP_JUMP) {
+            computeIn = SETTLE_TICKS;
         }
+        lastPos = pos;
+        if (computeIn > 0 && --computeIn == 0) {
+            correctPad = padInFront(mc);
+        }
+
+        if (correctPad != null) {
+            WorldRender.thickBox(new AABB(correctPad), CORRECT, LINE, true);
+        }
+    }
+
+    /** The pad your look vector points at, or the previous one if nothing lines up well enough. */
+    private static BlockPos padInFront(Minecraft mc) {
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 look = mc.player.getLookAngle();
+        double lookLen = Math.sqrt(look.x * look.x + look.z * look.z);
+        if (lookLen < 1e-6) {
+            return correctPad;   // staring straight up or down tells us nothing; keep the last pad
+        }
+        BlockPos best = null;
+        double bestDot = MIN_ALIGN;
         for (BlockPos pad : WORLD_PADS) {
-            boolean seen = VISITED_PADS.contains(pad);
-            if (seen && !mod.tpMazeShowVisited()) {
+            double dx = (pad.getX() + 0.5) - eye.x;
+            double dz = (pad.getZ() + 0.5) - eye.z;
+            double d = Math.sqrt(dx * dx + dz * dz);
+            if (d < MIN_DIST || d > MAX_DIST) {
                 continue;
             }
-            WorldRender.thickBox(new AABB(pad), seen ? VISITED : UNVISITED, LINE, true);
+            double dot = (dx * look.x + dz * look.z) / (d * lookLen);
+            if (dot > bestDot) {
+                bestDot = dot;
+                best = pad;
+            }
         }
+        return best != null ? best : correctPad;
     }
 
     /** Turns the recorded pads into world positions once the room's rotation is known. */
     private static void place() {
         WORLD_PADS.clear();
-        VISITED_PADS.clear();
         for (int[] p : PADS) {
             BlockPos pos = DungeonRooms.toWorld(new BlockPos(p[0], p[1], p[2]));
             if (pos == null) {

@@ -10,8 +10,17 @@ base {
     archivesName = project.archives_base_name
 }
 
+loom {
+    accessWidenerPath = file("src/main/resources/diegoaddonsv2.accesswidener")
+}
+
 repositories {
     // Loom adds the essential maven repositories automatically.
+    maven {
+        name = "RenderLib"
+        url = "https://renderlib.ifallious.com/maven"
+        content { includeGroup "com.render" }
+    }
 }
 
 dependencies {
@@ -23,6 +32,9 @@ dependencies {
 
     // Fabric API
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    // RenderLib - retained GUI / HUD / world rendering (jar-in-jar bundled).
+    implementation(include("com.render:render-lib:2.1.4"))
 }
 
 processResources {
