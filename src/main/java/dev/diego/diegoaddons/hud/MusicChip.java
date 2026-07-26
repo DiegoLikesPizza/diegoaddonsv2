@@ -112,7 +112,7 @@ public class MusicChip extends HudChip {
                 .gap(GAP)
                 .padding(PAD_Y, PAD_X);
 
-        float contentH = lines.size() * (TEXT_PX + ROW_GAP) + (wantBar ? GAP + BAR_H : 0f);
+        float contentH = lines.size() * (ROW_H + ROW_GAP) + (wantBar ? GAP + BAR_H : 0f);
         float textW = textWidth();
 
         if (wantCover) {
@@ -133,10 +133,16 @@ public class MusicChip extends HudChip {
                 .gap(ROW_GAP)
                 .width(textW);
         for (String line : lines) {
+            // Fixed-height box per row; text boxes left to size themselves collapse and overlap.
+            ContainerComponent box = new ContainerComponent();
+            box.size(textW, ROW_H).display(GuiDisplay.FLEX)
+                    .flexDirection(GuiFlexDirection.ROW)
+                    .alignItems(GuiAlignment.CENTER);
             TextComponent row = new TextComponent().text(line).color(color)
                     .font(HudText.MEDIUM).textScalePixels(TEXT_PX).width(textW);
+            box.add(row);
             rows.add(row);
-            textColumn.add(row);
+            textColumn.add(box);
         }
 
         if (wantBar) {
