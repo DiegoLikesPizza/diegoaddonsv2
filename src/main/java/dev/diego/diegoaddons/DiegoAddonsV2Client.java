@@ -46,6 +46,8 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
                 KeyMapping.Category.MISC));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            dev.diego.diegoaddons.util.AccessibilityDefaults.tick(client);
+
             while (OPEN_MENU.consumeClick()) {
                 if (client.screen == null) {
                     new dev.diego.diegoaddons.gui.DiegoClickGuiView().open();
