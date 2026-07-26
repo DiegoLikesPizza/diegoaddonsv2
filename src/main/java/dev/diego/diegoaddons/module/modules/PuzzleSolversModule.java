@@ -21,6 +21,8 @@ public class PuzzleSolversModule extends Module {
             new BooleanSetting(this, "quiz", "Quiz (Oruo)", true);
     private final BooleanSetting weirdos =
             new BooleanSetting(this, "weirdos", "Three Weirdos", true);
+    private final BooleanSetting tictactoe =
+            new BooleanSetting(this, "tictactoe", "Tic Tac Toe", true);
     private final BooleanSetting blaze =
             new BooleanSetting(this, "blaze", "Higher Or Lower (Blaze)", true);
     private final BooleanSetting blazeShowAll =
@@ -41,8 +43,6 @@ public class PuzzleSolversModule extends Module {
             new BooleanSetting(this, "waterShort", "Water Board: short route", false);
     private final BooleanSetting tpMaze =
             new BooleanSetting(this, "tpMaze", "Teleport Maze", true);
-    private final BooleanSetting tpMazeShowVisited =
-            new BooleanSetting(this, "tpMazeVisited", "Maze: show visited pads", true);
     /**
      * Only consulted when the puzzle's own instruction text was not found. Off means "do not guess":
      * a wrong order is worse than no highlight, since it reads as confident and is not.
@@ -57,6 +57,8 @@ public class PuzzleSolversModule extends Module {
 
     @Override
     public void onClientTick(net.minecraft.client.Minecraft mc) {
+        dev.diego.diegoaddons.util.PuzzleSolvers.tick(mc);
+        dev.diego.diegoaddons.util.TicTacToeSolver.tick(mc);
         dev.diego.diegoaddons.util.BlazeSolver.tick(mc);
         dev.diego.diegoaddons.util.BeamsSolver.tick(mc);
         dev.diego.diegoaddons.util.BoulderSolver.tick(mc);
@@ -70,6 +72,7 @@ public class PuzzleSolversModule extends Module {
                 "Solve dungeon puzzles that can be answered from chat.");
         settings.add(quiz);
         settings.add(weirdos);
+        settings.add(tictactoe);
         settings.add(blaze);
         settings.add(blazeShowAll);
         settings.add(beams);
@@ -80,7 +83,6 @@ public class PuzzleSolversModule extends Module {
         settings.add(waterBoard);
         settings.add(waterShort);
         settings.add(tpMaze);
-        settings.add(tpMazeShowVisited);
         settings.add(blazeGuess);
         settings.add(blazeGuessHighest);
         settings.add(announceToParty);
@@ -93,6 +95,10 @@ public class PuzzleSolversModule extends Module {
 
     public boolean weirdos() {
         return weirdos.get();
+    }
+
+    public boolean tictactoe() {
+        return tictactoe.get();
     }
 
     public boolean blaze() {
@@ -129,10 +135,6 @@ public class PuzzleSolversModule extends Module {
 
     public boolean tpMaze() {
         return tpMaze.get();
-    }
-
-    public boolean tpMazeShowVisited() {
-        return tpMazeShowVisited.get();
     }
 
     public boolean blazeShowAll() {

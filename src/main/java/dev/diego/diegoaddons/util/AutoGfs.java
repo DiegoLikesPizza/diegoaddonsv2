@@ -16,13 +16,13 @@ import java.util.Locale;
  * this sends commands on your behalf.
  */
 public final class AutoGfs {
-    /** One refillable item: what to look for in an item's name, and what to ask the sacks for. */
-    public record Item(String match, String command) {
+    /** One refillable item: what to look for in an item's name, and its SkyBlock sack id. */
+    public record Item(String match, String id) {
     }
 
-    public static final Item PEARLS = new Item("ender pearl", "gfs ENDER_PEARL 16");
-    public static final Item SUPERBOOM = new Item("superboom", "gfs SUPERBOOM_TNT 16");
-    public static final Item LEAPS = new Item("spirit leap", "gfs SPIRIT_LEAP 16");
+    public static final Item PEARLS = new Item("ender pearl", "ENDER_PEARL");
+    public static final Item SUPERBOOM = new Item("superboom", "SUPERBOOM_TNT");
+    public static final Item LEAPS = new Item("spirit leap", "SPIRIT_LEAP");
 
     /** Minimum gap between two refills, so a low stack cannot spam commands. */
     private static final long COOLDOWN_MS = 5000;
@@ -59,19 +59,34 @@ public final class AutoGfs {
 
         int threshold = mod.threshold();
         for (Item item : mod.enabledItems()) {
-            int have = count(mc, item.match());
+            int[] state = scan(mc, item.match());
+            int have = state[0];
+            int maxStack = state[1];
             // Zero means "not carried at all" rather than "ran out", so it is left alone.
-            if (have > 0 && have < threshold) {
-                lastRefill = System.currentTimeMillis();
-                mc.player.connection.sendCommand(item.command());
-                return;   // one refill at a time; the next check picks up the rest
+            if (have <= 0 || have >= threshold) {
+                continue;
             }
+            // Top the stack back up to full rather than always pulling a whole stack - grabbing 16
+            // when you are only four short just wastes them back into the sack.
+            int deficit = maxStack - have;
+            if (deficit <= 0) {
+                continue;
+            }
+            lastRefill = System.currentTimeMillis();
+            mc.player.connection.sendCommand("gfs " + item.id() + " " + deficit);
+            return;   // one refill at a time; the next check picks up the rest
         }
     }
 
-    /** How many of an item are in the inventory, matched loosely on the display name. */
-    private static int count(Minecraft mc, String match) {
+    /**
+     * Scans the inventory for an item matched loosely on its display name.
+     *
+     * @return {@code [total count, per-slot max stack size]}; the max size is what a full stack is,
+     *         so the refill can bring the count back up to it instead of over-grabbing.
+     */
+    private static int[] scan(Minecraft mc, String match) {
         int total = 0;
+        int maxStack = 1;
         var inv = mc.player.getInventory();
         for (int i = 0; i < inv.getContainerSize(); i++) {
             ItemStack st = inv.getItem(i);
@@ -81,8 +96,9 @@ public final class AutoGfs {
             String name = LegacyText.strip(st.getHoverName().getString()).toLowerCase(Locale.ROOT);
             if (name.contains(match)) {
                 total += st.getCount();
+                maxStack = Math.max(maxStack, st.getMaxStackSize());
             }
         }
-        return total;
+        return new int[]{total, maxStack};
     }
 }
