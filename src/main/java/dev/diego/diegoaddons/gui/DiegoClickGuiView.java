@@ -78,6 +78,12 @@ public class DiegoClickGuiView extends GuiView {
     private static final float CARD_INNER = CARD_W - CARD_PAD_X * 2f;
 
     private static final float ROW_H = 32f;
+    private static final float CARD_PAD_Y = 14f;
+    private static final float CARD_GAP = 10f;
+    private static final float NAME_H = 20f;
+    private static final float DESC_LINE_H = 15f;
+    private static final float SETTINGS_PAD_TOP = 6f;
+    private static final float SETTINGS_GAP = 10f;
     private static final float TOGGLE_W = 40f;
     private static final float TOGGLE_H = 22f;
 
@@ -327,7 +333,7 @@ public class DiegoClickGuiView extends GuiView {
      */
     private ContainerComponent card(Module m) {
         ButtonComponent shell = clickable(t.surfaceAlt(), () -> expand(m));
-        asColumn(shell, CARD_W, 10f).padding(14f, CARD_PAD_X).cornerRadius(12f)
+        asColumn(shell, CARD_W, CARD_GAP).padding(CARD_PAD_Y, CARD_PAD_X).cornerRadius(12f)
                 .borderWidth(1f).borderColor(t.border())
                 .flexShrink(0f);
 
@@ -347,14 +353,12 @@ public class DiegoClickGuiView extends GuiView {
 
         // Added to the card only while open. Kept as a hidden child instead, the card keeps the
         // height it was measured at and the settings spill out of its box.
-        ContainerComponent settings = column(CARD_INNER, 10f);
-        settings.padding(6f, 0f, 0f, 0f);
+        ContainerComponent settings = column(CARD_INNER, SETTINGS_GAP);
+        settings.padding(SETTINGS_PAD_TOP, 0f, 0f, 0f);
 
         Card card = new Card(m, shell, settings);
         cards.put(m.id, card);
-        if (m == expanded) {
-            fill(card, true);
-        }
+        fill(card, m == expanded);
         return shell;
     }
 
@@ -374,6 +378,7 @@ public class DiegoClickGuiView extends GuiView {
         if (card == null) {
             return;
         }
+        Module m = card.module();
         int background = open ? t.elevated() : t.surfaceAlt();
         card.shell().backgroundColor(background).gradient(flat(background))
                 .borderColor(open ? t.accent() : t.border());
@@ -382,9 +387,16 @@ public class DiegoClickGuiView extends GuiView {
         box.clearChildren();
         card.shell().remove(box);
         if (!open) {
+            // Measured, not auto: a card left to size itself keeps the height it was first laid out
+            // at, which is how settings ended up hanging out of the bottom of their card.
+            card.shell().height(CARD_PAD_Y * 2f + headHeight(m));
             return;
         }
+        float settingsH = settingsHeight(m);
+        card.shell().height(CARD_PAD_Y * 2f + headHeight(m) + CARD_GAP + settingsH);
+        box.height(settingsH);
         card.shell().add(box);
+
         box.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
         List<Setting> settings = card.module().settings();
         if (settings.isEmpty()) {
@@ -394,6 +406,35 @@ public class DiegoClickGuiView extends GuiView {
         for (Setting s : settings) {
             box.add(setting(s));
         }
+    }
+
+    /** The name row plus however many lines the description wraps to. */
+    private float headHeight(Module m) {
+        float h = NAME_H;
+        if (m.description != null && !m.description.isEmpty()) {
+            float textW = CARD_INNER - TOGGLE_W - 14f;
+            int lines = Math.max(1, (int) Math.ceil(GuiText.width(m.description, 12f) / textW));
+            h += 3f + lines * DESC_LINE_H;
+        }
+        return Math.max(h, TOGGLE_H);
+    }
+
+    /** The divider, every setting row, and the gaps between them. */
+    private float settingsHeight(Module m) {
+        List<Setting> settings = m.settings();
+        if (settings.isEmpty()) {
+            return SETTINGS_PAD_TOP + 1f + SETTINGS_GAP + DESC_LINE_H;
+        }
+        float h = SETTINGS_PAD_TOP + 1f;   // own top padding, then the divider
+        for (Setting s : settings) {
+            h += SETTINGS_GAP + settingRowHeight(s);
+        }
+        return h;
+    }
+
+    private static float settingRowHeight(Setting s) {
+        // A slider setting is its label row, a gap and the track; everything else is one row.
+        return s instanceof NumberSetting ? 20f + 6f + 16f : ROW_H;
     }
 
     // --- settings ----------------------------------------------------------------------------------
