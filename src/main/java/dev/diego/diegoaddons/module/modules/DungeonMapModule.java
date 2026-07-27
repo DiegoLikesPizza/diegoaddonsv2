@@ -616,11 +616,22 @@ public class DungeonMapModule extends HudModule {
      * is full of them. Two things separate them from real players: NPC entities carry a version-2
      * UUID (real accounts are version 4), and only genuine players hold a tab-list entry.
      */
+    /**
+     * Dungeon mobs are spawned as player entities, and some of them carry a v4 UUID with a tab-list
+     * entry, so presence in the tab list alone let them onto the map. A real player's tab entry also
+     * carries their name; a mob's does not match the entity it is attached to.
+     */
     private boolean isRealPlayer(Minecraft mc, Player p) {
-        if (p.getUUID().version() != 4) {
+        if (p.getUUID().version() != 4 || mc.getConnection() == null) {
             return false;
         }
-        return mc.getConnection() != null && mc.getConnection().getPlayerInfo(p.getUUID()) != null;
+        var info = mc.getConnection().getPlayerInfo(p.getUUID());
+        if (info == null || info.getProfile() == null) {
+            return false;
+        }
+        String tabName = info.getProfile().name();
+        return tabName != null && !tabName.isEmpty()
+                && tabName.equalsIgnoreCase(p.getGameProfile().name());
     }
 
     private void drawStats(GuiGraphicsExtractor g, Font font, Theme t, boolean sample) {

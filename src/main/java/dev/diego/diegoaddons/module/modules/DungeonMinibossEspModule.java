@@ -4,7 +4,8 @@ import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
 
 /**
- * Boxes dungeon minibosses (Lost Adventurer, Shadow Assassin, Diamond Guy, ...) by their name plate,
+ * Boxes dungeon minibosses - Shadow Assassin, Lost Adventurer, Frozen Adventurer and Angry
+ * Archeologist - by their name plate,
  * in a distinct colour from ordinary starred mobs. Handled in the shared
  * {@link dev.diego.diegoaddons.util.EntityEsp} pass; gated to dungeons.
  */
@@ -13,13 +14,13 @@ public class DungeonMinibossEspModule extends Module {
 
     /** The recognised dungeon miniboss plate names, matched by {@code contains}. */
     private static final String[] NAMES = {
-            "Lost Adventurer", "Shadow Assassin", "Diamond Guy", "Angry Archeologist",
-            "Zombie Commander", "Skeleton Master", "Super Archer", "King Midas",
+            "Shadow Assassin", "Lost Adventurer", "Frozen Adventurer",
+            "Angry Archeologist", "Angry Archaeologist",   // Hypixel has used both spellings
     };
 
     public DungeonMinibossEspModule() {
         super("dungeonminibossesp", Category.DUNGEONS, "Miniboss ESP",
-                "Box dungeon minibosses (Lost Adventurer, Shadow Assassin, ...).");
+                "Box Shadow Assassins, Lost/Frozen Adventurers and Angry Archeologists.");
         INSTANCE = this;
     }
 

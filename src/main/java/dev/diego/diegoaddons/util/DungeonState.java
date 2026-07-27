@@ -172,8 +172,10 @@ public final class DungeonState {
             } else if (l.contains("Time Elapsed:") || l.startsWith("Time:")) {
                 secondsElapsed = parseTime(l);
             }
-            if (l.contains(": [✖]") || l.contains(": [✦]")) {
-                puzzleFails++;   // reset each pass below is implicit: counted fresh via recompute
+            // Only a failed puzzle costs score. "[✦]" is one you have not finished yet, and
+            // counting those as failures took 10 points off each, which sank the whole run.
+            if (l.contains(": [✖]")) {
+                puzzleFails++;
             }
         }
     }
@@ -186,7 +188,9 @@ public final class DungeonState {
         }
         int fails = puzzleFails;   // re-counted fresh each pass in parseTab
         int totalRooms = (int) Math.round(completedRooms / clearedPercent);
-        int clearedRooms = completedRooms + (bloodDone ? 0 : 1) + 1; // +blood, +boss (best-effort)
+        // The tab list does not count the boss room you are standing in, so add it. Blood is not
+        // added: a blood room you have not opened is not a room you have cleared.
+        int clearedRooms = completedRooms + 1;
         if (totalRooms <= 0) {
             return;
         }
