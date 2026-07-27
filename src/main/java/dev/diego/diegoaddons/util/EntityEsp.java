@@ -51,6 +51,10 @@ public final class EntityEsp {
             return;
         }
 
+        if (!doMiniboss) {
+            tracked.clear();
+        }
+
         AABB area = mc.player.getBoundingBox().inflate(RANGE);
         for (Entity e : mc.level.getEntities(mc.player, area)) {
             // Bats are real entities, not name plates, so they are matched by type.
@@ -73,7 +77,11 @@ public final class EntityEsp {
             if (doStarred && name.contains(STAR) && !starred.hideDead(name)) {
                 box(stand, starred.color());
             } else if (doMiniboss && miniboss.matches(name)) {
-                box(stand, miniboss.color());
+                // Boxed from its body below, so it keeps its box once it turns invisible and the
+                // plate goes with it. Only if the body cannot be resolved do we fall back to the plate.
+                if (!remember(mc, stand)) {
+                    box(stand, miniboss.color());
+                }
             } else if (doCustom) {
                 String match = CustomEsp.match(name);
                 if (match != null) {
@@ -81,6 +89,68 @@ public final class EntityEsp {
                 }
             }
         }
+
+        if (doMiniboss) {
+            drawTracked(mc);
+        }
+    }
+
+    /**
+     * Minibosses whose plate we have seen, kept by entity id so they stay boxed after the plate goes.
+     *
+     * <p>A Shadow Assassin vanishes by turning invisible, and Hypixel takes its name plate away at the
+     * same moment - so a solver that only ever draws from plates loses the mob exactly when you most
+     * want to see it. The body entity itself stays loaded throughout, so once a plate has identified
+     * it we keep drawing from the body and stop only when the entity actually leaves the world.
+     */
+    private static final java.util.Map<Integer, Integer> tracked = new java.util.HashMap<>();
+
+    /** Re-boxes every remembered miniboss from its body, dropping any that have left the world. */
+    private static void drawTracked(Minecraft mc) {
+        var it = tracked.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            Entity body = mc.level.getEntity(entry.getKey());
+            if (body == null || !body.isAlive()) {
+                it.remove();
+                continue;
+            }
+            if (body.distanceToSqr(mc.player) > RANGE * RANGE) {
+                it.remove();   // out of range: forget it rather than hold a stale box
+                continue;
+            }
+            WorldRender.thickBox(body.getBoundingBox().inflate(0.05), entry.getValue(), EDGE, true);
+        }
+    }
+
+    /**
+     * Records the mob a miniboss plate belongs to. SkyBlock mounts the plate on the mob, so the
+     * vehicle is the body; when that is unavailable, the nearest living non-plate entity just below
+     * the plate is taken instead.
+     */
+    private static boolean remember(Minecraft mc, ArmorStand stand) {
+        Entity body = stand.getVehicle();
+        if (body == null) {
+            AABB below = new AABB(
+                    stand.getX() - 0.6, stand.getY() - 2.6, stand.getZ() - 0.6,
+                    stand.getX() + 0.6, stand.getY(), stand.getZ() + 0.6);
+            double best = Double.MAX_VALUE;
+            for (Entity e : mc.level.getEntities(stand, below)) {
+                if (!(e instanceof LivingEntity) || e instanceof ArmorStand) {
+                    continue;
+                }
+                double d = e.distanceToSqr(stand);
+                if (d < best) {
+                    best = d;
+                    body = e;
+                }
+            }
+        }
+        if (body == null) {
+            return false;
+        }
+        tracked.put(body.getId(), DungeonMinibossEspModule.INSTANCE.color());
+        return true;
     }
 
     /**

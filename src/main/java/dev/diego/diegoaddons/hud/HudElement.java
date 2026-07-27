@@ -65,6 +65,22 @@ public abstract class HudElement {
 
     // --- shared chrome ------------------------------------------------------------------------------
 
+    /**
+     * State the root's own box, width and height together.
+     *
+     * <p>RenderLib's element root takes the space it is offered rather than shrinking to fit its
+     * children, so an element that sets only a width keeps a full-height root. Everything drew in the
+     * right place - the content is laid out from the top-left either way - but the element's box is
+     * what the placement screen outlines and what it hit-tests, which is why the chips sat in tall,
+     * mostly empty rectangles there. An element that sizes a child explicitly (the maps, the
+     * inventory) never showed it; the ones that relied on intrinsic height did.
+     *
+     * <p>Both figures include the root's padding, matching how the chip widths are already computed.
+     */
+    protected void sizeRoot(float width, float height) {
+        root.width(width).height(height);
+    }
+
     /** The themed chip background every element sits on. Re-applied when the theme changes. */
     protected void applyBackground(ContainerComponent box, float radius) {
         Theme t = Themes.current();

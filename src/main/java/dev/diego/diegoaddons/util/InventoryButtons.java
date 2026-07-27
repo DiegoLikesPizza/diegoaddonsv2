@@ -2,15 +2,10 @@ package dev.diego.diegoaddons.util;
 
 import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.config.InventoryButton;
-import dev.diego.diegoaddons.gui.Fonts;
 import dev.diego.diegoaddons.gui.Theme;
-import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
-import dev.diego.diegoaddons.mixin.AbstractContainerScreenAccessor;
-import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import com.google.common.collect.LinkedHashMultimap;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
@@ -124,36 +119,12 @@ public final class InventoryButtons {
         ICONS.clear();
     }
 
-    // --- live drawing / clicking on real container screens ---
-
-    public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        InventoryButtonsModule mod = InventoryButtonsModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || !visible(mod)) {
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        Theme t = Themes.current();
-        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
-        int leftPos = acc.diego$leftPos();
-        int topPos = acc.diego$topPos();
-        int iw = acc.diego$imageWidth();
-        int ih = acc.diego$imageHeight();
-
-        InventoryButton hovered = null;
-        for (InventoryButton b : all()) {
-            int x = screenX(b, leftPos, iw);
-            int y = screenY(b, topPos, ih);
-            int size = size(b);
-            boolean hover = UiRender.inside(mouseX, mouseY, x, y, size, size);
-            draw(g, mc, t, b, x, y, hover, false);
-            if (hover) {
-                hovered = b;
-            }
-        }
-        if (hovered != null && mod.showTooltips() && !hovered.command.isBlank()) {
-            tooltip(g, mc, t, "/" + hovered.command, mouseX, mouseY);
-        }
-    }
+    // --- drawing, for the editor ---
+    //
+    // The live buttons on a container screen are not drawn here: they are retained RenderLib
+    // components owned by InventoryButtonsExtension, which also handles their presses. What is left
+    // here is the shared model - the configured list, the icon cache and the corner geometry - plus
+    // the one-button painter the editor still needs for its drag preview.
 
     /** Draws one button. {@code ghost} dims it, for the editor's not-yet-placed state. */
     public static void draw(GuiGraphicsExtractor g, Minecraft mc, Theme t, InventoryButton b,
@@ -177,62 +148,4 @@ public final class InventoryButtons {
         }
     }
 
-    /** A themed one-line tooltip, so the buttons explain themselves on hover. */
-    private static void tooltip(GuiGraphicsExtractor g, Minecraft mc, Theme t, String text, int mx, int my) {
-        boolean sm = ConfigManager.get().smoothCorners;
-        int w = Fonts.width(mc.font, text, Fonts.MEDIUM) + 12;
-        int h = 16;
-        int x = Math.max(2, Math.min(mx + 10, mc.getWindow().getGuiScaledWidth() - w - 2));
-        int y = Math.max(2, my - h - 4);
-        UiRender.fillRounded(g, x, y, w, h, 5, (0xEE << 24) | (t.surface() & 0x00FFFFFF), sm);
-        UiRender.strokeRounded(g, x, y, w, h, 5, Theme.withAlpha(t.border(), 0.9f), sm);
-        UiRender.text(g, mc.font, text, Fonts.MEDIUM, x + 6, y + 4, t.text());
-    }
-
-    /**
-     * Handles a click on a container screen.
-     *
-     * @return true when a button was hit, in which case the screen must not also process the click
-     */
-    public static boolean click(AbstractContainerScreen<?> screen, double mouseX, double mouseY, int button) {
-        InventoryButtonsModule mod = InventoryButtonsModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || button != 0 || !visible(mod)) {
-            return false;
-        }
-        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
-        int leftPos = acc.diego$leftPos();
-        int topPos = acc.diego$topPos();
-        int iw = acc.diego$imageWidth();
-        int ih = acc.diego$imageHeight();
-        for (InventoryButton b : all()) {
-            int size = size(b);
-            if (UiRender.inside(mouseX, mouseY, screenX(b, leftPos, iw), screenY(b, topPos, ih), size, size)) {
-                run(b);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Runs a button's command. The menu is closed first: most of these commands open another menu,
-     * and the server will not replace a container the client still thinks is open.
-     */
-    private static void run(InventoryButton b) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || b.command == null || b.command.isBlank()) {
-            return;
-        }
-        String cmd = b.command.startsWith("/") ? b.command.substring(1) : b.command;
-        mc.player.closeContainer();
-        mc.player.connection.sendCommand(cmd);
-    }
-
-    private static boolean visible(InventoryButtonsModule mod) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mod.hideInCreative() && mc.player != null && mc.player.isCreative()) {
-            return false;
-        }
-        return !all().isEmpty();
-    }
 }
