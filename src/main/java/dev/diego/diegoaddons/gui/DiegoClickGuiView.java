@@ -82,6 +82,9 @@ public class DiegoClickGuiView extends GuiView {
     private static final float CARD_GAP = 10f;
     private static final float SETTINGS_PAD_TOP = 6f;
     private static final float SETTINGS_GAP = 10f;
+    private static final float NAME_H = 20f;
+    private static final float NAME_GAP = 3f;
+    private static final float DESC_LINE_H = 15f;
     private static final float SLIDER_LABEL_H = 20f;
     private static final float SLIDER_GAP = 6f;
     private static final float SLIDER_H = 16f;
@@ -111,8 +114,9 @@ public class DiegoClickGuiView extends GuiView {
         final ButtonComponent shell;
         final ContainerComponent head;
         final ContainerComponent settings;
-        /** Height the settings box was built to, summed from the rows actually put in it. */
+        /** Heights the card was built to; the card is sized from these, not from a layout pass. */
         float settingsHeight;
+        float headHeight;
 
         Card(Module module, ButtonComponent shell, ContainerComponent head,
              ContainerComponent settings) {
@@ -246,37 +250,6 @@ public class DiegoClickGuiView extends GuiView {
         return all.get(0);
     }
 
-    /**
-     * Keeps every card as tall as its contents.
-     *
-     * <p>A card's auto height does not re-resolve when its settings are added, so it would keep the
-     * height it was first laid out at and clip them. Rather than compute the height from padding and
-     * row-height constants - which then have to be kept in step with the layout by hand - each card
-     * is fitted to the height its own head row and settings box report after they have been laid
-     * out. Nothing here knows what a setting looks like, so a new kind of setting, a different
-     * padding or a longer description all size correctly on their own.
-     */
-    @Override
-    public void tick() {
-        super.tick();
-        if (titleLabel != null) {
-            GuiText.calibrate(titleLabel, titleLabel.text().getString(), 19f);
-        }
-        for (Card card : cards.values()) {
-            float head = card.head.height();
-            if (head <= 0f) {
-                continue;   // not laid out yet; try again next frame
-            }
-            float wanted = CARD_PAD_Y * 2f + head;
-            if (card.settingsHeight > 0f) {
-                wanted += CARD_GAP + card.settingsHeight;
-            }
-            if (Math.abs(card.shell.height() - wanted) > 0.5f) {
-                card.shell.height(wanted);
-            }
-        }
-    }
-
     // --- category rail -----------------------------------------------------------------------------
 
     private void refreshRail() {
@@ -383,10 +356,12 @@ public class DiegoClickGuiView extends GuiView {
                 .borderWidth(1f).borderColor(t.border())
                 .flexShrink(0f);
 
-        ContainerComponent head = row(CARD_INNER, 14f);
         float textW = CARD_INNER - TOGGLE_W - 14f;
-        ContainerComponent titleBox = column(textW, 3f);
-        titleBox.add(textBox(GuiText.label(m.name, t.text(), 15f, GuiText.MEDIUM), textW, 20f));
+        float headH = headHeight(m, textW);
+        ContainerComponent head = row(CARD_INNER, 14f);
+        head.height(headH);
+        ContainerComponent titleBox = column(textW, NAME_GAP);
+        titleBox.add(textBox(GuiText.label(m.name, t.text(), 15f, GuiText.MEDIUM), textW, NAME_H));
         if (m.description != null && !m.description.isEmpty()) {
             titleBox.add(GuiText.wrapped(m.description, t.textMuted(), 12f, textW));
         }
@@ -403,6 +378,7 @@ public class DiegoClickGuiView extends GuiView {
         settings.padding(SETTINGS_PAD_TOP, 0f, 0f, 0f);
 
         Card card = new Card(m, shell, head, settings);
+        card.headHeight = headH;
         cards.put(m.id, card);
         fill(card, m == expanded);
         return shell;
@@ -434,6 +410,7 @@ public class DiegoClickGuiView extends GuiView {
         card.shell.remove(box);
         if (!open) {
             card.settingsHeight = 0f;
+            card.shell.height(CARD_PAD_Y * 2f + card.headHeight);
             return;
         }
 
@@ -457,10 +434,25 @@ public class DiegoClickGuiView extends GuiView {
         }
         card.settingsHeight = total;
         box.height(total);
+        card.shell.height(CARD_PAD_Y * 2f + card.headHeight + CARD_GAP + total);
         card.shell.add(box);
     }
 
     // --- settings ----------------------------------------------------------------------------------
+
+    /**
+     * The name row plus the lines its description wraps to. Everything here is a height this class
+     * sets itself; the only thing measured is how many lines the description needs, and that uses
+     * the width helper that calibrates itself against RenderLib's own shaping.
+     */
+    private static float headHeight(Module m, float textW) {
+        float h = NAME_H;
+        if (m.description != null && !m.description.isEmpty()) {
+            int lines = Math.max(1, (int) Math.ceil(GuiText.width(m.description, 12f) / textW));
+            h += NAME_GAP + lines * DESC_LINE_H;
+        }
+        return Math.max(h, TOGGLE_H);
+    }
 
     /** A built settings row and the height it was built at. */
     private record Row(ContainerComponent box, float height) {
