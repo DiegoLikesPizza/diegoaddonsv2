@@ -33,6 +33,15 @@ public class MiningAbilityModule extends HudModule {
         return chime.get();
     }
 
+    /**
+     * Drawn large in the middle of the screen by {@code MiningAbilityOverlay}, not as a chip you
+     * place, so it stays out of the managed HUD layout and the placement screen.
+     */
+    @Override
+    public boolean managedHud() {
+        return false;
+    }
+
     @Override
     public void onClientTick(Minecraft mc) {
         MiningAbility.tick(mc);
