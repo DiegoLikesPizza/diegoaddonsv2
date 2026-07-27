@@ -82,6 +82,9 @@ public class DiegoClickGuiView extends GuiView {
     private static final float CARD_GAP = 10f;
     private static final float SETTINGS_PAD_TOP = 6f;
     private static final float SETTINGS_GAP = 10f;
+    private static final float SLIDER_LABEL_H = 20f;
+    private static final float SLIDER_GAP = 6f;
+    private static final float SLIDER_H = 16f;
     private static final float TOGGLE_W = 40f;
     private static final float TOGGLE_H = 22f;
 
@@ -103,8 +106,21 @@ public class DiegoClickGuiView extends GuiView {
     private final java.util.Map<String, Card> cards = new java.util.LinkedHashMap<>();
 
     /** A built card: the clickable shell, its head row and the box its settings live in. */
-    private record Card(Module module, ButtonComponent shell, ContainerComponent head,
-                        ContainerComponent settings) {
+    private static final class Card {
+        final Module module;
+        final ButtonComponent shell;
+        final ContainerComponent head;
+        final ContainerComponent settings;
+        /** Height the settings box was built to, summed from the rows actually put in it. */
+        float settingsHeight;
+
+        Card(Module module, ButtonComponent shell, ContainerComponent head,
+             ContainerComponent settings) {
+            this.module = module;
+            this.shell = shell;
+            this.head = head;
+            this.settings = settings;
+        }
     }
 
     @Override
@@ -247,20 +263,16 @@ public class DiegoClickGuiView extends GuiView {
             GuiText.calibrate(titleLabel, titleLabel.text().getString(), 19f);
         }
         for (Card card : cards.values()) {
-            float head = card.head().height();
+            float head = card.head.height();
             if (head <= 0f) {
                 continue;   // not laid out yet; try again next frame
             }
             float wanted = CARD_PAD_Y * 2f + head;
-            if (card.settings().parent() != null) {
-                float settings = card.settings().height();
-                if (settings <= 0f) {
-                    continue;
-                }
-                wanted += CARD_GAP + settings;
+            if (card.settingsHeight > 0f) {
+                wanted += CARD_GAP + card.settingsHeight;
             }
-            if (Math.abs(card.shell().height() - wanted) > 0.5f) {
-                card.shell().height(wanted);
+            if (Math.abs(card.shell.height() - wanted) > 0.5f) {
+                card.shell.height(wanted);
             }
         }
     }
@@ -412,45 +424,61 @@ public class DiegoClickGuiView extends GuiView {
         if (card == null) {
             return;
         }
-        Module m = card.module();
+        Module m = card.module;
         int background = open ? t.elevated() : t.surfaceAlt();
-        card.shell().backgroundColor(background).gradient(flat(background))
+        card.shell.backgroundColor(background).gradient(flat(background))
                 .borderColor(open ? t.accent() : t.border());
 
-        ContainerComponent box = card.settings();
+        ContainerComponent box = card.settings;
         box.clearChildren();
-        card.shell().remove(box);
+        card.shell.remove(box);
         if (!open) {
+            card.settingsHeight = 0f;
             return;
         }
-        card.shell().add(box);
 
+        float total = SETTINGS_PAD_TOP + 1f;   // own padding, then the divider
         box.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
-        List<Setting> settings = card.module().settings();
-        if (settings.isEmpty()) {
-            box.add(GuiText.wrapped("No settings for this feature.", t.textFaint(), 13f, CARD_INNER));
-            return;
+        List<Setting> rows = card.module.settings();
+        if (rows.isEmpty()) {
+            ContainerComponent empty = row(CARD_INNER, 0f);
+            empty.height(ROW_H);
+            empty.add(GuiText.wrapped("No settings for this feature.", t.textFaint(), 13f, CARD_INNER));
+            box.add(empty);
+            total += SETTINGS_GAP + ROW_H;
+        } else {
+            for (Setting s : rows) {
+                // Every row is built with a height of its own, so the box's height is just their
+                // sum - no table of per-setting heights kept anywhere else to fall out of date.
+                Row built = setting(s);
+                box.add(built.box());
+                total += SETTINGS_GAP + built.height();
+            }
         }
-        for (Setting s : settings) {
-            box.add(setting(s));
-        }
+        card.settingsHeight = total;
+        box.height(total);
+        card.shell.add(box);
     }
 
     // --- settings ----------------------------------------------------------------------------------
 
-    private ContainerComponent setting(Setting s) {
+    /** A built settings row and the height it was built at. */
+    private record Row(ContainerComponent box, float height) {
+    }
+
+    private Row setting(Setting s) {
         if (s instanceof BooleanSetting bs) {
             ContainerComponent r = row(CARD_INNER, 12f).height(ROW_H).flexShrink(0f)
                     .justifyContent(GuiAlignment.SPACE_BETWEEN);
             r.add(GuiText.label(bs.name, t.text(), 14f).flexGrow(1f));
             r.add(toggle(bs.get(), bs::set));
-            return r;
+            return new Row(r, ROW_H);
         }
 
         if (s instanceof NumberSetting ns) {
-            ContainerComponent col = column(CARD_INNER, 6f).flexShrink(0f);
+            ContainerComponent col = column(CARD_INNER, SLIDER_GAP).flexShrink(0f);
             TextComponent value = GuiText.label(ns.display(), t.textMuted(), 12f);
-            ContainerComponent top = row(CARD_INNER, 10f).height(20f)
+            ContainerComponent top = row(CARD_INNER, 10f).height(SLIDER_LABEL_H)
                     .justifyContent(GuiAlignment.SPACE_BETWEEN);
             top.add(GuiText.label(ns.name, t.text(), 14f).flexGrow(1f));
             top.add(value);
@@ -462,9 +490,11 @@ public class DiegoClickGuiView extends GuiView {
                         ns.set(v);
                         value.text(ns.display());   // in place: a rebuild would drop the drag
                     })
-                    .size(CARD_INNER, 16f)
+                    .size(CARD_INNER, SLIDER_H)
                     .trackColor(t.surface()).fillColor(t.accent()).thumbColor(t.accentText()));
-            return col;
+            float height = SLIDER_LABEL_H + SLIDER_GAP + SLIDER_H;
+            col.height(height);
+            return new Row(col, height);
         }
 
         if (s instanceof CycleSetting cs) {
@@ -482,11 +512,11 @@ public class DiegoClickGuiView extends GuiView {
         if (s instanceof ActionSetting as) {
             return valueRow(as.name, as.action, as::run);
         }
-        return new ContainerComponent().width(CARD_INNER);
+        return new Row(row(CARD_INNER, 0f).height(ROW_H), ROW_H);
     }
 
     /** A full-width "name … value" row that runs an action when clicked. */
-    private ContainerComponent valueRow(String name, String value, Runnable action) {
+    private Row valueRow(String name, String value, Runnable action) {
         ContainerComponent wrap = row(CARD_INNER, 0f).height(ROW_H).flexShrink(0f);
         ButtonComponent b = clickable(t.surface(), action);
         asRow(b, CARD_INNER, 10f).height(ROW_H).padding(0f, 12f).cornerRadius(8f)
@@ -495,7 +525,7 @@ public class DiegoClickGuiView extends GuiView {
         b.add(GuiText.label(name, t.text(), 14f).flexGrow(1f));
         b.add(GuiText.label(value, t.textMuted(), 13f).textAlignment(GuiTextAlignment.RIGHT));
         wrap.add(b);
-        return wrap;
+        return new Row(wrap, ROW_H);
     }
 
     // --- building blocks ---------------------------------------------------------------------------
