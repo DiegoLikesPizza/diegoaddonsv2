@@ -9,6 +9,12 @@ import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.modules.AnimationsModule;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
+import dev.diego.diegoaddons.module.modules.AnnounceKickModule;
+import dev.diego.diegoaddons.module.modules.AutoRequeueModule;
+import dev.diego.diegoaddons.module.modules.AutoSprintModule;
+import dev.diego.diegoaddons.module.modules.ForceNametagModule;
+import dev.diego.diegoaddons.module.modules.FullbrightModule;
+import dev.diego.diegoaddons.module.modules.ItemRarityModule;
 import dev.diego.diegoaddons.module.modules.AutoGfsModule;
 import dev.diego.diegoaddons.module.modules.BetterIgnoreListModule;
 import dev.diego.diegoaddons.module.modules.ChatCompactModule;
@@ -19,8 +25,17 @@ import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
 import dev.diego.diegoaddons.module.modules.CustomEspModule;
 import dev.diego.diegoaddons.module.modules.StarredMobEspModule;
 import dev.diego.diegoaddons.module.modules.SecretChimeModule;
+import dev.diego.diegoaddons.module.modules.ChestSolverModule;
+import dev.diego.diegoaddons.module.modules.CrystalHollowsMapModule;
 import dev.diego.diegoaddons.module.modules.CustomF5;
+import dev.diego.diegoaddons.module.modules.DoorKeyEspModule;
+import dev.diego.diegoaddons.module.modules.DungeonMapModule;
 import dev.diego.diegoaddons.module.modules.EtherwarpModule;
+import dev.diego.diegoaddons.module.modules.GrottoFinderModule;
+import dev.diego.diegoaddons.module.modules.MimicMessageModule;
+import dev.diego.diegoaddons.module.modules.MiningRoutesModule;
+import dev.diego.diegoaddons.module.modules.PrinceMessageModule;
+import dev.diego.diegoaddons.module.modules.StructureFinderModule;
 import dev.diego.diegoaddons.module.modules.HideEffectsModule;
 import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
@@ -33,6 +48,18 @@ import dev.diego.diegoaddons.module.modules.PuzzleSolversModule;
 import dev.diego.diegoaddons.module.modules.PerformanceModule;
 import dev.diego.diegoaddons.module.modules.ReplaceWordsModule;
 import dev.diego.diegoaddons.module.modules.SkinChangerModule;
+import dev.diego.diegoaddons.module.modules.AbilityCooldownModule;
+import dev.diego.diegoaddons.module.modules.AutoCloseChestModule;
+import dev.diego.diegoaddons.module.modules.BatEspModule;
+import dev.diego.diegoaddons.module.modules.DungeonMinibossEspModule;
+import dev.diego.diegoaddons.module.modules.FishingRareAlertModule;
+import dev.diego.diegoaddons.module.modules.LeapOverlayModule;
+import dev.diego.diegoaddons.module.modules.CustomScoreboardModule;
+import dev.diego.diegoaddons.module.modules.PlayerEspModule;
+import dev.diego.diegoaddons.module.modules.SlotLockModule;
+import dev.diego.diegoaddons.module.modules.SlayerBossHighlightModule;
+import dev.diego.diegoaddons.module.modules.SlayerMinibossEspModule;
+import dev.diego.diegoaddons.module.modules.VoidgloomSlayerModule;
 import dev.diego.diegoaddons.util.InventoryButtons;
 import dev.diego.diegoaddons.util.IgnoreList;
 import dev.diego.diegoaddons.util.LegacyText;
@@ -46,6 +73,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -85,7 +113,13 @@ public final class ModuleManager {
         // Register modules with their default-on state (used only the first time this instance runs).
         // Everything ships disabled by default; the user enables what they want.
         register(new CustomF5(), false);
+        register(new FullbrightModule(), false);
+        register(new ForceNametagModule(), false);
         register(new ArmorHiderModule(), false);
+        register(new AutoSprintModule(), false);
+        register(new ItemRarityModule(), false);
+        register(new AutoRequeueModule(), false);
+        register(new AnnounceKickModule(), false);
         register(new AnimationsModule(), false);
         register(new SkinChangerModule(), false);
         register(new PerformanceModule(), false);
@@ -103,13 +137,34 @@ public final class ModuleManager {
         register(new PartyCommandsModule(), false);
         register(new PartyFinderModule(), false);
         register(new PuzzleSolversModule(), false);
+        register(new DungeonMapModule(), false);
+        register(new DoorKeyEspModule(), false);
+        register(new MimicMessageModule(), false);
+        register(new PrinceMessageModule(), false);
         register(new StarredMobEspModule(), false);
         register(new SecretChimeModule(), false);
         register(new CustomEspModule(), false);
         register(new EtherwarpModule(), false);
         register(new MiningAbilityModule(), false);
         register(new AutoGfsModule(), false);
+        register(new CrystalHollowsMapModule(), false);
+        register(new StructureFinderModule(), false);
+        register(new GrottoFinderModule(), false);
+        register(new ChestSolverModule(), false);
+        register(new MiningRoutesModule(), false);
         register(new CommandHotkeysModule(), false);
+        register(new SlayerBossHighlightModule(), false);
+        register(new SlayerMinibossEspModule(), false);
+        register(new VoidgloomSlayerModule(), false);
+        register(new BatEspModule(), false);
+        register(new DungeonMinibossEspModule(), false);
+        register(new FishingRareAlertModule(), false);
+        register(new AutoCloseChestModule(), false);
+        register(new AbilityCooldownModule(), false);
+        register(new LeapOverlayModule(), false);
+        register(new PlayerEspModule(), false);
+        register(new CustomScoreboardModule(), false);
+        register(new SlotLockModule(), false);
         ConfigManager.save();
 
         // Apply persisted enabled states.
@@ -120,6 +175,12 @@ public final class ModuleManager {
         // Always-on dispatch hooks.
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             dev.diego.diegoaddons.util.SkyblockHud.tick(mc);
+            dev.diego.diegoaddons.util.DungeonState.tick(mc);
+            dev.diego.diegoaddons.util.SlayerState.tick(mc);
+            dev.diego.diegoaddons.util.CrystalHollows.tick(mc);
+            // Room detection is shared by every dungeon solver and the map, so it ticks here once -
+            // not off the back of one solver, which left the others blind whenever it was disabled.
+            dev.diego.diegoaddons.util.DungeonRooms.tick(mc);
             for (Module m : MODULES) {
                 if (m.isEnabled()) {
                     m.onClientTick(mc);
@@ -127,6 +188,10 @@ public final class ModuleManager {
             }
             // Both ESP features read the same name plates, so they share a single pass.
             dev.diego.diegoaddons.util.EntityEsp.tick(mc);
+            // Promote everything submitted this tick to the frames until the next one, so world
+            // boxes stay solid instead of flickering between ticks.
+            dev.diego.diegoaddons.util.WorldRender.flip();
+            dev.diego.diegoaddons.util.EspDraw.flip();
         });
         HudElementRegistry.addLast(
                 Identifier.fromNamespaceAndPath(DiegoAddonsV2Client.MOD_ID, "hud"),
@@ -159,6 +224,16 @@ public final class ModuleManager {
 
         // Watch system messages: blocked players joining the party, and party chat triggers.
         // Observing only; the message itself is left alone.
+        // Recolour Oruo's answer options in chat: the correct one green, the wrong ones red.
+        ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
+            if (overlay) {
+                return message;
+            }
+            String plain = LegacyText.strip(message.getString()).trim();
+            int color = PuzzleSolvers.quizOptionColor(plain);
+            return color != 0 ? Component.literal(plain).withColor(color) : message;
+        });
+
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (!overlay) {
                 String plain = LegacyText.strip(message.getString());
@@ -166,6 +241,10 @@ public final class ModuleManager {
                 PartyCommands.onMessage(plain);
                 PuzzleSolvers.onMessage(plain);
                 dev.diego.diegoaddons.util.MiningAbility.onMessage(plain);
+                dev.diego.diegoaddons.util.DungeonState.onMessage(plain);
+                dev.diego.diegoaddons.util.FishingAlerts.onMessage(plain);
+                PrinceMessageModule.onMessage(plain);
+                AutoRequeueModule.onMessage(plain);
             }
         });
 
@@ -174,20 +253,28 @@ public final class ModuleManager {
             if (screen instanceof AbstractContainerScreen<?>) {
                 // The party finder overlay draws with the background, so item tooltips stay on top
                 // of it and the slot highlight sits behind the item rather than over it.
-                ScreenEvents.afterBackground(screen).register((scr, g, mx, my, dt) ->
-                        PartyFinder.render((AbstractContainerScreen<?>) scr, g));
+                ScreenEvents.afterBackground(screen).register((scr, g, mx, my, dt) -> {
+                    dev.diego.diegoaddons.util.ItemRarity.render((AbstractContainerScreen<?>) scr, g);
+                    PartyFinder.render((AbstractContainerScreen<?>) scr, g);
+                });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
                     InventoryButtons.render((AbstractContainerScreen<?>) scr, g, mx, my);
+                    dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
+                    dev.diego.diegoaddons.util.SlotLocks.render((AbstractContainerScreen<?>) scr, g, mx, my);
                     Toasts.render(g);
                 });
-                // Deny the click to the menu when it lands on one of our buttons, so the button
-                // press cannot also be read as a click on the slot behind it.
+                // Deny the click to the menu when it lands on one of our buttons (so the press is not
+                // also read as a slot click) or on a locked slot.
                 ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) -> {
                     AbstractContainerScreen<?> cs = (AbstractContainerScreen<?>) scr;
                     boolean ours = PartyFinder.click(cs, ev.x(), ev.y(), ev.button())
                             || InventoryButtons.click(cs, ev.x(), ev.y(), ev.button());
-                    return !ours;
+                    boolean locked = dev.diego.diegoaddons.util.SlotLocks.locksClick(cs, ev.x(), ev.y());
+                    return !ours && !locked;
                 });
+                // Deny hotbar-swap / drop keys that would move a locked slot's item.
+                ScreenKeyboardEvents.allowKeyPress(screen).register((scr, event) ->
+                        !dev.diego.diegoaddons.util.SlotLocks.locksKey((AbstractContainerScreen<?>) scr, event));
             }
         });
 
@@ -200,16 +287,26 @@ public final class ModuleManager {
             PuzzleSolvers.reset();
             dev.diego.diegoaddons.util.BlazeSolver.reset();
             dev.diego.diegoaddons.util.DungeonRooms.reset();
+            dev.diego.diegoaddons.util.DungeonState.reset();
+            dev.diego.diegoaddons.util.SlayerState.reset();
+            dev.diego.diegoaddons.util.VoidgloomSlayer.reset();
+            dev.diego.diegoaddons.util.DungeonMapData.reset();
+            dev.diego.diegoaddons.util.CrystalHollows.reset();
+            if (MimicMessageModule.INSTANCE != null) {
+                MimicMessageModule.INSTANCE.resetRun();
+            }
             dev.diego.diegoaddons.util.BeamsSolver.reset();
             dev.diego.diegoaddons.util.BoulderSolver.reset();
             dev.diego.diegoaddons.util.IceFillSolver.reset();
             dev.diego.diegoaddons.util.WaterSolver.reset();
             dev.diego.diegoaddons.util.TpMazeSolver.reset();
+            dev.diego.diegoaddons.util.TicTacToeSolver.reset();
             dev.diego.diegoaddons.util.SecretChime.reset();
             dev.diego.diegoaddons.util.MiningAbility.reset();
             dev.diego.diegoaddons.util.AutoGfs.reset();
             dev.diego.diegoaddons.util.EtherwarpHelper.reset();
             dev.diego.diegoaddons.util.WorldRender.clear();
+            dev.diego.diegoaddons.util.EspDraw.clear();
             PartyCommands.reset();
         });
 
@@ -408,6 +505,10 @@ public final class ModuleManager {
         for (HudModule hud : enabledHudModules()) {
             drawElement(g, font, t, smooth, hud, mc, hudX(hud), hudY(hud), false);
         }
+        dev.diego.diegoaddons.util.ItemRarity.renderHotbar(g, mc);
+        dev.diego.diegoaddons.util.CustomScoreboard.render(g, mc);
+        dev.diego.diegoaddons.util.AbilityCooldown.renderHotbar(g, mc);
+        dev.diego.diegoaddons.util.EspDraw.renderHud(g, mc);
         // Toasts, except on the screens that draw them themselves - those sit above the HUD (and
         // dim it), so drawing here too would show a faded ghost behind the crisp one.
         if (!(mc.screen instanceof dev.diego.diegoaddons.gui.ChatSearchScreen)

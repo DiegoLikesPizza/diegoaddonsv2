@@ -39,12 +39,15 @@ public final class BlazeSolver {
 
     /** True when the room wants the highest health shot first; null until the room says so. */
     private static Boolean highestFirst;
+    /** TEMP: guards the one-shot room diagnostic so it prints once per blaze room, not every tick. */
+    private static boolean debugPrinted;
 
     private BlazeSolver() {
     }
 
     public static void reset() {
         highestFirst = null;
+        debugPrinted = false;
     }
 
     /** What the solver currently believes, for the readout in chat. */
@@ -58,21 +61,35 @@ public final class BlazeSolver {
         if (mod == null || !mod.isEnabled() || !mod.blaze() || mc.level == null || mc.player == null) {
             return;
         }
-        DungeonRooms.tick(mc);
         String room = DungeonRooms.currentRoomName();
         if (room != null) {
-            if (room.equals("Higher Blaze")) {
-                highestFirst = Boolean.TRUE;
-            } else if (room.equals("Lower Blaze")) {
+            // "Lower Blaze" = shoot from the lowest health up; "Higher Blaze" = from the highest down.
+            if (room.equals("Lower Blaze")) {
                 highestFirst = Boolean.FALSE;
+            } else if (room.equals("Higher Blaze")) {
+                highestFirst = Boolean.TRUE;
             }
         }
 
         List<Blaze> blazes = new ArrayList<>();
         scan(mc, blazes);
         if (blazes.size() < 2) {
+            debugPrinted = false;   // re-arm the diagnostic for the next blaze room
             return;   // not the puzzle, or it is already finished
         }
+
+        // TEMP DIAGNOSTIC: prints the detected room name + core hash once per blaze room so a
+        // mislabelled variant (Higher reading as Lower) can be corrected in rooms.json. Remove once
+        // the blaze rooms are confirmed correct.
+        if (!debugPrinted) {
+            debugPrinted = true;
+            String info = DungeonRooms.debugCurrentTile(mc);
+            if (info != null && mc.gui != null) {
+                mc.gui.getChat().addClientSystemMessage(
+                        net.minecraft.network.chat.Component.literal("§b[DiegoAddons] §eBlaze room " + info));
+            }
+        }
+
         Boolean useHighest = highestFirst != null ? highestFirst : mod.blazeFallbackOrder();
         if (useHighest == null) {
             return;

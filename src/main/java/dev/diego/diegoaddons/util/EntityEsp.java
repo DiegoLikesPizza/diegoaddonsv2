@@ -1,11 +1,16 @@
 package dev.diego.diegoaddons.util;
 
+import dev.diego.diegoaddons.module.modules.BatEspModule;
 import dev.diego.diegoaddons.module.modules.CustomEspModule;
+import dev.diego.diegoaddons.module.modules.DungeonMinibossEspModule;
+import dev.diego.diegoaddons.module.modules.PlayerEspModule;
 import dev.diego.diegoaddons.module.modules.StarredMobEspModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ambient.Bat;
 import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
@@ -32,14 +37,34 @@ public final class EntityEsp {
     public static void tick(Minecraft mc) {
         StarredMobEspModule starred = StarredMobEspModule.INSTANCE;
         CustomEspModule custom = CustomEspModule.INSTANCE;
+        BatEspModule bats = BatEspModule.INSTANCE;
+        DungeonMinibossEspModule miniboss = DungeonMinibossEspModule.INSTANCE;
+        PlayerEspModule players = PlayerEspModule.INSTANCE;
         boolean doStarred = starred != null && starred.isEnabled();
         boolean doCustom = custom != null && custom.isEnabled() && !CustomEsp.all().isEmpty();
-        if (!doStarred && !doCustom || mc.player == null || mc.level == null) {
+        boolean inDungeons = DungeonState.inDungeons();
+        boolean doBat = bats != null && bats.isEnabled() && inDungeons;
+        boolean doMiniboss = miniboss != null && miniboss.isEnabled() && inDungeons;
+        boolean doPlayer = players != null && players.isEnabled();
+        if (!doStarred && !doCustom && !doBat && !doMiniboss && !doPlayer
+                || mc.player == null || mc.level == null) {
             return;
         }
 
         AABB area = mc.player.getBoundingBox().inflate(RANGE);
         for (Entity e : mc.level.getEntities(mc.player, area)) {
+            // Bats are real entities, not name plates, so they are matched by type.
+            if (doBat && e instanceof Bat) {
+                WorldRender.thickBox(e.getBoundingBox().inflate(0.1), bats.color(), EDGE, true);
+                continue;
+            }
+            // Real players, hiding the NPCs that share the player model.
+            if (doPlayer && e instanceof Player p && p != mc.player) {
+                if (isRealPlayer(mc, p)) {
+                    WorldRender.thickBox(p.getBoundingBox().inflate(0.05), players.color(), EDGE, true);
+                }
+                continue;
+            }
             if (!(e instanceof ArmorStand stand) || !stand.hasCustomName()) {
                 continue;
             }
@@ -47,6 +72,8 @@ public final class EntityEsp {
 
             if (doStarred && name.contains(STAR) && !starred.hideDead(name)) {
                 box(stand, starred.color());
+            } else if (doMiniboss && miniboss.matches(name)) {
+                box(stand, miniboss.color());
             } else if (doCustom) {
                 String match = CustomEsp.match(name);
                 if (match != null) {
@@ -54,6 +81,17 @@ public final class EntityEsp {
                 }
             }
         }
+    }
+
+    /**
+     * A real party/lobby player versus a SkyBlock NPC. NPCs are spawned as client-side player entities
+     * with a version-2 UUID and no tab-list entry; real accounts are version 4 and are listed.
+     */
+    private static boolean isRealPlayer(Minecraft mc, Player p) {
+        if (p.getUUID().version() != 4) {
+            return false;
+        }
+        return mc.getConnection() != null && mc.getConnection().getPlayerInfo(p.getUUID()) != null;
     }
 
     /** The plate floats above its mob, so the box is placed on the body below it. */

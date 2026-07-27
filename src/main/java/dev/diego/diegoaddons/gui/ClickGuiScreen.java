@@ -4,6 +4,7 @@ import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
+import dev.diego.diegoaddons.module.CycleSetting;
 import dev.diego.diegoaddons.module.KeybindSetting;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.NumberSetting;
@@ -376,7 +377,11 @@ public class ClickGuiScreen extends Screen {
             int ry = y0 + (k - setScroll) * (SET_ROW_H + ROW_GAP);
             boolean hover = UiRender.inside(mx, my, setX, ry, setW, SET_ROW_H);
             UiRender.fillRounded(g, setX, ry, setW, SET_ROW_H, CARD_RAD, hover ? t.elevated() : t.surfaceAlt(), sm);
-            UiRender.textVC(g, font, s.name, Fonts.UI_BODY, Fonts.UI_BODY_SZ, setX + 18, ry, SET_ROW_H, t.text());
+            // The slider draws its own name in the top band next to the value, since its track fills
+            // the middle of the row where a centred name would otherwise sit on top of it.
+            if (!(s instanceof NumberSetting)) {
+                UiRender.textVC(g, font, s.name, Fonts.UI_BODY, Fonts.UI_BODY_SZ, setX + 18, ry, SET_ROW_H, t.text());
+            }
             if (s instanceof BooleanSetting bs) {
                 pill(g, setX + setW - 18 - 46, ry + (SET_ROW_H - 26) / 2, 46, 26, bs.get(), t, sm);
             } else if (s instanceof KeybindSetting ks) {
@@ -385,6 +390,8 @@ public class ClickGuiScreen extends Screen {
                 slider(g, t, sm, ns, ry, mx, my);
             } else if (s instanceof ActionSetting as) {
                 actionChip(g, t, sm, as, ry, mx, my);
+            } else if (s instanceof CycleSetting cs) {
+                cycleChip(g, t, sm, cs, ry, mx, my);
             }
         }
         scrollbar(g, t, sm, setX + setW - BAR_W, y0, SET_ROW_H, sets.size(), setRows, setScroll);
@@ -411,8 +418,9 @@ public class ClickGuiScreen extends Screen {
      * it. The track spans the whole row so it is easy to hit, rather than a thin handle.
      */
     private void slider(GuiGraphicsExtractor g, Theme t, boolean sm, NumberSetting ns, int ry, int mx, int my) {
-        UiRender.textRight(g, font, ns.display(), Fonts.UI_BODY, setX + setW - 18,
-                Fonts.centerTop(ry, SLIDER_TOP, Fonts.UI_BODY_SZ), t.accent());
+        int topY = Fonts.centerTop(ry, SLIDER_TOP, Fonts.UI_BODY_SZ);
+        UiRender.text(g, font, ns.name, Fonts.UI_BODY, setX + 18, topY, t.text());
+        UiRender.textRight(g, font, ns.display(), Fonts.UI_BODY, setX + setW - 18, topY, t.accent());
 
         int x = setX + 18;
         int w = setW - 36;
@@ -467,6 +475,26 @@ public class ClickGuiScreen extends Screen {
                 listening ? t.accent() : Theme.withAlpha(t.border(), 0.9f), S, sm);
         int col = listening ? t.accent() : (ks.isBound() ? t.text() : t.textFaint());
         UiRender.textCenteredVC(g, font, label, Fonts.UI_BODY, Fonts.UI_BODY_SZ, x + w / 2, y, h, col);
+    }
+
+    /**
+     * A cycle row: a bordered chip showing the current option, prefixed with a small arrow to hint it
+     * advances on click. Sized to the widest option so the chip does not jump as the choice changes.
+     */
+    private void cycleChip(GuiGraphicsExtractor g, Theme t, boolean sm, CycleSetting cs, int ry, int mx, int my) {
+        String label = "↻ " + cs.label();
+        int widest = 0;
+        for (String opt : cs.options) {
+            widest = Math.max(widest, font.width(Fonts.t("↻ " + opt, Fonts.UI_BODY)));
+        }
+        int w = Math.max(96, widest + 28);
+        int h = 32;
+        int x = setX + setW - 18 - w;
+        int y = ry + (SET_ROW_H - h) / 2;
+        boolean hover = UiRender.inside(mx, my, x, y, w, h);
+        UiRender.fillRounded(g, x, y, w, h, 10, hover ? t.elevated() : t.surface(), sm);
+        UiRender.strokeRoundedThick(g, x, y, w, h, 10, Theme.withAlpha(t.border(), 0.9f), S, sm);
+        UiRender.textCenteredVC(g, font, label, Fonts.UI_BODY, Fonts.UI_BODY_SZ, x + w / 2, y, h, t.text());
     }
 
     private void eyebrow(GuiGraphicsExtractor g, Theme t, String s, int x, int y) {
@@ -575,6 +603,8 @@ public class ClickGuiScreen extends Screen {
                         dragSlider(ns, mx);
                     } else if (sets.get(k) instanceof ActionSetting as) {
                         as.run();
+                    } else if (sets.get(k) instanceof CycleSetting cs) {
+                        cs.cycle();
                     }
                     return true;
                 }

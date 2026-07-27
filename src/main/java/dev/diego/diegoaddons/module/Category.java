@@ -6,6 +6,9 @@ public enum Category {
     HUD("HUD"),
     DUNGEONS("Dungeons"),
     MINING("Mining"),
+    FORAGING("Foraging"),
+    FISHING("Fishing"),
+    SLAYER("Slayer"),
     MISC("Misc");
 
     public final String display;

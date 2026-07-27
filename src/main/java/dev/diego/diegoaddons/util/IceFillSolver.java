@@ -36,9 +36,13 @@ public final class IceFillSolver {
     private static List<List<List<int[]>>> easy;
     private static List<List<List<int[]>>> hard;
 
+    /** How many ticks to wait before re-attempting a scan that turned up nothing. */
+    private static final int RETRY_TICKS = 10;
+
     private static final List<Vec3> PATH = new ArrayList<>();
     private static String lastRoom;
     private static boolean scanned;
+    private static int retryIn;
 
     private IceFillSolver() {
     }
@@ -47,6 +51,7 @@ public final class IceFillSolver {
         PATH.clear();
         lastRoom = null;
         scanned = false;
+        retryIn = 0;
     }
 
     /** Called every client tick while the solver is on. */
@@ -65,13 +70,23 @@ public final class IceFillSolver {
         if (!room.equals(lastRoom)) {
             lastRoom = room;
             scanned = false;
+            retryIn = 0;
             PATH.clear();
         }
+        // Keep trying (throttled) until a path is actually found: the floors' blocks may not be
+        // readable the instant the room resolves, and a single early miss must not give up for good.
         if (!scanned) {
-            scan(mc, mod.iceFillShortRoute());
+            if (retryIn > 0) {
+                retryIn--;
+            } else {
+                scan(mc, mod.iceFillShortRoute());
+                if (!scanned) {
+                    retryIn = RETRY_TICKS;
+                }
+            }
         }
         if (!PATH.isEmpty()) {
-            WorldRender.path(PATH, COLOR, LINE);
+            WorldRender.lines(PATH, COLOR);
         }
     }
 
@@ -110,7 +125,10 @@ public final class IceFillSolver {
                 }
             }
         }
-        scanned = true;
+        // Only consider the room solved once a path was built; otherwise the caller retries.
+        if (!PATH.isEmpty()) {
+            scanned = true;
+        }
     }
 
     private static BlockPos pos(int[] xyz) {

@@ -17,9 +17,11 @@
     "EffectsInInventoryMixin",
     "EtherwarpZoomMixin",
     "FontMixin",
+    "ForceNametagMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",
-    "LivingEntitySwingMixin"
+    "LivingEntitySwingMixin",
+    "ScoreboardSidebarMixin"
   ],
   "injectors": {
     "defaultRequire": 1

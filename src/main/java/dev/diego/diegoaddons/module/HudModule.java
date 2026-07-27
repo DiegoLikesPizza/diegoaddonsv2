@@ -42,10 +42,17 @@ public abstract class HudModule extends Module {
      * in the HUD editor; only where it appears in the menu changes.
      */
     protected HudModule(String id, Category category, String name, String description) {
+        this(id, category, name, description, true);
+    }
+
+    /** As above, but {@code textSettings=false} omits the text toggles for custom-drawn elements. */
+    protected HudModule(String id, Category category, String name, String description, boolean textSettings) {
         super(id, category, name, description);
-        settings.add(accentColour);
-        settings.add(showLabel);
-        settings.add(centered);
+        if (textSettings) {
+            settings.add(accentColour);
+            settings.add(showLabel);
+            settings.add(centered);
+        }
     }
 
     /**
