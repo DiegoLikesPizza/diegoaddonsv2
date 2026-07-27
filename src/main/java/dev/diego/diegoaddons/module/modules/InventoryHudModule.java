@@ -186,8 +186,8 @@ public class InventoryHudModule extends HudModule {
     }
 
     @Override
-    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.InventoryChip(this, root);
+    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.InventoryElement(this, root);
     }
 
     @Override

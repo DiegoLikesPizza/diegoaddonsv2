@@ -78,9 +78,9 @@ public abstract class HudModule extends Module {
         return true;
     }
 
-    /** Builds the RenderLib component tree for this element inside {@code root}. */
-    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.HudChip(this, root);
+    /** Builds this element's RenderLib component tree inside {@code root}. */
+    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.TextChipElement(this, root);
     }
 
     public int color() {
