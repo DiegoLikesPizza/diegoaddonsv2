@@ -38,6 +38,7 @@ public class MusicElement extends HudElement {
     private int lastColor;
     private String lastArt;
     private boolean plainMode = true;
+    private static boolean loggedFirstCover;
 
     public MusicElement(MusicDisplayModule module, ContainerComponent root) {
         super(module, root);
@@ -81,6 +82,14 @@ public class MusicElement extends HudElement {
                 lastArt = art;
                 if (art != null) {
                     cover.url(art);
+                    if (!loggedFirstCover) {
+                        loggedFirstCover = true;
+                        // RenderLib does not gate remote images the way it gates remote fonts, so a
+                        // cover that stays grey after this line means the fetch or decode failed on
+                        // its side, not that we never found artwork.
+                        org.slf4j.LoggerFactory.getLogger("DiegoAddonsV2")
+                                .info("[DiegoAddons V2] Cover art handed to RenderLib: {}", art);
+                    }
                 }
                 cover.visible(art != null);
             }

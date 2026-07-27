@@ -11,9 +11,7 @@ import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.ModuleManager;
 import net.minecraft.client.Minecraft;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -167,12 +165,4 @@ public final class HudElements {
         }
     }
 
-    /** The modules currently drawn by the managed layout. */
-    public static List<HudModule> managedModules() {
-        List<HudModule> out = new ArrayList<>();
-        for (Entry e : ENTRIES.values()) {
-            out.add(e.module());
-        }
-        return out;
-    }
 }
