@@ -35,7 +35,6 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
         ConfigManager.load();
         SkinChanger.ensureFolder();
         ModuleManager.init();
-        dev.diego.diegoaddons.hud.HudElements.init();
         dev.diego.diegoaddons.util.WorldRender.init();
         dev.diego.diegoaddons.command.DiegoCommands.register();
 

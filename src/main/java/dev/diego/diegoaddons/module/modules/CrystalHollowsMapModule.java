@@ -65,8 +65,8 @@ public class CrystalHollowsMapModule extends HudModule {
     }
 
     @Override
-    public dev.diego.diegoaddons.hud.HudChip createChip(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.CrystalMapChip(this, root);
+    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.CrystalMapElement(this, root);
     }
 
     @Override
