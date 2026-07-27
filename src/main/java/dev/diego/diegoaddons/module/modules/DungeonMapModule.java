@@ -503,14 +503,18 @@ public class DungeonMapModule extends HudModule {
     /**
      * A real party member versus a dungeon NPC. Hypixel spawns dungeon mobs (Shadow Assassins,
      * Diamond Guy, Lost Adventurers, ...) as client-side player entities, so {@code level.players()}
-     * is full of them. Two things separate them from real players: NPC entities carry a version-2
-     * UUID (real accounts are version 4), and only genuine players hold a tab-list entry.
+     * is full of them - which is why they were showing up as markers.
+     *
+     * <p>The UUID-version and tab-list-entry tests this used to apply do not actually separate them:
+     * those NPCs carry a version-4 UUID and are listed just like a real account. The party roster
+     * does separate them - the five dungeon team slots are the only tab entries formatted with a
+     * class ("Name (Archer LvL 33)"), and no NPC ever holds one. See {@link DungeonState#isTeamMember}.
+     *
+     * <p>Until the roster has been read (the first ticks of a run) nothing but the player is drawn,
+     * rather than falling back to a test that lets every mob through.
      */
     private boolean isRealPlayer(Minecraft mc, Player p) {
-        if (p.getUUID().version() != 4) {
-            return false;
-        }
-        return mc.getConnection() != null && mc.getConnection().getPlayerInfo(p.getUUID()) != null;
+        return DungeonState.isTeamMember(p.getName().getString());
     }
 
     private void drawStats(GuiGraphicsExtractor g, Font font, Theme t, boolean sample) {

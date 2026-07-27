@@ -37,14 +37,27 @@ public class InventoryHudModule extends HudModule {
     private static final int PAD = 5;
     private static final int GAP = 6;         // gap between main storage and the hotbar row
     private static final int SECTION_GAP = 6; // gap between sections
-    private static final int MODEL_W = 44;
     private static final int COL_H = (4 - 1) * SLOT + CELL;   // 4 stacked slots (armour / equipment)
     private static final int GRID_W = (COLS - 1) * SLOT + CELL;
 
-    // Pet card: item on top, then the name row and the level row.
+    /**
+     * Vanilla draws the inventory's player model into a 49x70 rect at entity scale 30 with a 0.0625
+     * vertical nudge. Those three numbers are a set - the scale is what fits a 1.8-block body inside
+     * that rect - so the model is framed by reproducing the ratios rather than by picking a scale:
+     * too large a scale and the body overflows upward, leaving only the legs inside the element,
+     * which is exactly what a flat 0.55 factor was doing here.
+     */
+    private static final float MODEL_ASPECT = 49f / 70f;
+    private static final float MODEL_SCALE = 30f / 70f;
+    private static final float MODEL_Y_NUDGE = 0.0625f;
+
+    // Pet card: item on top, then the name row and the level row. The item is drawn at double slot
+    // size - at a plain 16px it read as a stray icon next to four rows of armour.
+    private static final int PET_ITEM = CELL * 2;
+    private static final int PET_NAME_H = Fonts.BODY_H;
     private static final int PET_LINE_H = Fonts.SMALL_H;
     private static final int PET_GAP = 3;
-    private static final int PET_H = CELL + PET_GAP + PET_LINE_H * 2 + 1;
+    private static final int PET_H = PET_ITEM + PET_GAP + PET_NAME_H + PET_LINE_H + 1;
     private static final int PET_MIN_W = 54;
 
     private static final EquipmentSlot[] ARMOR = {
@@ -112,8 +125,8 @@ public class InventoryHudModule extends HudModule {
         if (info == null) {
             return PET_MIN_W;
         }
-        int w = Math.max(Fonts.width(font, info.name(), Fonts.SMALL), Fonts.width(font, levelLine(info), Fonts.SMALL));
-        return Math.max(PET_MIN_W, w);
+        int w = Math.max(Fonts.width(font, info.name(), Fonts.BODY), Fonts.width(font, levelLine(info), Fonts.SMALL));
+        return Math.max(Math.max(PET_MIN_W, PET_ITEM), w);
     }
 
     private static String levelLine(SkyblockHud.PetInfo info) {
@@ -141,6 +154,21 @@ public class InventoryHudModule extends HudModule {
         return naturalH > 0 ? contentH() / (float) naturalH : 1f;
     }
 
+    /** Width the player model needs to frame the body at the element's height. */
+    private int modelW() {
+        return Math.max(1, Math.round(contentH() * MODEL_ASPECT));
+    }
+
+    /**
+     * Top offset that centres a section of natural height {@code naturalH} once scaled by
+     * {@code scale}. Sections are meant to fill the element exactly, but rounding (and any section
+     * whose scale is pinned) can leave a few pixels over - splitting them beats letting the whole
+     * remainder pile up under the shortest column.
+     */
+    private int centreTop(int naturalH, float scale) {
+        return PAD + Math.max(0, Math.round((contentH() - naturalH * scale) / 2f));
+    }
+
     @Override
     public int hudWidth(Font font, Minecraft mc, boolean editor) {
         int w = 0;
@@ -148,7 +176,7 @@ public class InventoryHudModule extends HudModule {
             w += Math.round(CELL * fill(COL_H)) + SECTION_GAP;
         }
         if (playerModel.get()) {
-            w += MODEL_W + SECTION_GAP;   // the model is drawn at the element height already
+            w += modelW() + SECTION_GAP;   // the model is drawn at the element height already
         }
         if (equipment.get()) {
             w += Math.round(CELL * fill(COL_H)) + SECTION_GAP;
@@ -183,7 +211,7 @@ public class InventoryHudModule extends HudModule {
         if (armor.get()) {
             float s = fill(COL_H);
             g.pose().pushMatrix();
-            g.pose().translate(x, PAD);
+            g.pose().translate(x, centreTop(COL_H, s));
             g.pose().scale(s);
             for (int i = 0; i < ARMOR.length; i++) {
                 ItemStack st = mc.player != null ? mc.player.getItemBySlot(ARMOR[i]) : ItemStack.EMPTY;
@@ -198,29 +226,33 @@ public class InventoryHudModule extends HudModule {
         // ignores the pose's translate/scale. Transform the model's local rect through the current
         // pose ourselves so it moves and scales with the rest of the HUD element.
         if (playerModel.get()) {
+            int mw = modelW();
             if (mc.player != null) {
                 org.joml.Matrix3x2f m = g.pose();
                 org.joml.Vector2f p1 = m.transformPosition(new org.joml.Vector2f(x, PAD));
-                org.joml.Vector2f p2 = m.transformPosition(new org.joml.Vector2f(x + MODEL_W, PAD + contentH()));
+                org.joml.Vector2f p2 = m.transformPosition(new org.joml.Vector2f(x + mw, PAD + contentH()));
                 int x1 = Math.round(p1.x), y1 = Math.round(p1.y);
                 int x2 = Math.round(p2.x), y2 = Math.round(p2.y);
                 float cx = (x1 + x2) / 2f;
                 float cy = (y1 + y2) / 2f;
+                // Scale from the rect's height using vanilla's own ratio, so the whole body is framed
+                // instead of being blown up until only the legs fall inside the rect.
+                int scale = Math.max(1, Math.round((y2 - y1) * MODEL_SCALE));
                 try {
                     InventoryScreen.extractEntityInInventoryFollowsMouse(
-                            g, x1, y1, x2, y2, (int) ((y2 - y1) * 0.55f), 0.0f, cx, cy, mc.player);
+                            g, x1, y1, x2, y2, scale, MODEL_Y_NUDGE, cx, cy, mc.player);
                 } catch (Throwable ignored) {
                     // Entity rendering can be finicky; never let it break the HUD.
                 }
             }
-            x += MODEL_W + SECTION_GAP;
+            x += mw + SECTION_GAP;
         }
 
         // 3. SkyBlock equipment column (necklace / cloak / belt / gloves), cached from its menu.
         if (equipment.get()) {
             float s = fill(COL_H);
             g.pose().pushMatrix();
-            g.pose().translate(x, PAD);
+            g.pose().translate(x, centreTop(COL_H, s));
             g.pose().scale(s);
             for (int i = 0; i < 4; i++) {
                 slot(g, font, t, smooth, SkyblockHud.equipment(i), 0, i * SLOT, false);
@@ -233,7 +265,7 @@ public class InventoryHudModule extends HudModule {
         // around its top-left corner.
         float gs = fill(gridH());
         g.pose().pushMatrix();
-        g.pose().translate(x, PAD);
+        g.pose().translate(x, centreTop(gridH(), gs));
         g.pose().scale(gs);
 
         // Main storage (inventory indices 9..35), top row first.
@@ -263,21 +295,33 @@ public class InventoryHudModule extends HudModule {
         return true;
     }
 
-    /** The pet section: item centred on top, then the rarity-coloured name and the level row. */
+    /**
+     * The pet section: the pet item on top at double slot size, then the rarity-coloured name and
+     * the level row. The name is set in the body face rather than the caption face - at caption size
+     * the two rows filled barely half the card, which is what made the pet read as an afterthought.
+     */
     private void drawPet(GuiGraphicsExtractor g, Font font, Theme t, boolean smooth, int x) {
         float s = fill(PET_H);
         int cardW = petW(font);
         g.pose().pushMatrix();
-        g.pose().translate(x, PAD);
+        g.pose().translate(x, centreTop(PET_H, s));
         g.pose().scale(s);
 
         SkyblockHud.PetInfo info = SkyblockHud.petInfo();
-        slot(g, font, t, smooth, SkyblockHud.pet(), (cardW - CELL) / 2, 0, false);
+
+        // The item renderer always draws a 16px icon, so the pet gets its own scaled group.
+        g.pose().pushMatrix();
+        g.pose().translate((cardW - PET_ITEM) / 2f, 0);
+        g.pose().scale(PET_ITEM / (float) CELL);
+        slot(g, font, t, smooth, SkyblockHud.pet(), 0, 0, false);
+        g.pose().popMatrix();
+
+        int nameY = PET_ITEM + PET_GAP;
         if (info == null) {
-            UiRender.text(g, font, "No pet", Fonts.SMALL, 0, CELL + PET_GAP, t.textFaint());
+            UiRender.text(g, font, "No pet", Fonts.BODY, 0, nameY, t.textFaint());
         } else {
-            UiRender.text(g, font, info.name(), Fonts.SMALL, 0, CELL + PET_GAP, info.colour());
-            UiRender.text(g, font, levelLine(info), Fonts.SMALL, 0, CELL + PET_GAP + PET_LINE_H + 1, t.textMuted());
+            UiRender.text(g, font, info.name(), Fonts.BODY, 0, nameY, info.colour());
+            UiRender.text(g, font, levelLine(info), Fonts.SMALL, 0, nameY + PET_NAME_H + 1, t.textMuted());
         }
         g.pose().popMatrix();
     }
