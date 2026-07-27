@@ -37,8 +37,26 @@ public class InventoryElement extends HudElement {
     private static final float PAD = 5f;
     private static final float SECTION_GAP = 6f;
     private static final float HOTBAR_GAP = 6f;
-    private static final float MODEL_W = 44f;
+    /**
+     * Player-model framing. RenderLib scales a preview entity by
+     * {@code min(boxW, boxH) * 0.625 * zoom / bbHeight}, so the body only fills its box at a zoom
+     * derived from that - at the default zoom of 1 it renders at a bit over a third of the box and
+     * sits wherever the pivot leaves it. The default {@code yPivot} of {@code -1.0625} is
+     * {@code 2.0 / 2 + 0.0625}, the vanilla centring for a <em>two-block</em> entity; a player is
+     * 1.8 tall, so the model hung low in its box with the head cropped away.
+     */
+    private static final float MODEL_ASPECT = 0.7f;      // vanilla's 49x70 inventory preview
+    private static final float MODEL_FILL = 0.9f;        // share of the box height the body takes
+    private static final float RENDERLIB_FIT = 0.625f;   // the constant in RenderLib's scale
+    private static final float PLAYER_BB_H = 1.8f;
+    private static final float PLAYER_PIVOT = -(PLAYER_BB_H / 2f + 0.0625f);
+
+    // Pet card: a double-size item over the name and level. At slot size under two 7px rows it read
+    // as a stray icon filling about half the column next to four rows of armour.
+    private static final float PET_ITEM = 32f;
     private static final float PET_LINE = 7f;
+    private static final float PET_NAME_PX = 10f;
+    private static final float PET_W = 64f;
 
     private static final EquipmentSlot[] ARMOR = {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
@@ -150,37 +168,66 @@ public class InventoryElement extends HudElement {
         return wrap;
     }
 
+    /**
+     * The tallest section, which every other one centres against. The model used to be sized to the
+     * storage grid alone, so it stayed short whenever armour or the hotbar made the element taller.
+     */
+    private float contentHeight() {
+        float storage = ROWS * CELL + (ROWS - 1) * SLOT_GAP
+                + (inv.showHotbar() ? HOTBAR_GAP + CELL : 0f);
+        float h = storage;
+        if (inv.showArmor() || inv.showEquipment()) {
+            h = Math.max(h, 4 * CELL + 3 * SLOT_GAP);
+        }
+        if (inv.showPet()) {
+            h = Math.max(h, PET_ITEM + 2f + (PET_NAME_PX + 2f) + (PET_LINE + 2f));
+        }
+        return h;
+    }
+
     private ContainerComponent playerModel() {
-        float height = ROWS * CELL + (ROWS - 1) * SLOT_GAP;
-        ContainerComponent holder = row(MODEL_W, 0f);
+        float height = contentHeight();
+        float width = height * MODEL_ASPECT;
+        ContainerComponent holder = row(width, 0f);
         holder.height(height).justifyContent(GuiAlignment.CENTER);
         EntityModelComponent model = new EntityModelComponent();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             model.playerUuid(mc.player.getUUID());
         }
-        model.size(MODEL_W, height);
+        model.size(width, height);
+        // Solve RenderLib's own scale for "the body fills MODEL_FILL of the box height".
+        model.zoom(MODEL_FILL * height / (RENDERLIB_FIT * Math.min(width, height)));
+        model.yPivot(PLAYER_PIVOT);
         holder.add(model);
         return holder;
     }
 
     private ContainerComponent petCard() {
-        ContainerComponent card = column(56f, 2f);
+        ContainerComponent card = column(PET_W, 2f);
         card.alignItems(GuiAlignment.CENTER);
-        petSlot = slot();
+        petSlot = slot(PET_ITEM);
         card.add(petSlot.box());
-        petName = small("", Themes.current().text(), PET_LINE).width(56f);
-        petLevel = small("", Themes.current().textMuted(), PET_LINE).width(56f);
-        card.add(textRow(petName, 56f, PET_LINE + 2f));
-        card.add(textRow(petLevel, 56f, PET_LINE + 2f));
+        petName = text("", Themes.current().text(), PET_NAME_PX).width(PET_W);
+        petLevel = small("", Themes.current().textMuted(), PET_LINE).width(PET_W);
+        card.add(textRow(petName, PET_W, PET_NAME_PX + 2f));
+        card.add(textRow(petLevel, PET_W, PET_LINE + 2f));
         return card;
     }
 
     /** One slot: a box, the item centred in it, and the count label in its corner. */
     private Slot slot() {
+        return slot(CELL);
+    }
+
+    /**
+     * A slot of a given size. The pet uses a larger one; RenderLib's item component rasterises at the
+     * box size, so a bigger box means a genuinely bigger item rather than a stretched 16px sprite.
+     */
+    private Slot slot(float size) {
         Theme t = Themes.current();
-        ContainerComponent box = row(CELL, 0f);
-        box.height(CELL).cornerRadius(3f)
+        ContainerComponent box = row(size, 0f);
+        box.height(size).cornerRadius(3f)
                 .position(GuiPositionType.RELATIVE)     // anchors the count label
                 .justifyContent(GuiAlignment.CENTER);
         if (inv.showSlotBoxes()) {
@@ -188,12 +235,12 @@ public class InventoryElement extends HudElement {
         }
 
         ItemModelComponent item = new ItemModelComponent();
-        item.size(CELL, CELL).visible(false);
+        item.size(size, size).visible(false);
         box.add(item);
 
         TextComponent count = new TextComponent().font(MEDIUM).textScalePixels(6f)
-                .color(0xFFFFFFFF).width(CELL)
-                .position(GuiPositionType.ABSOLUTE).x(CELL * 0.4f).y(CELL * 0.55f)
+                .color(0xFFFFFFFF).width(size)
+                .position(GuiPositionType.ABSOLUTE).x(size * 0.4f).y(size * 0.55f)
                 .visible(false);
         box.add(count);
         return new Slot(box, item, count);

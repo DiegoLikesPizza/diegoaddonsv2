@@ -123,6 +123,7 @@ public class MusicElement extends HudElement {
 
         asRow(root, textWidth + PAD_X * 2f + (wantCover ? contentH + GAP : 0f), GAP)
                 .padding(PAD_Y, PAD_X);
+        root.height(contentH + PAD_Y * 2f);
         applyBackground(root, 7f);
 
         if (wantCover) {

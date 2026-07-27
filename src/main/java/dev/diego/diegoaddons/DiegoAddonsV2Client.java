@@ -30,12 +30,19 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
 
     public static KeyMapping OPEN_MENU;
 
+    /** Kept so the inventory-button extension can be detached if it is ever torn down. */
+    private static com.render.api.RenderRegistration INVENTORY_BUTTONS;
+
     @Override
     public void onInitializeClient() {
         ConfigManager.load();
         SkinChanger.ensureFolder();
         ModuleManager.init();
         dev.diego.diegoaddons.hud.MiningAbilityOverlay.register();
+        // Inventory buttons attach themselves to any container screen. The extension decides per
+        // screen whether it applies, so this stays registered for the client's lifetime.
+        INVENTORY_BUTTONS = com.render.api.RenderLibScreen.register(
+                new dev.diego.diegoaddons.gui.InventoryButtonsExtension());
         dev.diego.diegoaddons.util.WorldRender.init();
         dev.diego.diegoaddons.command.DiegoCommands.register();
 

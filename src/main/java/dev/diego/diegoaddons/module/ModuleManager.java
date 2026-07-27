@@ -258,7 +258,8 @@ public final class ModuleManager {
                     PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
-                    InventoryButtons.render((AbstractContainerScreen<?>) scr, g, mx, my);
+                    // Inventory buttons are not drawn here any more - they are a RenderLib screen
+                    // extension (see InventoryButtonsExtension), which owns their hit testing too.
                     dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
                     dev.diego.diegoaddons.util.SlotLocks.render((AbstractContainerScreen<?>) scr, g, mx, my);
                     Toasts.render(g);
@@ -267,8 +268,9 @@ public final class ModuleManager {
                 // also read as a slot click) or on a locked slot.
                 ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) -> {
                     AbstractContainerScreen<?> cs = (AbstractContainerScreen<?>) scr;
-                    boolean ours = PartyFinder.click(cs, ev.x(), ev.y(), ev.button())
-                            || InventoryButtons.click(cs, ev.x(), ev.y(), ev.button());
+                    // Inventory buttons are absent here on purpose: a RenderLib button consumes its
+                    // own press, so the click never reaches the menu and needs no veto.
+                    boolean ours = PartyFinder.click(cs, ev.x(), ev.y(), ev.button());
                     boolean locked = dev.diego.diegoaddons.util.SlotLocks.locksClick(cs, ev.x(), ev.y());
                     return !ours && !locked;
                 });
