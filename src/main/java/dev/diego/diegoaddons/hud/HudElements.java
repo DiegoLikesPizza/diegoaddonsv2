@@ -116,6 +116,30 @@ public final class HudElements {
         return sb.toString();
     }
 
+    /**
+     * Puts every element back where it started: RenderLib's stored placements are deleted and the
+     * layout is registered again, so each element falls back to its default position and scale.
+     */
+    public static void resetPositions() {
+        for (Module m : ModuleManager.all()) {
+            if (m instanceof HudModule hud && hud.managedHud()) {
+                var cfg = ConfigManager.moduleConfig(hud.id);
+                cfg.hudX = -1;
+                cfg.hudY = -1;
+            }
+        }
+        ConfigManager.save();
+        try {
+            java.nio.file.Path file = net.minecraft.client.Minecraft.getInstance().gameDirectory
+                    .toPath().resolve("config").resolve("render-lib").resolve("hud-layouts")
+                    .resolve(MOD_ID + ".json");
+            java.nio.file.Files.deleteIfExists(file);
+        } catch (java.io.IOException ignored) {
+            // Nothing stored, or not ours to delete; the re-register below still resets the layout.
+        }
+        registeredFor = "";   // forces a fresh registration on the next tick
+    }
+
     /** Opens RenderLib's placement screen - the replacement for the mod's own HUD editor. */
     public static void openPlacementScreen() {
         if (layout != null) {
