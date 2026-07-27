@@ -93,6 +93,14 @@ public class DiegoClickGuiView extends GuiView {
     private ContainerComponent railPane;
     private ContainerComponent contentPane;
     private TextInputComponent search;
+    private TextComponent titleLabel;
+    private TextComponent countLabel;
+    private ScrollContainerComponent list;
+    private final java.util.Map<String, Card> cards = new java.util.LinkedHashMap<>();
+
+    /** A built card: the clickable shell and the box its settings live in. */
+    private record Card(Module module, ButtonComponent shell, ContainerComponent settings) {
+    }
 
     @Override
     protected void build() {
@@ -130,8 +138,49 @@ public class DiegoClickGuiView extends GuiView {
         body.add(contentPane);
         panel.add(body);
 
+        buildContentChrome();
         refreshRail();
-        refreshContent();
+        refreshList();
+    }
+
+    /**
+     * The parts of the content pane that outlive a list refresh. The search field in particular:
+     * rebuilding it while you type destroys the focused component, which drops the caret after every
+     * character.
+     */
+    private void buildContentChrome() {
+        ContainerComponent title = row(CONTENT_INNER, 12f).height(TITLE_H);
+        titleLabel = GuiText.label("", t.text(), 19f, GuiText.TITLE).flexGrow(1f);
+        countLabel = GuiText.label("", t.textFaint(), 12f);
+        title.add(textBox(titleLabel, 0f, TITLE_H).flexGrow(1f));
+        title.add(countLabel);
+
+        search = new TextInputComponent()
+                .value(query)
+                .placeholder("Search modules...")
+                .font(GuiText.BODY)
+                .textScalePixels(13f)
+                .onChange(s -> {
+                    query = s == null ? "" : s;
+                    refreshList();
+                });
+        search.size(240f, 32f).padding(8f, 12f).cornerRadius(9f).flexShrink(0f)
+                .backgroundColor(t.surfaceAlt())
+                .borderWidth(1f).borderColor(t.border())
+                .color(t.text());
+        title.add(search);
+        contentPane.add(title);
+
+        list = new ScrollContainerComponent();
+        list.size(CONTENT_INNER, LIST_H);
+        list.flowColumn();
+        list.display(GuiDisplay.FLEX);
+        list.flexDirection(GuiFlexDirection.COLUMN);
+        list.alignItems(GuiAlignment.START);
+        list.rowGap(GuiLength.pixels(10f));
+        list.gap(10f);
+        list.overflowY(GuiOverflowMode.AUTO);
+        contentPane.add(list);
     }
 
     // --- header ------------------------------------------------------------------------------------
@@ -202,7 +251,7 @@ public class DiegoClickGuiView extends GuiView {
             expanded = null;
             clearSearch();
             refreshRail();
-            refreshContent();
+            refreshList();
         });
         asRow(b, RAIL_INNER, 10f).height(38f).padding(0f, 13f).cornerRadius(10f).flexShrink(0f);
         b.add(GuiText.glyph(icon(c), fg, 12f).width(16f));
@@ -234,53 +283,18 @@ public class DiegoClickGuiView extends GuiView {
 
     // --- module cards ------------------------------------------------------------------------------
 
-    private void refreshContent() {
-        contentPane.clearChildren();
+    /** Rebuilds the card list only. The title row and the search field are left alone. */
+    private void refreshList() {
         List<Module> modules = visibleModules();
+        titleLabel.text(query.isEmpty() && category != null ? category.display : "Search");
+        countLabel.text(modules.size() + (modules.size() == 1 ? " module" : " modules"))
+                .width(GuiText.width("00 modules", 12f));
 
-        ContainerComponent title = row(CONTENT_INNER, 12f).height(TITLE_H);
-        title.add(GuiText.label(query.isEmpty() && category != null ? category.display : "Search",
-                t.text(), 19f, GuiText.TITLE).flexGrow(1f));
-        title.add(GuiText.label(modules.size() + (modules.size() == 1 ? " module" : " modules"),
-                t.textFaint(), 12f));
-
-        search = new TextInputComponent()
-                .value(query)
-                .placeholder("Search modules...")
-                .font(GuiText.BODY)
-                .textScalePixels(13f)
-                .onChange(s -> {
-                    query = s == null ? "" : s;
-                    refreshContent();
-                });
-        // Fixed height with symmetric padding: under autoHeight the box collapses to a hairline and
-        // the placeholder draws underneath it.
-        search.size(240f, 32f).padding(8f, 12f).cornerRadius(9f).flexShrink(0f)
-                .backgroundColor(t.surfaceAlt())
-                .borderWidth(1f).borderColor(t.border())
-                .color(t.text());
-        title.add(search);
-        contentPane.add(title);
-
-        if (modules.isEmpty()) {
-            contentPane.add(GuiText.wrapped("Nothing here. Try another search.",
-                    t.textFaint(), 14f, CONTENT_INNER));
-            return;
-        }
-
-        ScrollContainerComponent list = new ScrollContainerComponent();
-        list.size(CONTENT_INNER, LIST_H);
-        list.flowColumn();
-        list.display(GuiDisplay.FLEX);
-        list.flexDirection(GuiFlexDirection.COLUMN);
-        list.alignItems(GuiAlignment.START);
-        list.rowGap(GuiLength.pixels(10f));
-        list.gap(10f);
-        list.overflowY(GuiOverflowMode.AUTO);
+        list.clearChildren();
+        cards.clear();
         for (Module m : modules) {
             list.add(card(m));
         }
-        contentPane.add(list);
     }
 
     private List<Module> visibleModules() {
@@ -304,49 +318,78 @@ public class DiegoClickGuiView extends GuiView {
     }
 
     /**
-     * One module card. The whole card is clickable to expand it; the toggle sits outside that
-     * pressable area so flipping a module doesn't also open it.
+     * One module card. The whole card is the clickable surface - a hit area the size of the text
+     * block is the difference between a card that feels clickable and one that does not - and the
+     * toggle inside it swallows its own clicks.
      */
     private ContainerComponent card(Module m) {
-        boolean open = m == expanded;
-
-        ContainerComponent shell = column(CARD_W, 12f).padding(14f, CARD_PAD_X).cornerRadius(12f)
-                .backgroundColor(open ? t.elevated() : t.surfaceAlt())
-                .borderWidth(1f).borderColor(open ? t.accent() : t.border())
+        ButtonComponent shell = clickable(t.surfaceAlt(), () -> expand(m));
+        asColumn(shell, CARD_W, 10f).padding(14f, CARD_PAD_X).cornerRadius(12f)
+                .borderWidth(1f).borderColor(t.border())
                 .flexShrink(0f);
 
         ContainerComponent head = row(CARD_INNER, 14f);
         float textW = CARD_INNER - TOGGLE_W - 14f;
-
-        ButtonComponent hit = clickable(0x00000000, () -> {
-            expanded = open ? null : m;
-            refreshContent();
-        });
-        asColumn(hit, textW, 3f).cornerRadius(8f).alignItems(GuiAlignment.START);
-        hit.add(box(textW, 20f, GuiText.label(m.name, t.text(), 15f, GuiText.MEDIUM)));
+        ContainerComponent titleBox = column(textW, 3f);
+        titleBox.add(textBox(GuiText.label(m.name, t.text(), 15f, GuiText.MEDIUM), textW, 20f));
         if (m.description != null && !m.description.isEmpty()) {
-            hit.add(GuiText.wrapped(m.description, t.textMuted(), 12f, textW));
+            titleBox.add(GuiText.wrapped(m.description, t.textMuted(), 12f, textW));
         }
-        head.add(hit);
+        head.add(titleBox);
         head.add(toggle(m.isEnabled(), v -> {
             ModuleManager.setEnabled(m, v);
             refreshRail();
         }));
         shell.add(head);
 
-        if (open) {
-            shell.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
-            List<Setting> settings = m.settings();
-            if (settings.isEmpty()) {
-                shell.add(GuiText.wrapped("No settings for this feature.",
-                        t.textFaint(), 13f, CARD_INNER));
-            } else {
-                for (Setting s : settings) {
-                    shell.add(setting(s));
-                }
-            }
+        // Filled in on expand; the gap above it is what separates the settings from the name row.
+        ContainerComponent settings = column(CARD_INNER, 10f);
+        settings.padding(6f, 0f, 0f, 0f).visible(false);
+        shell.add(settings);
+
+        Card card = new Card(m, shell, settings);
+        cards.put(m.id, card);
+        if (m == expanded) {
+            fill(card, true);
         }
         return shell;
+    }
+
+    /** Opens or closes a card without rebuilding the list, so no other toggle re-animates. */
+    private void expand(Module m) {
+        Module previous = expanded;
+        expanded = m == expanded ? null : m;
+        if (previous != null) {
+            fill(cards.get(previous.id), false);
+        }
+        if (expanded != null) {
+            fill(cards.get(expanded.id), true);
+        }
+    }
+
+    private void fill(Card card, boolean open) {
+        if (card == null) {
+            return;
+        }
+        int background = open ? t.elevated() : t.surfaceAlt();
+        card.shell().backgroundColor(background).gradient(flat(background))
+                .borderColor(open ? t.accent() : t.border());
+
+        ContainerComponent box = card.settings();
+        box.clearChildren();
+        box.visible(open);
+        if (!open) {
+            return;
+        }
+        box.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
+        List<Setting> settings = card.module().settings();
+        if (settings.isEmpty()) {
+            box.add(GuiText.wrapped("No settings for this feature.", t.textFaint(), 13f, CARD_INNER));
+            return;
+        }
+        for (Setting s : settings) {
+            box.add(setting(s));
+        }
     }
 
     // --- settings ----------------------------------------------------------------------------------
@@ -383,13 +426,13 @@ public class DiegoClickGuiView extends GuiView {
         if (s instanceof CycleSetting cs) {
             return valueRow(cs.name, cs.label(), () -> {
                 cs.cycle();
-                refreshContent();
+                fill(cards.get(cs.owner.id), true);
             });
         }
         if (s instanceof KeybindSetting ks) {
             return valueRow(ks.name, ks.display(), () -> {
                 ks.clear();
-                refreshContent();
+                fill(cards.get(ks.owner.id), true);
             });
         }
         if (s instanceof ActionSetting as) {
@@ -448,8 +491,9 @@ public class DiegoClickGuiView extends GuiView {
     }
 
     /** Puts text in a box of a known height, which text alone cannot have without spilling. */
-    private static ContainerComponent box(float width, float height, TextComponent text) {
-        ContainerComponent b = row(width, 0f).height(height);
+    private static ContainerComponent textBox(TextComponent text, float width, float height) {
+        ContainerComponent b = row(width, 0f);
+        b.height(height);
         b.add(text);
         return b;
     }
