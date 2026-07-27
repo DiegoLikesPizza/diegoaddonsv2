@@ -26,8 +26,15 @@ import java.util.regex.Pattern;
  * (which detect those events) flag them here via {@link #setMimicKilled()} / {@link #setPrinceKilled()}.
  */
 public final class DungeonState {
-    private static final Pattern FLOOR = Pattern.compile("\\((M?\\d|E)\\d?\\)");
+    /** "The Catacombs (F7)" / "(M3)" / "(Entrance)". The floor letter is part of the token. */
+    private static final Pattern FLOOR = Pattern.compile("\\(\\s*(F\\d|M\\d|E(?:ntrance)?)\\s*\\)");
     private static final Pattern TIME = Pattern.compile("(?:(\\d+)m)?\\s*(\\d+)s");
+    /** The first number in a line, so a trailing "(280)" or "/5" cannot break a percent parse. */
+    private static final Pattern NUMBER = Pattern.compile("(\\d+(?:\\.\\d+)?)");
+
+    /** A dungeon tab-list team slot: "[MVP+] Name (Archer LvL 33)" / "Name (DEAD)" / "(EMPTY)". */
+    private static final Pattern TEAM_SLOT = Pattern.compile(
+            "^(?:\\[[^\\]]+\\]\\s*)?([A-Za-z0-9_]{1,16})\\s*\\((?:Archer|Berserk|Healer|Mage|Tank|DEAD)[^)]*\\)$");
 
     private static boolean inDungeons;
     private static String floor = "";        // "F7", "M3", "E", or ""
@@ -44,6 +51,26 @@ public final class DungeonState {
     private static boolean mimicKilled;
     private static boolean princeKilled;
     private static boolean bloodDone;
+
+    /** Lower-cased names of the run's five party slots, read from the tab list. */
+    private static final java.util.Set<String> teamNames = new java.util.HashSet<>();
+
+    /**
+     * Whether a name belongs to one of the run's party members.
+     *
+     * <p>The only dependable way to tell a real teammate from a dungeon NPC: Hypixel spawns
+     * Shadow Assassins, Lost Adventurers and friends as genuine player entities that carry both a
+     * version-4 UUID and a tab-list entry, so neither of those distinguishes them. The five party
+     * slots, on the other hand, are the only tab entries formatted with a dungeon class.
+     */
+    public static boolean isTeamMember(String name) {
+        return name != null && teamNames.contains(name.toLowerCase(Locale.ROOT));
+    }
+
+    /** True once the party roster has been read, so callers can tell "no team" from "not parsed yet". */
+    public static boolean hasTeam() {
+        return !teamNames.isEmpty();
+    }
 
     private DungeonState() {
     }
@@ -111,6 +138,7 @@ public final class DungeonState {
         mimicKilled = false;
         princeKilled = false;
         bloodDone = false;
+        teamNames.clear();
     }
 
     /** Called every client tick. Cheap when not in a dungeon (bails after the area check). */
@@ -142,7 +170,7 @@ public final class DungeonState {
 
         parseTab(mc);
         for (String l : sidebar) {
-            if (l.startsWith("Cleared:")) {
+            if (l.contains("Cleared:")) {
                 clearedPercent = parsePercent(l);
             }
         }
@@ -151,12 +179,21 @@ public final class DungeonState {
 
     private static String parseFloor(String line) {
         Matcher m = FLOOR.matcher(line);
-        return m.find() ? m.group(1) : (line.contains("Entrance") ? "E" : floor);
+        if (m.find()) {
+            String f = m.group(1);
+            return f.startsWith("E") ? "E" : f;
+        }
+        return line.contains("Entrance") ? "E" : floor;
     }
 
     private static void parseTab(Minecraft mc) {
         puzzleFails = 0;   // recounted fresh from the current tab list every pass
+        teamNames.clear();
         for (String l : tabLines(mc)) {
+            Matcher slot = TEAM_SLOT.matcher(l);
+            if (slot.matches()) {
+                teamNames.add(slot.group(1).toLowerCase(Locale.ROOT));
+            }
             if (l.startsWith("Secrets Found:")) {
                 if (l.endsWith("%")) {
                     secretsPercent = parsePercent(l);
@@ -346,10 +383,20 @@ public final class DungeonState {
         }
     }
 
+    /**
+     * The percentage in a line, as 0..1. Takes the <i>first</i> number after the colon rather than
+     * the whole remainder: Hypixel appends extras to these lines ("Cleared: 62% (280)"), and parsing
+     * the remainder wholesale failed on those - which left {@code clearedPercent} at zero and, since
+     * the score's total-room estimate divides by it, pinned the displayed score to 0 all run.
+     */
     private static double parsePercent(String line) {
-        String v = line.substring(line.indexOf(':') + 1).replace("%", "").trim();
+        int colon = line.indexOf(':');
+        Matcher m = NUMBER.matcher(colon >= 0 ? line.substring(colon + 1) : line);
+        if (!m.find()) {
+            return 0;
+        }
         try {
-            return Double.parseDouble(v) * 0.01;
+            return Double.parseDouble(m.group(1)) * 0.01;
         } catch (NumberFormatException e) {
             return 0;
         }
