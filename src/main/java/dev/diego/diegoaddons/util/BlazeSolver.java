@@ -63,10 +63,13 @@ public final class BlazeSolver {
         }
         String room = DungeonRooms.currentRoomName();
         if (room != null) {
-            // "Lower Blaze" = shoot from the lowest health up; "Higher Blaze" = from the highest down.
-            if (room.equals("Lower Blaze")) {
+            // The room name says which way the order *runs*, not which end it starts at. In
+            // "Higher Blaze" every blaze you shoot must be higher health than the last, so the first
+            // one is the lowest; "Lower Blaze" is the mirror and starts at the highest. Reading the
+            // name as the starting end is what had the higher room listed back to front.
+            if (room.equals("Higher Blaze")) {
                 highestFirst = Boolean.FALSE;
-            } else if (room.equals("Higher Blaze")) {
+            } else if (room.equals("Lower Blaze")) {
                 highestFirst = Boolean.TRUE;
             }
         }
