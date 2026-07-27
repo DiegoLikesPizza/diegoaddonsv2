@@ -154,8 +154,11 @@ public final class DungeonState {
         return m.find() ? m.group(1) : (line.contains("Entrance") ? "E" : floor);
     }
 
+    private static boolean warnedAboutTab;
+
     private static void parseTab(Minecraft mc) {
         puzzleFails = 0;   // recounted fresh from the current tab list every pass
+        boolean sawAnything = false;
         for (String l : tabLines(mc)) {
             if (l.startsWith("Secrets Found:")) {
                 if (l.endsWith("%")) {
@@ -163,6 +166,7 @@ public final class DungeonState {
                 } else {
                     secretsFound = intAfterColon(l);
                 }
+                sawAnything = true;
             } else if (l.startsWith("Crypts:")) {
                 crypts = intAfterColon(l);
             } else if (l.startsWith("Completed Rooms:")) {

@@ -26,6 +26,8 @@ import java.util.Map;
  * everything the mod could draw.
  */
 public final class HudElements {
+    private static final org.slf4j.Logger LOGGER =
+            org.slf4j.LoggerFactory.getLogger("DiegoAddonsV2");
     private static final String MOD_ID = "diegoaddonsv2";
 
     private static final float DEFAULT_X = 8f;
@@ -38,6 +40,13 @@ public final class HudElements {
     private static ManagedHudLayout layout;
     private static RenderRegistration registration;
     private static final Map<String, Entry> ENTRIES = new LinkedHashMap<>();
+    /**
+     * Element trees, kept across re-registrations. Toggling one HUD module rebuilds the layout - the
+     * list RenderLib holds is frozen at registration - but there is no reason for that to throw away
+     * the component trees of every other element, so they are reused.
+     */
+    private static final Map<String, HudElement> CONTENT = new LinkedHashMap<>();
+    private static final Map<String, HudLayoutElement> SHELLS = new LinkedHashMap<>();
     private static String registeredFor = "";
 
     private HudElements() {
@@ -69,9 +78,15 @@ public final class HudElements {
             if (!(m instanceof HudModule hud) || !hud.isEnabled() || !hud.managedHud()) {
                 continue;
             }
-            HudLayoutElement element = new HudLayoutElement(hud.id, placement(hud, cursor));
+            HudLayoutElement element = SHELLS.get(hud.id);
+            HudElement content = CONTENT.get(hud.id);
+            if (element == null || content == null) {
+                element = new HudLayoutElement(hud.id, placement(hud, cursor));
+                content = hud.createElement(element.root());
+                SHELLS.put(hud.id, element);
+                CONTENT.put(hud.id, content);
+            }
             cursor += estimatedHeight(hud) + DEFAULT_GAP;
-            HudElement content = hud.createElement(element.root());
             element.visible(false);
             layout.addElement(element);
             ENTRIES.put(hud.id, new Entry(hud, element, content));
@@ -134,9 +149,14 @@ public final class HudElements {
                     .toPath().resolve("config").resolve("render-lib").resolve("hud-layouts")
                     .resolve(MOD_ID + ".json");
             java.nio.file.Files.deleteIfExists(file);
-        } catch (java.io.IOException ignored) {
-            // Nothing stored, or not ours to delete; the re-register below still resets the layout.
+        } catch (java.io.IOException | RuntimeException e) {
+            // RenderLib owns that file and offers no API to clear it, so this is the only way in.
+            // If it ever moves or gets cached in memory, reset would silently stop working - so say
+            // so rather than leave you wondering why your elements came back.
+            LOGGER.warn("[DiegoAddons V2] Could not clear the stored HUD placements", e);
         }
+        SHELLS.clear();       // defaults are recomputed, so the shells have to be rebuilt
+        CONTENT.clear();
         registeredFor = "";   // forces a fresh registration on the next tick
     }
 

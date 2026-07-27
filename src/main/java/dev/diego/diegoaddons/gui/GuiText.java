@@ -22,8 +22,16 @@ public final class GuiText {
 
     /** Natural pixel size of the bundled faces, as Minecraft rasterises them. */
     private static final float NATURAL_PX = 10f;
-    /** Measured against a running client: RenderLib needs about a quarter more room. */
-    private static final float SLACK = 1.25f;
+    /**
+     * How much wider RenderLib shapes these faces than {@code Font.width} reports.
+     *
+     * <p>Starts as an estimate and is replaced by a real measurement the moment one is available:
+     * {@link #calibrate} reads a laid-out label's own intrinsic width and works the ratio out from
+     * that, so the number describes what RenderLib actually did rather than what I once measured off
+     * a screenshot.
+     */
+    private static float slack = 1.25f;
+    private static boolean calibrated;
 
     private GuiText() {
     }
@@ -64,7 +72,31 @@ public final class GuiText {
         if (mc == null || mc.font == null) {
             return s.length() * scale * 0.6f;
         }
-        return mc.font.width(styled(s, Fonts.MEDIUM)) * (scale / NATURAL_PX) * SLACK + 6f;
+        return mc.font.width(styled(s, Fonts.MEDIUM)) * (scale / NATURAL_PX) * slack + 6f;
+    }
+
+    /**
+     * Learns the real shaping ratio from a label that has been laid out. Call with a label whose
+     * text and scale are known; it takes the first sane reading and then leaves itself alone.
+     */
+    public static void calibrate(TextComponent label, String text, float scale) {
+        if (calibrated || label == null || text.isEmpty()) {
+            return;
+        }
+        float actual = label.intrinsicSize().maxWidth();
+        Minecraft mc = Minecraft.getInstance();
+        if (actual <= 0f || mc == null || mc.font == null) {
+            return;   // not laid out yet
+        }
+        float base = mc.font.width(styled(text, Fonts.MEDIUM)) * (scale / NATURAL_PX);
+        if (base <= 0f) {
+            return;
+        }
+        float measured = actual / base;
+        if (measured > 0.8f && measured < 2.0f) {   // ignore a nonsense reading
+            slack = measured;
+            calibrated = true;
+        }
     }
 
     private static net.minecraft.network.chat.Component styled(String s, Style style) {
