@@ -2,7 +2,6 @@ package dev.diego.diegoaddons;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.gui.ClickGuiScreen;
 import dev.diego.diegoaddons.gui.IntroScreen;
 import dev.diego.diegoaddons.module.ModuleManager;
 import dev.diego.diegoaddons.util.SkinChanger;
