@@ -207,6 +207,9 @@ public class DiegoClickGuiView extends GuiView {
             close();
             dev.diego.diegoaddons.hud.HudElements.openPlacementScreen();
         }));
+        right.add(pill("Reset HUD", () -> {
+            dev.diego.diegoaddons.hud.HudElements.resetPositions();
+        }));
         right.add(glyphPill("✕", this::close));
         bar.add(right);
         return bar;
@@ -342,10 +345,10 @@ public class DiegoClickGuiView extends GuiView {
         }));
         shell.add(head);
 
-        // Filled in on expand; the gap above it is what separates the settings from the name row.
+        // Added to the card only while open. Kept as a hidden child instead, the card keeps the
+        // height it was measured at and the settings spill out of its box.
         ContainerComponent settings = column(CARD_INNER, 10f);
-        settings.padding(6f, 0f, 0f, 0f).visible(false);
-        shell.add(settings);
+        settings.padding(6f, 0f, 0f, 0f);
 
         Card card = new Card(m, shell, settings);
         cards.put(m.id, card);
@@ -377,10 +380,11 @@ public class DiegoClickGuiView extends GuiView {
 
         ContainerComponent box = card.settings();
         box.clearChildren();
-        box.visible(open);
+        card.shell().remove(box);
         if (!open) {
             return;
         }
+        card.shell().add(box);
         box.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
         List<Setting> settings = card.module().settings();
         if (settings.isEmpty()) {

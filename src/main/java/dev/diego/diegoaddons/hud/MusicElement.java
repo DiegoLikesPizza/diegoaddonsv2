@@ -82,7 +82,6 @@ public class MusicElement extends HudElement {
                     cover.resource(art);
                 }
                 cover.visible(art != null);
-                coverBox.visible(art == null);
             }
         }
         if (wantBar && barFill != null) {
@@ -117,12 +116,14 @@ public class MusicElement extends HudElement {
         applyBackground(root, 7f);
 
         if (wantCover) {
-            cover = new ImageComponent();
-            cover.size(contentH, contentH).cornerRadius(3f).visible(false);
+            // One box, not two: the artwork lives inside it and the box's own tint is what shows
+            // while the lookup is still out. Two siblings both took up room in the row.
             coverBox = new ContainerComponent();
             coverBox.size(contentH, contentH).cornerRadius(3f)
                     .backgroundColor(Theme.withAlpha(t.textFaint(), 0.25f));
-            root.add(cover);
+            cover = new ImageComponent();
+            cover.size(contentH, contentH).cornerRadius(3f).visible(false);
+            coverBox.add(cover);
             root.add(coverBox);
         }
 
