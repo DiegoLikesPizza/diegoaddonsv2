@@ -80,8 +80,6 @@ public class DiegoClickGuiView extends GuiView {
     private static final float ROW_H = 32f;
     private static final float CARD_PAD_Y = 14f;
     private static final float CARD_GAP = 10f;
-    private static final float NAME_H = 20f;
-    private static final float DESC_LINE_H = 15f;
     private static final float SETTINGS_PAD_TOP = 6f;
     private static final float SETTINGS_GAP = 10f;
     private static final float TOGGLE_W = 40f;
@@ -104,8 +102,9 @@ public class DiegoClickGuiView extends GuiView {
     private ScrollContainerComponent list;
     private final java.util.Map<String, Card> cards = new java.util.LinkedHashMap<>();
 
-    /** A built card: the clickable shell and the box its settings live in. */
-    private record Card(Module module, ButtonComponent shell, ContainerComponent settings) {
+    /** A built card: the clickable shell, its head row and the box its settings live in. */
+    private record Card(Module module, ButtonComponent shell, ContainerComponent head,
+                        ContainerComponent settings) {
     }
 
     @Override
@@ -229,6 +228,38 @@ public class DiegoClickGuiView extends GuiView {
             }
         }
         return all.get(0);
+    }
+
+    /**
+     * Keeps every card as tall as its contents.
+     *
+     * <p>A card's auto height does not re-resolve when its settings are added, so it would keep the
+     * height it was first laid out at and clip them. Rather than compute the height from padding and
+     * row-height constants - which then have to be kept in step with the layout by hand - each card
+     * is fitted to the height its own head row and settings box report after they have been laid
+     * out. Nothing here knows what a setting looks like, so a new kind of setting, a different
+     * padding or a longer description all size correctly on their own.
+     */
+    @Override
+    public void tick() {
+        super.tick();
+        for (Card card : cards.values()) {
+            float head = card.head().height();
+            if (head <= 0f) {
+                continue;   // not laid out yet; try again next frame
+            }
+            float wanted = CARD_PAD_Y * 2f + head;
+            if (card.settings().parent() != null) {
+                float settings = card.settings().height();
+                if (settings <= 0f) {
+                    continue;
+                }
+                wanted += CARD_GAP + settings;
+            }
+            if (Math.abs(card.shell().height() - wanted) > 0.5f) {
+                card.shell().height(wanted);
+            }
+        }
     }
 
     // --- category rail -----------------------------------------------------------------------------
@@ -356,7 +387,7 @@ public class DiegoClickGuiView extends GuiView {
         ContainerComponent settings = column(CARD_INNER, SETTINGS_GAP);
         settings.padding(SETTINGS_PAD_TOP, 0f, 0f, 0f);
 
-        Card card = new Card(m, shell, settings);
+        Card card = new Card(m, shell, head, settings);
         cards.put(m.id, card);
         fill(card, m == expanded);
         return shell;
@@ -387,14 +418,8 @@ public class DiegoClickGuiView extends GuiView {
         box.clearChildren();
         card.shell().remove(box);
         if (!open) {
-            // Measured, not auto: a card left to size itself keeps the height it was first laid out
-            // at, which is how settings ended up hanging out of the bottom of their card.
-            card.shell().height(CARD_PAD_Y * 2f + headHeight(m));
             return;
         }
-        float settingsH = settingsHeight(m);
-        card.shell().height(CARD_PAD_Y * 2f + headHeight(m) + CARD_GAP + settingsH);
-        box.height(settingsH);
         card.shell().add(box);
 
         box.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
@@ -406,35 +431,6 @@ public class DiegoClickGuiView extends GuiView {
         for (Setting s : settings) {
             box.add(setting(s));
         }
-    }
-
-    /** The name row plus however many lines the description wraps to. */
-    private float headHeight(Module m) {
-        float h = NAME_H;
-        if (m.description != null && !m.description.isEmpty()) {
-            float textW = CARD_INNER - TOGGLE_W - 14f;
-            int lines = Math.max(1, (int) Math.ceil(GuiText.width(m.description, 12f) / textW));
-            h += 3f + lines * DESC_LINE_H;
-        }
-        return Math.max(h, TOGGLE_H);
-    }
-
-    /** The divider, every setting row, and the gaps between them. */
-    private float settingsHeight(Module m) {
-        List<Setting> settings = m.settings();
-        if (settings.isEmpty()) {
-            return SETTINGS_PAD_TOP + 1f + SETTINGS_GAP + DESC_LINE_H;
-        }
-        float h = SETTINGS_PAD_TOP + 1f;   // own top padding, then the divider
-        for (Setting s : settings) {
-            h += SETTINGS_GAP + settingRowHeight(s);
-        }
-        return h;
-    }
-
-    private static float settingRowHeight(Setting s) {
-        // A slider setting is its label row, a gap and the track; everything else is one row.
-        return s instanceof NumberSetting ? 20f + 6f + 16f : ROW_H;
     }
 
     // --- settings ----------------------------------------------------------------------------------
