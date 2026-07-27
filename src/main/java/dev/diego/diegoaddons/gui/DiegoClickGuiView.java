@@ -27,32 +27,30 @@ import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.ModuleManager;
 import dev.diego.diegoaddons.module.NumberSetting;
 import dev.diego.diegoaddons.module.Setting;
-import net.minecraft.client.Minecraft;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Consumer;
 
 /**
- * The DiegoAddons menu, built on RenderLib's retained {@link GuiView}: a header, a category rail and
- * a list of module cards whose settings expand inline underneath the card you clicked.
+ * The DiegoAddons menu: a category rail on the left and a list of module cards on the right, whose
+ * settings expand inline underneath the card you clicked.
  *
- * <p>Two RenderLib facts shape everything here:
+ * <p>Built on RenderLib's retained {@link GuiView}. Three of its behaviours shape the code:
  * <ul>
  *   <li>Components default to {@link GuiDisplay#RETAINED}, where the legacy component-local layout
- *       runs and {@code justifyContent}/{@code alignItems}/{@code flexGrow} are inert. Every
- *       container therefore goes through {@link #row}/{@link #column}, which opt into
+ *       runs and {@code justifyContent}/{@code alignItems}/{@code flexGrow} do nothing. Containers
+ *       are therefore always made through {@link #row}/{@link #column}, which opt into
  *       {@code display(FLEX)}.</li>
- *   <li>Text shapes through RenderLib, not Minecraft's font metrics, and a text component with no
- *       width wraps at whatever the layout hands it. Every label therefore gets a measured width
- *       ({@link #text}), while heights are always left to the content - forcing a height makes the
- *       glyphs spill out below their box.</li>
+ *   <li>Text sizes itself from RenderLib's shaping; see {@link GuiText}. A label with no width
+ *       wraps, and a text component with a forced height spills its glyphs, so a row that needs a
+ *       fixed height wraps its text in a box.</li>
+ *   <li>{@link ButtonComponent} arrives with a stock size, padding, gradient, shadow and hover
+ *       colours. {@link #clickable} strips all of that so a button can be a themed box of our own.</li>
  * </ul>
  *
- * <p>The rail and the card list refresh independently ({@link #refreshRail()} /
- * {@link #refreshContent()}) instead of rebuilding the tree, which keeps the search field's focus
- * and caret alive while you type. Only a theme change rebuilds everything.
+ * <p>The rail and the card list refresh independently, so typing in the search field never rebuilds
+ * the field out from under the caret. Only a theme change rebuilds the whole tree.
  */
 public class DiegoClickGuiView extends GuiView {
     private static final float DESIGN_W = 1920f;
@@ -61,39 +59,38 @@ public class DiegoClickGuiView extends GuiView {
     private static final float PANEL_W = 1160f;
     private static final float PANEL_H = 760f;
     private static final float HEADER_H = 66f;
-    private static final float BODY_H = PANEL_H - HEADER_H;      // 694
+    private static final float BODY_H = PANEL_H - HEADER_H;
 
     private static final float RAIL_W = 250f;
     private static final float RAIL_PAD = 16f;
-    private static final float RAIL_INNER = RAIL_W - RAIL_PAD * 2f;        // 218
+    private static final float RAIL_INNER = RAIL_W - RAIL_PAD * 2f;
 
-    private static final float DIVIDER_W = 1f;
-    private static final float CONTENT_W = PANEL_W - RAIL_W - DIVIDER_W;   // 909
-    private static final float CONTENT_PAD = 18f;
-    private static final float CONTENT_INNER = CONTENT_W - CONTENT_PAD * 2f;   // 873
-    private static final float LIST_H = BODY_H - CONTENT_PAD * 2f - 44f;
+    private static final float CONTENT_W = PANEL_W - RAIL_W - 1f;
+    private static final float CONTENT_PAD = 20f;
+    private static final float CONTENT_INNER = CONTENT_W - CONTENT_PAD * 2f;
+    private static final float TITLE_H = 36f;
+    private static final float LIST_H = BODY_H - CONTENT_PAD * 2f - TITLE_H - 12f;
 
-    private static final float SCROLLBAR_GUTTER = 14f;
-    private static final float CARD_W = CONTENT_INNER - SCROLLBAR_GUTTER;      // 859
-    private static final float CARD_PAD_X = 18f;
-    private static final float CARD_INNER = CARD_W - CARD_PAD_X * 2f;          // 823
+    private static final float CARD_W = CONTENT_INNER - 12f;      // room for the scrollbar
+    private static final float CARD_PAD_X = 16f;
+    private static final float CARD_INNER = CARD_W - CARD_PAD_X * 2f;
 
-    private static final float TOGGLE_W = 46f;
-    private static final float TOGGLE_H = 24f;
-    private static final float TOGGLE_KNOB_R = 8f;
+    private static final float ROW_H = 32f;
+    private static final float TOGGLE_W = 40f;
+    private static final float TOGGLE_H = 22f;
 
-    /** One glyph per {@link Category}, in enum order, for the rail. */
-    private static final String[] CATEGORY_ICONS = {"◆", "▤", "⚔", "⛏", "✿", "≈", "☠", "⚙"};
+    /** One glyph per {@link Category}, in enum order. */
+    private static final String[] ICONS = {"◆", "▤", "⚔", "⛏", "✿", "≈", "☠", "⚙"};
 
     private Theme t = Themes.current();
-    private Category selectedCategory;
-    private Module expandedModule;
+    private Category category;
+    private Module expanded;
     private String query = "";
 
     private ContainerComponent panel;
     private ContainerComponent railPane;
     private ContainerComponent contentPane;
-    private TextInputComponent searchField;
+    private TextInputComponent search;
 
     @Override
     protected void build() {
@@ -105,26 +102,26 @@ public class DiegoClickGuiView extends GuiView {
         rebuildAll();
     }
 
-    /** Full rebuild - only needed when the theme changes, since every colour is baked in. */
+    /** Whole-tree rebuild. Only a theme change needs this; everything else refreshes a pane. */
     private void rebuildAll() {
         t = Themes.current();
-        List<Category> cats = ModuleManager.categories();
-        if (selectedCategory == null && !cats.isEmpty()) {
-            selectedCategory = cats.get(0);
+        List<Category> categories = ModuleManager.categories();
+        if (category == null && !categories.isEmpty()) {
+            category = categories.get(0);
         }
 
         panel.clearChildren();
-        panel.backgroundColor(t.surface()).cornerRadius(16f).borderColor(t.border()).borderWidth(1f);
-        panel.add(headerBar());
+        panel.backgroundColor(t.surface()).cornerRadius(16f)
+                .borderWidth(1f).borderColor(t.border());
+        panel.add(header());
 
-        railPane = column(RAIL_W, 8f).height(BODY_H).padding(RAIL_PAD)
+        railPane = column(RAIL_W, 6f).height(BODY_H).padding(RAIL_PAD)
                 .backgroundColor(t.surfaceAlt());
         contentPane = column(CONTENT_W, 12f).height(BODY_H).padding(CONTENT_PAD);
 
-        ContainerComponent body = row(PANEL_W, 0f).height(BODY_H)
-                .alignItems(GuiAlignment.STRETCH);
+        ContainerComponent body = row(PANEL_W, 0f).height(BODY_H).alignItems(GuiAlignment.STRETCH);
         body.add(railPane);
-        body.add(new ContainerComponent().size(DIVIDER_W, BODY_H).backgroundColor(t.border()));
+        body.add(new ContainerComponent().size(1f, BODY_H).backgroundColor(t.border()));
         body.add(contentPane);
         panel.add(body);
 
@@ -132,41 +129,23 @@ public class DiegoClickGuiView extends GuiView {
         refreshContent();
     }
 
-    // --- header -----------------------------------------------------------------------------------
+    // --- header ------------------------------------------------------------------------------------
 
-    private ContainerComponent headerBar() {
-        ContainerComponent bar = row(PANEL_W, 12f).height(HEADER_H)
-                .padding(0f, 22f)
+    private ContainerComponent header() {
+        ContainerComponent bar = row(PANEL_W, 12f).height(HEADER_H).padding(0f, 22f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN);
 
         ContainerComponent brand = row(0f, 10f).autoWidth().flexShrink(0f);
-        brand.add(text("⚡", t.accentTo(), 20f));
-        brand.add(text("DiegoAddons", t.text(), 24f));
+        brand.add(GuiText.glyph("⚡", t.accentTo(), 18f));
+        brand.add(GuiText.label("DiegoAddons", t.text(), 24f, GuiText.TITLE));
+        brand.add(GuiText.label("v2", t.textFaint(), 11f));
         bar.add(brand);
 
-        // Grows into whatever the brand leaves, and packs its children against the right edge, so an
-        // over-wide button overflows towards the middle instead of out past the panel.
+        // Grows into the space the brand leaves and packs to the right edge, so an over-wide button
+        // overflows towards the middle instead of out past the panel.
         ContainerComponent right = row(0f, 10f).flexGrow(1f).flexShrink(1f)
                 .justifyContent(GuiAlignment.END);
-
-        searchField = new TextInputComponent()
-                .value(query)
-                .placeholder("Search all " + ModuleManager.all().size() + " modules...")
-                .textScalePixels(14f)
-                .onChange(s -> {
-                    query = s == null ? "" : s;
-                    refreshContent();
-                });
-        // A fixed height with symmetric padding centres the text: left to autoHeight the box
-        // collapses to a hairline and the placeholder draws underneath it.
-        searchField.size(280f, 36f).padding(9f, 12f).cornerRadius(10f)
-                .flexShrink(0f)
-                .backgroundColor(t.surfaceAlt())
-                .borderColor(t.border()).borderWidth(1f)
-                .color(t.text());
-        right.add(searchField);
-
-        right.add(pill("Theme: " + t.name(), () -> {
+        right.add(pill("Theme · " + t.name(), () -> {
             Themes.select(nextTheme());
             rebuildAll();
         }));
@@ -174,66 +153,62 @@ public class DiegoClickGuiView extends GuiView {
             close();
             dev.diego.diegoaddons.hud.HudElements.openPlacementScreen();
         }));
-        right.add(pill("✕", this::close));
+        right.add(glyphPill("✕", this::close));
         bar.add(right);
         return bar;
     }
 
     private Theme nextTheme() {
         List<Theme> all = Themes.ALL;
-        int i = 0;
-        for (int k = 0; k < all.size(); k++) {
-            if (all.get(k).name().equalsIgnoreCase(t.name())) {
-                i = k;
-                break;
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).name().equalsIgnoreCase(t.name())) {
+                return all.get((i + 1) % all.size());
             }
         }
-        return all.get((i + 1) % all.size());
+        return all.get(0);
     }
 
-    // --- category rail ----------------------------------------------------------------------------
+    // --- category rail -----------------------------------------------------------------------------
 
     private void refreshRail() {
         railPane.clearChildren();
-        railPane.add(text("CATEGORIES", t.textFaint(), 11f));
+        railPane.add(GuiText.label("CATEGORIES", t.textFaint(), 11f));
 
         for (Category c : ModuleManager.categories()) {
             railPane.add(categoryRow(c));
         }
 
-        // Pushes the footer to the bottom of the rail.
         railPane.add(new ContainerComponent().width(RAIL_INNER).flexGrow(1f).flexShrink(1f));
         railPane.add(new ContainerComponent().size(RAIL_INNER, 1f).backgroundColor(t.border()));
 
-        ContainerComponent footer = row(RAIL_INNER, 8f)
+        ContainerComponent footer = row(RAIL_INNER, 8f).height(26f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN);
-        footer.add(text(enabledCount() + " enabled", t.textMuted(), 12f));
-        footer.add(keyChip(openKeyName()));
+        footer.add(GuiText.label(enabledCount() + " enabled", t.textMuted(), 12f));
+        footer.add(chip(openKey(), t.textMuted()));
         railPane.add(footer);
     }
 
     private ButtonComponent categoryRow(Category c) {
-        boolean sel = c == selectedCategory;
-        int fg = sel ? t.accentText() : t.text();
-        int countFg = sel ? t.accentText() : t.textFaint();
+        boolean selected = c == category;
+        int fg = selected ? t.accentText() : t.text();
 
-        ButtonComponent b = plainButton(sel ? t.accent() : 0x00000000, () -> {
-            selectedCategory = c;
-            expandedModule = null;
+        ButtonComponent b = clickable(selected ? t.accent() : 0x00000000, () -> {
+            category = c;
+            expanded = null;
+            clearSearch();
             refreshRail();
             refreshContent();
         });
-        asRow(b, RAIL_INNER, 10f).autoHeight().padding(10f, 13f).cornerRadius(10f).flexShrink(0f);
-
-        b.add(text(icon(c), fg, 13f).width(16f));
-        b.add(text(c.display, fg, 14f).flexGrow(1f));
-        b.add(text(String.valueOf(ModuleManager.modulesIn(c).size()), countFg, 11f));
+        asRow(b, RAIL_INNER, 10f).height(38f).padding(0f, 13f).cornerRadius(10f).flexShrink(0f);
+        b.add(GuiText.glyph(icon(c), fg, 12f).width(16f));
+        b.add(GuiText.label(c.display, fg, 14f).flexGrow(1f));
+        b.add(GuiText.label(String.valueOf(ModuleManager.modulesIn(c).size()),
+                selected ? t.accentText() : t.textFaint(), 11f));
         return b;
     }
 
     private static String icon(Category c) {
-        int i = c.ordinal();
-        return i >= 0 && i < CATEGORY_ICONS.length ? CATEGORY_ICONS[i] : "•";
+        return c.ordinal() < ICONS.length ? ICONS[c.ordinal()] : "•";
     }
 
     private static int enabledCount() {
@@ -246,33 +221,50 @@ public class DiegoClickGuiView extends GuiView {
         return n;
     }
 
-    private static String openKeyName() {
+    private static String openKey() {
         return DiegoAddonsV2Client.OPEN_MENU == null
                 ? "\\"
                 : DiegoAddonsV2Client.OPEN_MENU.getTranslatedKeyMessage().getString();
     }
 
-    // --- module cards -----------------------------------------------------------------------------
+    // --- module cards ------------------------------------------------------------------------------
 
     private void refreshContent() {
         contentPane.clearChildren();
-
         List<Module> modules = visibleModules();
-        ContainerComponent title = row(CONTENT_INNER, 10f);
-        title.add(text(query.isEmpty() && selectedCategory != null ? selectedCategory.display : "Search",
-                t.text(), 19f).flexGrow(1f));
-        title.add(text(modules.size() + (modules.size() == 1 ? " module" : " modules"),
+
+        ContainerComponent title = row(CONTENT_INNER, 12f).height(TITLE_H);
+        title.add(GuiText.label(query.isEmpty() && category != null ? category.display : "Search",
+                t.text(), 19f, GuiText.TITLE).flexGrow(1f));
+        title.add(GuiText.label(modules.size() + (modules.size() == 1 ? " module" : " modules"),
                 t.textFaint(), 12f));
+
+        search = new TextInputComponent()
+                .value(query)
+                .placeholder("Search modules...")
+                .font(GuiText.BODY)
+                .textScalePixels(13f)
+                .onChange(s -> {
+                    query = s == null ? "" : s;
+                    refreshContent();
+                });
+        // Fixed height with symmetric padding: under autoHeight the box collapses to a hairline and
+        // the placeholder draws underneath it.
+        search.size(240f, 32f).padding(8f, 12f).cornerRadius(9f).flexShrink(0f)
+                .backgroundColor(t.surfaceAlt())
+                .borderWidth(1f).borderColor(t.border())
+                .color(t.text());
+        title.add(search);
         contentPane.add(title);
 
         if (modules.isEmpty()) {
-            contentPane.add(wrappingText("Nothing here. Try another search.", t.textFaint(), 14f, CONTENT_INNER));
+            contentPane.add(GuiText.wrapped("Nothing here. Try another search.",
+                    t.textFaint(), 14f, CONTENT_INNER));
             return;
         }
 
         ScrollContainerComponent list = new ScrollContainerComponent();
-        list.width(CONTENT_INNER);
-        list.height(LIST_H);
+        list.size(CONTENT_INNER, LIST_H);
         list.flowColumn();
         list.display(GuiDisplay.FLEX);
         list.flexDirection(GuiFlexDirection.COLUMN);
@@ -281,16 +273,15 @@ public class DiegoClickGuiView extends GuiView {
         list.gap(10f);
         list.overflowY(GuiOverflowMode.AUTO);
         for (Module m : modules) {
-            list.add(moduleCard(m));
+            list.add(card(m));
         }
         contentPane.add(list);
     }
 
-    /** The modules the list shows: the selected category, or every match while searching. */
     private List<Module> visibleModules() {
         if (!query.isEmpty()) {
-            List<Module> out = new ArrayList<>();
             String q = query.toLowerCase(Locale.ROOT);
+            List<Module> out = new ArrayList<>();
             for (Module m : ModuleManager.all()) {
                 if (matches(m, q)) {
                     out.add(m);
@@ -298,160 +289,138 @@ public class DiegoClickGuiView extends GuiView {
             }
             return out;
         }
-        return selectedCategory == null ? List.of() : ModuleManager.modulesIn(selectedCategory);
+        return category == null ? List.of() : ModuleManager.modulesIn(category);
     }
 
-    private static boolean matches(Module m, String lowerQuery) {
-        if (m.name.toLowerCase(Locale.ROOT).contains(lowerQuery)) {
-            return true;
-        }
-        if (m.category.display.toLowerCase(Locale.ROOT).contains(lowerQuery)) {
-            return true;
-        }
-        return m.description != null && m.description.toLowerCase(Locale.ROOT).contains(lowerQuery);
+    private static boolean matches(Module m, String q) {
+        return m.name.toLowerCase(Locale.ROOT).contains(q)
+                || m.category.display.toLowerCase(Locale.ROOT).contains(q)
+                || (m.description != null && m.description.toLowerCase(Locale.ROOT).contains(q));
     }
 
     /**
-     * The whole card is the clickable surface, so anywhere on it expands or collapses the settings.
-     * The toggle is a child of it and swallows its own clicks, which keeps flipping a module from
-     * expanding it as a side effect.
+     * One module card. The whole card is clickable to expand it; the toggle sits outside that
+     * pressable area so flipping a module doesn't also open it.
      */
-    private ButtonComponent moduleCard(Module m) {
-        boolean expanded = m == expandedModule;
+    private ContainerComponent card(Module m) {
+        boolean open = m == expanded;
 
-        ButtonComponent card = plainButton(expanded ? t.elevated() : t.surfaceAlt(), () -> {
-            expandedModule = expanded ? null : m;
-            refreshContent();
-        });
-        asColumn(card, CARD_W, 12f).autoHeight()
-                .padding(14f, CARD_PAD_X).cornerRadius(12f)
-                .borderWidth(1f).borderColor(expanded ? t.accent() : t.border())
+        ContainerComponent shell = column(CARD_W, 12f).padding(14f, CARD_PAD_X).cornerRadius(12f)
+                .backgroundColor(open ? t.elevated() : t.surfaceAlt())
+                .borderWidth(1f).borderColor(open ? t.accent() : t.border())
                 .flexShrink(0f);
 
         ContainerComponent head = row(CARD_INNER, 14f);
-        ContainerComponent titleBox = column(0f, 3f).flexGrow(1f).flexShrink(1f);
         float textW = CARD_INNER - TOGGLE_W - 14f;
-        titleBox.add(wrappingText(m.name, t.text(), 15f, textW));
+
+        ButtonComponent hit = clickable(0x00000000, () -> {
+            expanded = open ? null : m;
+            refreshContent();
+        });
+        asColumn(hit, textW, 3f).cornerRadius(8f).alignItems(GuiAlignment.START);
+        hit.add(box(textW, 20f, GuiText.label(m.name, t.text(), 15f, GuiText.MEDIUM)));
         if (m.description != null && !m.description.isEmpty()) {
-            titleBox.add(wrappingText(m.description, t.textMuted(), 12f, textW));
+            hit.add(GuiText.wrapped(m.description, t.textMuted(), 12f, textW));
         }
-        head.add(titleBox);
+        head.add(hit);
         head.add(toggle(m.isEnabled(), v -> {
             ModuleManager.setEnabled(m, v);
             refreshRail();
         }));
-        card.add(head);
+        shell.add(head);
 
-        if (expanded) {
-            card.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border())
-                    .flexShrink(0f));
+        if (open) {
+            shell.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
             List<Setting> settings = m.settings();
             if (settings.isEmpty()) {
-                card.add(wrappingText("No settings for this feature.", t.textFaint(), 13f, CARD_INNER));
+                shell.add(GuiText.wrapped("No settings for this feature.",
+                        t.textFaint(), 13f, CARD_INNER));
             } else {
                 for (Setting s : settings) {
-                    card.add(settingRow(s));
+                    shell.add(setting(s));
                 }
             }
         }
-        return card;
+        return shell;
     }
 
-    // --- setting controls -------------------------------------------------------------------------
+    // --- settings ----------------------------------------------------------------------------------
 
-    private ContainerComponent settingRow(Setting s) {
+    private ContainerComponent setting(Setting s) {
         if (s instanceof BooleanSetting bs) {
-            ContainerComponent r = row(CARD_INNER, 12f)
-                    .justifyContent(GuiAlignment.SPACE_BETWEEN).flexShrink(0f);
-            r.add(text(bs.name, t.text(), 14f).flexGrow(1f));
+            ContainerComponent r = row(CARD_INNER, 12f).height(ROW_H).flexShrink(0f)
+                    .justifyContent(GuiAlignment.SPACE_BETWEEN);
+            r.add(GuiText.label(bs.name, t.text(), 14f).flexGrow(1f));
             r.add(toggle(bs.get(), bs::set));
             return r;
         }
 
         if (s instanceof NumberSetting ns) {
-            ContainerComponent box = column(CARD_INNER, 6f).flexShrink(0f);
-            TextComponent value = text(ns.display(), t.textMuted(), 12f);
-            ContainerComponent top = row(CARD_INNER, 10f)
+            ContainerComponent col = column(CARD_INNER, 6f).flexShrink(0f);
+            TextComponent value = GuiText.label(ns.display(), t.textMuted(), 12f);
+            ContainerComponent top = row(CARD_INNER, 10f).height(20f)
                     .justifyContent(GuiAlignment.SPACE_BETWEEN);
-            top.add(text(ns.name, t.text(), 14f).flexGrow(1f));
+            top.add(GuiText.label(ns.name, t.text(), 14f).flexGrow(1f));
             top.add(value);
-            box.add(top);
-            box.add(new SliderComponent().min(ns.min).max(ns.max).step(ns.step).value(ns.get())
-                    .valueFormatter(v -> String.format(Locale.ROOT, "%." + ns.decimals + "f", v))
+            col.add(top);
+            col.add(new SliderComponent()
+                    .min(ns.min).max(ns.max).step(ns.step).value(ns.get())
+                    .valueLabelPosition(SliderValueLabelPosition.OFF)
                     .onChange(v -> {
                         ns.set(v);
-                        // Update the read-out in place; rebuilding here would kill the drag.
-                        value.text(ns.display());
+                        value.text(ns.display());   // in place: a rebuild would drop the drag
                     })
-                    .valueLabelPosition(SliderValueLabelPosition.OFF)
-                    .size(CARD_INNER, 18f)
+                    .size(CARD_INNER, 16f)
                     .trackColor(t.surface()).fillColor(t.accent()).thumbColor(t.accentText()));
-            return box;
+            return col;
         }
 
         if (s instanceof CycleSetting cs) {
-            return valueButton(cs.name, cs.label(), () -> {
+            return valueRow(cs.name, cs.label(), () -> {
                 cs.cycle();
                 refreshContent();
             });
         }
-
         if (s instanceof KeybindSetting ks) {
-            return valueButton(ks.name, ks.display(), () -> {
+            return valueRow(ks.name, ks.display(), () -> {
                 ks.clear();
                 refreshContent();
             });
         }
-
         if (s instanceof ActionSetting as) {
-            return valueButton(as.name, as.action, as::run);
+            return valueRow(as.name, as.action, as::run);
         }
-
         return new ContainerComponent().width(CARD_INNER);
     }
 
-    /** A full-width row that reads "name ... value" and runs an action when clicked. */
-    private ContainerComponent valueButton(String name, String value, Runnable action) {
-        ContainerComponent wrap = row(CARD_INNER, 0f).flexShrink(0f);
-        ButtonComponent b = plainButton(t.surface(), action);
-        asRow(b, CARD_INNER, 10f).autoHeight()
+    /** A full-width "name … value" row that runs an action when clicked. */
+    private ContainerComponent valueRow(String name, String value, Runnable action) {
+        ContainerComponent wrap = row(CARD_INNER, 0f).height(ROW_H).flexShrink(0f);
+        ButtonComponent b = clickable(t.surface(), action);
+        asRow(b, CARD_INNER, 10f).height(ROW_H).padding(0f, 12f).cornerRadius(8f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN)
-                .padding(9f, 12f).cornerRadius(8f)
                 .borderWidth(1f).borderColor(t.border());
-        b.add(text(name, t.text(), 14f).flexGrow(1f));
-        b.add(text(value, t.textMuted(), 13f).textAlignment(GuiTextAlignment.RIGHT));
+        b.add(GuiText.label(name, t.text(), 14f).flexGrow(1f));
+        b.add(GuiText.label(value, t.textMuted(), 13f).textAlignment(GuiTextAlignment.RIGHT));
         wrap.add(b);
         return wrap;
     }
 
-    // --- small shared pieces ----------------------------------------------------------------------
+    // --- building blocks ---------------------------------------------------------------------------
 
-    /**
-     * A flex row that centres its children vertically. A width of {@code 0} leaves the width to the
-     * layout; heights are always left to the content unless a caller sets one.
-     */
     private static ContainerComponent row(float width, float gap) {
-        ContainerComponent c = new ContainerComponent();
-        if (width > 0f) {
-            c.width(width);
-        }
-        return asRow(c, 0f, gap);
+        return asRow(new ContainerComponent(), width, gap);
     }
 
     private static ContainerComponent column(float width, float gap) {
-        ContainerComponent c = new ContainerComponent();
-        if (width > 0f) {
-            c.width(width);
-        }
-        return asColumn(c, 0f, gap);
+        return asColumn(new ContainerComponent(), width, gap);
     }
 
-    /** Turns an already-created component (a button, say) into a flex row. */
     private static <T extends ContainerComponent> T asRow(T c, float width, float gap) {
         if (width > 0f) {
             c.width(width);
         }
-        c.flowRow()      // legacy direction, in case a container ever falls back to RETAINED
+        c.flowRow()      // legacy direction, in case a container falls back to RETAINED
                 .display(GuiDisplay.FLEX)
                 .flexDirection(GuiFlexDirection.ROW)
                 .alignItems(GuiAlignment.CENTER)
@@ -473,36 +442,17 @@ public class DiegoClickGuiView extends GuiView {
         return c;
     }
 
-    /**
-     * Text with a width wide enough that it never wraps. A text component with no width wraps at
-     * whatever the flex engine hands it, which is how "HUD Editor" ended up on two lines - so every
-     * single-line label gets a measured width. Height is always left to the content: forcing one
-     * makes the glyphs spill out below the box.
-     */
-    private static TextComponent text(String s, int color, float scale) {
-        return new TextComponent().text(s).color(color).textScalePixels(scale)
-                .width(textWidth(s, scale));
+    /** Puts text in a box of a known height, which text alone cannot have without spilling. */
+    private static ContainerComponent box(float width, float height, TextComponent text) {
+        ContainerComponent b = row(width, 0f).height(height);
+        b.add(text);
+        return b;
     }
 
-    /** Text that may wrap, at the width given. */
-    private static TextComponent wrappingText(String s, int color, float scale, float width) {
-        return new TextComponent().text(s).color(color).textScalePixels(scale).width(width);
-    }
-
-    /**
-     * How wide a run of text renders, from Minecraft's own metrics rescaled to RenderLib's. The
-     * ratio was calibrated against a screenshot of the running client (RenderLib draws roughly
-     * {@code scale / 9.6} times the vanilla width); the extra slack keeps a label off its own
-     * wrapping point.
-     */
-    private static float textWidth(String s, float scale) {
-        return Minecraft.getInstance().font.width(s) * (scale / 9.6f) * 1.12f + 6f;
-    }
-
-    private ToggleSwitchComponent toggle(boolean value, Consumer<Boolean> onChange) {
+    private ToggleSwitchComponent toggle(boolean value, java.util.function.Consumer<Boolean> onChange) {
         ToggleSwitchComponent sw = new ToggleSwitchComponent().value(value)
                 .trackOnColor(t.accent()).trackOffColor(t.border())
-                .knobRadius(TOGGLE_KNOB_R)
+                .knobRadius(7f)
                 .onChange(onChange);
         sw.size(TOGGLE_W, TOGGLE_H).flexShrink(0f);
         return sw;
@@ -510,14 +460,13 @@ public class DiegoClickGuiView extends GuiView {
 
     /**
      * A {@link ButtonComponent} stripped of its stock label, size, padding, gradient, shadow and
-     * hover colours, so it can be used as a themed clickable box that holds its own children.
+     * hover colours, leaving a themed clickable box that holds its own children.
      */
-    private ButtonComponent plainButton(int background, Runnable action) {
+    private ButtonComponent clickable(int background, Runnable action) {
         ButtonComponent b = new ButtonComponent();
-        b.clearChildren();          // drop the built-in centred label; we supply the content
+        b.clearChildren();
         b.onPress(action);
-        b.autoSize()                // clear the stock 220x52
-                .padding(0f)        // and the stock 14x18 padding
+        b.autoSize().padding(0f)
                 .backgroundColor(background)
                 .gradient(flat(background))
                 .borderWidth(0f)
@@ -528,27 +477,40 @@ public class DiegoClickGuiView extends GuiView {
         return b;
     }
 
-    /** A single-colour "gradient", so the stock button gradient never shows through. */
+    /** A flat single-colour gradient, so the stock button gradient never shows through. */
     private static GuiGradient flat(int argb) {
         return new GuiGradient().startColor(argb).endColor(argb).angleDegrees(180f);
     }
 
-    /** A header button that hugs its label - no fixed width, so nothing wraps or clips. */
     private ButtonComponent pill(String label, Runnable action) {
-        ButtonComponent b = plainButton(t.elevated(), action);
-        asRow(b, 0f, 0f).autoSize()
-                .justifyContent(GuiAlignment.CENTER)
+        ButtonComponent b = clickable(t.elevated(), action);
+        asRow(b, 0f, 0f).autoSize().justifyContent(GuiAlignment.CENTER)
                 .padding(9f, 14f).cornerRadius(10f).flexShrink(0f);
-        b.add(text(label, t.text(), 13f));
+        b.add(GuiText.label(label, t.text(), 13f));
         return b;
     }
 
-    private ContainerComponent keyChip(String key) {
-        ContainerComponent chip = row(0f, 0f).autoSize()
-                .justifyContent(GuiAlignment.CENTER)
+    /** A pill whose label is a symbol, so it uses Minecraft's font rather than Poppins. */
+    private ButtonComponent glyphPill(String label, Runnable action) {
+        ButtonComponent b = clickable(t.elevated(), action);
+        asRow(b, 0f, 0f).autoSize().justifyContent(GuiAlignment.CENTER)
+                .padding(9f, 14f).cornerRadius(10f).flexShrink(0f);
+        b.add(GuiText.glyph(label, t.text(), 12f));
+        return b;
+    }
+
+    private ContainerComponent chip(String label, int color) {
+        ContainerComponent c = row(0f, 0f).autoSize().justifyContent(GuiAlignment.CENTER)
                 .padding(3f, 8f).cornerRadius(5f).flexShrink(0f)
-                .backgroundColor(t.elevated()).borderColor(t.border()).borderWidth(1f);
-        chip.add(text(key, t.textMuted(), 11f));
-        return chip;
+                .backgroundColor(t.elevated()).borderWidth(1f).borderColor(t.border());
+        c.add(GuiText.label(label, color, 11f));
+        return c;
+    }
+
+    private void clearSearch() {
+        query = "";
+        if (search != null) {
+            search.value("");
+        }
     }
 }
