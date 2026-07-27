@@ -59,7 +59,9 @@ public class DiegoClickGuiView extends GuiView {
     private static final float PANEL_W = 1160f;
     private static final float PANEL_H = 760f;
     private static final float HEADER_H = 66f;
-    private static final float BODY_H = PANEL_H - HEADER_H;
+    /** The panel's 1px border sits inside its height, so the body gets what is left of it. */
+    private static final float BORDER = 1f;
+    private static final float BODY_H = PANEL_H - HEADER_H - BORDER * 2f;
 
     private static final float RAIL_W = 250f;
     private static final float RAIL_PAD = 16f;
@@ -112,7 +114,10 @@ public class DiegoClickGuiView extends GuiView {
 
         panel.clearChildren();
         panel.backgroundColor(t.surface()).cornerRadius(16f)
-                .borderWidth(1f).borderColor(t.border());
+                .borderWidth(BORDER).borderColor(t.border())
+                // Without this the rail's square corners paint over the panel's rounded ones and
+                // spill past its bottom edge.
+                .clipChildren(true);
         panel.add(header());
 
         railPane = column(RAIL_W, 6f).height(BODY_H).padding(RAIL_PAD)
