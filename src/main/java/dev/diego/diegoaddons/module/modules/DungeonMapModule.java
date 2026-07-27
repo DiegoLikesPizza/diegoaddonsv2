@@ -346,16 +346,7 @@ public class DungeonMapModule extends HudModule {
         return new dev.diego.diegoaddons.hud.DungeonMapElement(this, root);
     }
 
-    @Override
-    public int hudWidth(Font font, Minecraft mc, boolean editor) {
-        return PAD * 2 + SIZE;
-    }
 
-    @Override
-    public int hudHeight(Minecraft mc, boolean editor) {
-        int n = statCount();
-        return PAD * 2 + SIZE + (n > 0 ? STAT_GAP + n * LINE_H : 0);
-    }
 
     private static int roomX(int rx) {
         return PAD + rx * STRIDE;
@@ -367,34 +358,6 @@ public class DungeonMapModule extends HudModule {
 
     // --- drawing --------------------------------------------------------------------------------
 
-    @Override
-    public boolean drawLocal(GuiGraphicsExtractor g, Font font, Theme t, boolean smooth, Minecraft mc, boolean editor) {
-        boolean live = DungeonState.inDungeons() && mc.level != null;
-        if (!live && !editor) {
-            return false;
-        }
-        int w = hudWidth(font, mc, editor);
-        int h = hudHeight(mc, editor);
-        int bg = (0xCC << 24) | (t.surface() & 0x00FFFFFF);
-        UiRender.fillRounded(g, 0, 0, w, h, 8, bg, smooth);
-        UiRender.strokeRounded(g, 0, 0, w, h, 8, Theme.withAlpha(t.border(), 0.9f), smooth);
-
-        if (!live) {
-            UiRender.text(g, font, "Dungeon Map", Fonts.SMALL, PAD + 4, PAD + SIZE / 2 - 4, t.textMuted());
-            drawStats(g, font, t, true);
-            return true;
-        }
-
-        // Seams first (fills + doors) so the room squares sit on top of them.
-        drawSeams(g, mc);
-        drawRooms(g, font, mc, smooth);
-        drawLabels(g, font, mc);
-        if (showPlayers.get()) {
-            drawPlayers(g, t, mc);
-        }
-        drawStats(g, font, t, false);
-        return true;
-    }
 
     private void drawSeams(GuiGraphicsExtractor g, Minecraft mc) {
         for (int rz = 0; rz < ROOMS; rz++) {

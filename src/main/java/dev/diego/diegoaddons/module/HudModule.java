@@ -1,10 +1,7 @@
 package dev.diego.diegoaddons.module;
 
-import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.List;
 
@@ -130,29 +127,4 @@ public abstract class HudModule extends Module {
         return live.isEmpty() ? List.of(editorLine(mc)) : live;
     }
 
-    // --- Generalised element footprint + drawing (default: the text chip; overridable for grids) ---
-
-    /** Unscaled element width in GUI pixels. */
-    public int hudWidth(Font font, Minecraft mc, boolean editor) {
-        return ModuleManager.chipWidth(font, editor ? editorLines(mc) : hudLines(mc));
-    }
-
-    /** Unscaled element height in GUI pixels. */
-    public int hudHeight(Minecraft mc, boolean editor) {
-        return ModuleManager.chipHeight(editor ? editorLines(mc) : hudLines(mc));
-    }
-
-    /**
-     * Draw this element at the local origin {@code (0, 0)}; the caller has already translated to the
-     * element position and applied the scale. Return {@code false} if there is nothing to draw this
-     * frame (so the live HUD skips it). The default renders the text chip.
-     */
-    public boolean drawLocal(GuiGraphicsExtractor g, Font font, Theme t, boolean smooth, Minecraft mc, boolean editor) {
-        List<String> lines = editor ? editorLines(mc) : hudLines(mc);
-        if (lines.isEmpty()) {
-            return false;
-        }
-        ModuleManager.drawTextChipLocal(g, font, t, smooth, this, lines);
-        return true;
-    }
 }

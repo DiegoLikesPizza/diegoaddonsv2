@@ -356,15 +356,7 @@ public final class ModuleManager {
         return out;
     }
 
-    // --- HUD chip geometry + drawing, shared by the live HUD and the HUD editor ---
-
-    private static final int CHIP_PAD_X = 8;
-    private static final int CHIP_PAD_Y = 5;
-    private static final int CHIP_LINE_H = Fonts.BODY_H;   // per-row height
-    /** Height of a single-line chip - the default row stride when auto-stacking new modules. */
-    public static final int CHIP_H = CHIP_LINE_H + CHIP_PAD_Y * 2;
-    private static final int DEFAULT_X = 6;
-    private static final int DEFAULT_GAP = 4;
+    // --- HUD helpers still used elsewhere --------------------------------------------------------
 
     /** The enabled HUD modules, in registration order. */
     public static List<HudModule> enabledHudModules() {
@@ -375,123 +367,6 @@ public final class ModuleManager {
             }
         }
         return out;
-    }
-
-    public static int chipWidth(Font font, List<String> lines) {
-        int w = 0;
-        for (String line : lines) {
-            w = Math.max(w, font.width(Fonts.t(normalizeDigits(font, line), Fonts.MEDIUM)));
-        }
-        return w + CHIP_PAD_X * 2;
-    }
-
-    /**
-     * Replace every digit with the widest digit glyph so numeric HUD values (clock, FPS, coords)
-     * keep a stable chip width instead of jittering as the digits change from frame to frame.
-     */
-    private static String normalizeDigits(Font font, String line) {
-        char widest = '0';
-        int max = -1;
-        for (char c = '0'; c <= '9'; c++) {
-            int cw = font.width(Fonts.t(String.valueOf(c), Fonts.MEDIUM));
-            if (cw > max) {
-                max = cw;
-                widest = c;
-            }
-        }
-        StringBuilder sb = new StringBuilder(line.length());
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
-            sb.append(c >= '0' && c <= '9' ? widest : c);
-        }
-        return sb.toString();
-    }
-
-    public static int chipHeight(List<String> lines) {
-        return Math.max(1, lines.size()) * CHIP_LINE_H + CHIP_PAD_Y * 2;
-    }
-
-    /** Resolve a module's HUD X, falling back to a default stacked position by its index. */
-    public static int hudX(HudModule hud) {
-        int cx = ConfigManager.moduleConfig(hud.id).hudX;
-        return cx >= 0 ? cx : DEFAULT_X;
-    }
-
-    public static int hudY(HudModule hud) {
-        int cy = ConfigManager.moduleConfig(hud.id).hudY;
-        if (cy >= 0) {
-            return cy;
-        }
-        int slot = MODULES.indexOf(hud);
-        return 6 + slot * (CHIP_H + DEFAULT_GAP);
-    }
-
-    public static void setHudPos(HudModule hud, int x, int y) {
-        ModuleConfig cfg = ConfigManager.moduleConfig(hud.id);
-        cfg.hudX = x;
-        cfg.hudY = y;
-        ConfigManager.save();
-    }
-
-    public static final float MIN_SCALE = 0.5f;
-    public static final float MAX_SCALE = 3.0f;
-
-    /** The chip scale multiplier for a module, clamped to the allowed range. */
-    public static float hudScale(HudModule hud) {
-        float s = ConfigManager.moduleConfig(hud.id).hudScale;
-        return Math.max(MIN_SCALE, Math.min(MAX_SCALE, s <= 0f ? 1f : s));
-    }
-
-    public static void setHudScale(HudModule hud, float scale) {
-        ConfigManager.moduleConfig(hud.id).hudScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
-        ConfigManager.save();
-    }
-
-    public static void resetHudPositions() {
-        for (Module m : MODULES) {
-            ModuleConfig cfg = ConfigManager.moduleConfig(m.id);
-            cfg.hudX = -1;
-            cfg.hudY = -1;
-        }
-        ConfigManager.save();
-    }
-
-    /** Draw the default text chip (one or more stacked lines) at the local origin (0, 0). */
-    public static void drawTextChipLocal(GuiGraphicsExtractor g, Font font, Theme t, boolean smooth,
-                                         HudModule hud, List<String> lines) {
-        int w = chipWidth(font, lines);
-        int h = chipHeight(lines);
-        int bg = (0xCC << 24) | (t.surface() & 0x00FFFFFF);
-        UiRender.fillRounded(g, 0, 0, w, h, 7, bg, smooth);
-        UiRender.strokeRounded(g, 0, 0, w, h, 7, Theme.withAlpha(t.border(), 0.9f), smooth);
-        for (int i = 0; i < lines.size(); i++) {
-            int slotTop = CHIP_PAD_Y + i * CHIP_LINE_H;
-            // Baseline-correct vertical centring (size 10 = Fonts.MEDIUM point-size).
-            int ty = Fonts.centerTop(slotTop, CHIP_LINE_H, 10);
-            // Centring uses the line's real width, not the digit-normalised one, so the slack the
-            // normalisation leaves behind is split evenly instead of piling up on the right.
-            int tx = CHIP_PAD_X;
-            if (hud.isCentered()) {
-                tx = (w - font.width(Fonts.t(lines.get(i), Fonts.MEDIUM))) / 2;
-            }
-            UiRender.text(g, font, lines.get(i), Fonts.MEDIUM, tx, ty, hud.color());
-        }
-    }
-
-    /**
-     * Draw a HUD element at (x, y). Used by both the live HUD and the editor: it sets up a scaled
-     * pose (so the whole element grows/shrinks by {@link #hudScale(HudModule)} around its top-left
-     * corner) and delegates the actual drawing to the module. Returns whether anything was drawn.
-     */
-    public static boolean drawElement(GuiGraphicsExtractor g, Font font, Theme t, boolean smooth,
-                                      HudModule hud, Minecraft mc, int x, int y, boolean editor) {
-        float s = hudScale(hud);
-        g.pose().pushMatrix();
-        g.pose().translate(x, y);
-        g.pose().scale(s);
-        boolean drawn = hud.drawLocal(g, font, t, smooth, mc, editor);
-        g.pose().popMatrix();
-        return drawn;
     }
 
     private static void renderHud(GuiGraphicsExtractor g, DeltaTracker delta) {

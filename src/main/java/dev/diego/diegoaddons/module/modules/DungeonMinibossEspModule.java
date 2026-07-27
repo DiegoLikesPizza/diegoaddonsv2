@@ -30,8 +30,10 @@ public class DungeonMinibossEspModule extends Module {
 
     /** Whether a name plate is one of the dungeon minibosses. */
     public boolean matches(String plate) {
+        String haystack = plate.toLowerCase(java.util.Locale.ROOT);
         for (String n : NAMES) {
-            if (plate.contains(n)) {
+            // Case-insensitive: Hypixel has shipped these plates with different casing over time.
+            if (haystack.contains(n.toLowerCase(java.util.Locale.ROOT))) {
                 return true;
             }
         }

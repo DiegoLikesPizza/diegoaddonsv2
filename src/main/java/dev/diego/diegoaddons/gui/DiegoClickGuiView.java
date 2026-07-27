@@ -243,6 +243,9 @@ public class DiegoClickGuiView extends GuiView {
     @Override
     public void tick() {
         super.tick();
+        if (titleLabel != null) {
+            GuiText.calibrate(titleLabel, titleLabel.text().getString(), 19f);
+        }
         for (Card card : cards.values()) {
             float head = card.head().height();
             if (head <= 0f) {
