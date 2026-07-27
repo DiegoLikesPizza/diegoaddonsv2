@@ -2,6 +2,7 @@ package dev.diego.diegoaddons.hud;
 
 import com.render.api.gui.ContainerComponent;
 import com.render.api.gui.TextComponent;
+import com.render.api.gui.GuiTextAlignment;
 import com.render.api.gui.layout.GuiAlignment;
 import dev.diego.diegoaddons.module.HudModule;
 import net.minecraft.client.Minecraft;
@@ -74,10 +75,11 @@ public class TextChipElement extends HudElement {
         }
         for (int i = 0; i < lines.size(); i++) {
             rows.get(i).width(width);
-            labels.get(i).text(lines.get(i)).color(color).width(width);
-            if (centered) {
-                rows.get(i).justifyContent(GuiAlignment.CENTER);
-            }
+            rows.get(i).justifyContent(centered ? GuiAlignment.CENTER : GuiAlignment.START);
+            // The label is as wide as the whole chip - which is the digit-normalised width, wider
+            // than the text itself - so centring has to happen inside the label, not just around it.
+            labels.get(i).text(lines.get(i)).color(color).width(width)
+                    .textAlignment(centered ? GuiTextAlignment.CENTER : GuiTextAlignment.LEFT);
         }
     }
 }
