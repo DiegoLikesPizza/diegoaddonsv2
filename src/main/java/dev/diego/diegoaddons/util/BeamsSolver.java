@@ -83,11 +83,16 @@ public final class BeamsSolver {
         }
     }
 
-    /** Keeps the recorded pairs whose both ends are lanterns right now. */
+    /**
+     * Keeps the recorded pairs whose both ends are lanterns right now. Each pair's colour is tied to
+     * its <b>fixed position in the recorded list</b>, not to a running count of survivors - so
+     * completing a pair (its lanterns disappear) drops it out without recolouring any of the others.
+     */
     private static void rebuild(Minecraft mc) {
+        List<int[]> ps = pairs();
         ACTIVE.clear();
-        int index = 0;
-        for (int[] p : pairs()) {
+        for (int idx = 0; idx < ps.size(); idx++) {
+            int[] p = ps.get(idx);
             BlockPos a = DungeonRooms.toWorld(new BlockPos(p[0], p[1], p[2]));
             BlockPos b = DungeonRooms.toWorld(new BlockPos(p[3], p[4], p[5]));
             if (a == null || b == null) {
@@ -95,8 +100,7 @@ public final class BeamsSolver {
             }
             if (mc.level.getBlockState(a).getBlock() == Blocks.SEA_LANTERN
                     && mc.level.getBlockState(b).getBlock() == Blocks.SEA_LANTERN) {
-                ACTIVE.add(new Pair(a, b, COLORS[index % COLORS.length]));
-                index++;
+                ACTIVE.add(new Pair(a, b, COLORS[idx % COLORS.length]));
             }
         }
     }

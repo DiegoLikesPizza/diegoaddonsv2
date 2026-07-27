@@ -6,14 +6,19 @@ import com.google.gson.JsonParser;
 import dev.diego.diegoaddons.DiegoAddonsV2Client;
 import dev.diego.diegoaddons.module.modules.PuzzleSolversModule;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.phys.AABB;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,6 +51,38 @@ public final class PuzzleSolvers {
             Pattern.compile("The reward isn't in any of our chests\\.?"),
             Pattern.compile("Both of them are telling the truth\\. Also, .+ has the reward in their chest\\.?"),
     };
+
+    /** Lines a lying NPC says - the chest each one names (or its own) is not the reward. */
+    private static final Pattern[] WEIRDOS_LIE = {
+            Pattern.compile("One of us is telling the truth!"),
+            Pattern.compile("They are both telling the truth\\. The reward isn't in .+'s chest\\.?"),
+            Pattern.compile("We are all telling the truth!"),
+            Pattern.compile(".+ is telling the truth and the reward is in his chest\\.?"),
+            Pattern.compile("My chest doesn't have the reward\\. At least one of the others is telling the truth!"),
+            Pattern.compile("One of the others is lying\\.?"),
+            Pattern.compile("They are both telling the truth, the reward is in .+'s chest\\.?"),
+            Pattern.compile("They are both lying, the reward is in my chest!"),
+            Pattern.compile("The reward is in my chest\\.?"),
+            Pattern.compile("The reward is not in my chest\\. They are both lying\\.?"),
+            Pattern.compile(".+ is telling the truth\\.?"),
+            Pattern.compile("My chest has the reward\\.?"),
+    };
+
+    /** The three answer buttons in the Quiz room, relative to the room, in ⓐ/ⓑ/ⓒ order. */
+    private static final BlockPos[] QUIZ_BUTTONS = {
+            new BlockPos(20, 70, 6), new BlockPos(15, 70, 9), new BlockPos(10, 70, 6),
+    };
+
+    private static final int GREEN = 0xFF00FF00;
+    private static final int RED = 0xFFFF3333;
+    private static final double EDGE = 0.06;
+
+    /** ⓐ/ⓑ/ⓒ index of the correct Quiz option, or -1 until it is known. */
+    private static int correctOption = -1;
+    /** Each spoken Weirdo, by name -> {NPC x, NPC z, 1 if it holds the reward else 0}. The chest is
+     * worked out from this every tick, so it is right even before the room's rotation had resolved
+     * when the NPC first spoke. */
+    private static final Map<String, double[]> weirdosNpc = new LinkedHashMap<>();
 
     /** "[NPC] Name: message" - how the puzzle NPCs speak. */
     private static final Pattern NPC_LINE = Pattern.compile("^\\[NPC] ([^:]+): (.+)$");
@@ -113,6 +150,7 @@ public final class PuzzleSolvers {
     private static void quiz(PuzzleSolversModule mod, String msg) {
         if (msg.startsWith(ORUO) && msg.endsWith("correctly!")) {
             currentAnswers = null;   // moved on to the next question
+            correctOption = -1;
             return;
         }
 
@@ -124,6 +162,7 @@ public final class PuzzleSolvers {
                 }
                 for (String answer : currentAnswers) {
                     if (msg.endsWith(answer)) {
+                        correctOption = i;
                         announce(mod, "Quiz: " + OPTIONS[i] + " " + answer);
                         return;
                     }
@@ -140,7 +179,10 @@ public final class PuzzleSolvers {
         }
     }
 
-    /** The NPC whose line only a truth-teller could say is the one holding the reward. */
+    /**
+     * The NPC whose line only a truth-teller could say is the one holding the reward; the ones whose
+     * line marks a chest empty are wrong. Each NPC's chest is found from where the NPC is standing.
+     */
     private static void weirdos(PuzzleSolversModule mod, String msg) {
         var m = NPC_LINE.matcher(msg);
         if (!m.matches()) {
@@ -148,12 +190,64 @@ public final class PuzzleSolvers {
         }
         String npc = m.group(1).trim();
         String said = m.group(2).trim();
-        for (Pattern p : WEIRDOS_TRUTH) {
-            if (p.matcher(said).matches()) {
-                announce(mod, "Weirdos: reward is in " + npc + "'s chest");
-                return;
+
+        boolean truth = matchesAny(WEIRDOS_TRUTH, said);
+        boolean lie = !truth && matchesAny(WEIRDOS_LIE, said);
+        // Record every weirdo that speaks while in the room, not only the ones whose exact line is in
+        // the tables - otherwise a phrasing we don't have leaves that chest unmarked. Outside the room
+        // we still require a known line, so stray [NPC] chatter elsewhere is never picked up.
+        boolean inRoom = "Three Weirdos".equals(DungeonRooms.currentRoomName());
+        if (!truth && !lie && !inRoom) {
+            return;
+        }
+        double[] pos = npcPos(npc);
+        if (pos == null) {
+            return;
+        }
+        weirdosNpc.put(npc, new double[]{pos[0], pos[1], truth ? 1 : 0});
+        if (truth) {
+            announce(mod, "Weirdos: reward is in " + npc + "'s chest");
+        }
+    }
+
+    /** Whether the reward chest has been pinned down, so highlights are meaningful. */
+    private static boolean weirdosSolved() {
+        for (double[] v : weirdosNpc.values()) {
+            if (v[2] == 1) {
+                return true;
             }
         }
+        return false;
+    }
+
+    private static boolean matchesAny(Pattern[] patterns, String s) {
+        for (Pattern p : patterns) {
+            if (p.matcher(s).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The world x/z of the armour-stand NPC with this name, or null if it isn't loaded. */
+    private static double[] npcPos(String npc) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return null;
+        }
+        for (Entity e : mc.level.entitiesForRendering()) {
+            if (e instanceof ArmorStand && e.hasCustomName()
+                    && LegacyText.strip(e.getCustomName().getString()).trim().equals(npc)) {
+                return new double[]{e.getX(), e.getZ()};
+            }
+        }
+        return null;
+    }
+
+    /** The chest block tied to a Weirdo NPC standing at (x, z), turned to the room's rotation. */
+    private static BlockPos weirdosChest(double x, double z) {
+        BlockPos rel = DungeonRooms.toRecorded(new BlockPos((int) x - 1, 69, (int) z - 1));
+        return rel == null ? null : DungeonRooms.toWorld(rel.offset(1, 0, 0));
     }
 
     /** Prints a solution once, either to yourself or to the party. */
@@ -171,10 +265,64 @@ public final class PuzzleSolvers {
         }
     }
 
+    /**
+     * Draws the world highlights each tick: the correct Quiz answer's block green, and in Three
+     * Weirdos the reward chest green with the ruled-out chests red. Chat still calls the answer out;
+     * this is the same answer, placed on the block you actually click.
+     */
+    public static void tick(Minecraft mc) {
+        PuzzleSolversModule mod = PuzzleSolversModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || mc.level == null) {
+            return;
+        }
+        String room = DungeonRooms.currentRoomName();
+        if (mod.quiz() && "Quiz".equals(room) && correctOption >= 0 && correctOption < QUIZ_BUTTONS.length) {
+            BlockPos w = DungeonRooms.toWorld(QUIZ_BUTTONS[correctOption]);
+            if (w != null) {
+                // The button block, plus the block it sits on, so both read as the answer.
+                WorldRender.thickBox(new AABB(w.getX(), w.getY() - 1, w.getZ(),
+                        w.getX() + 1, w.getY() + 1, w.getZ() + 1), GREEN, EDGE, true);
+            }
+        }
+        // Only highlight once the reward chest is known: the green one is the answer and every other
+        // recorded weirdo chest is ruled out red. Until then the chat line is the only output.
+        if (mod.weirdos() && "Three Weirdos".equals(room) && weirdosSolved()) {
+            for (double[] v : weirdosNpc.values()) {
+                BlockPos chest = weirdosChest(v[0], v[1]);
+                if (chest != null) {
+                    WorldRender.thickBox(new AABB(chest), v[2] == 1 ? GREEN : RED, EDGE, true);
+                }
+            }
+        }
+    }
+
     /** Clears per-dungeon state. */
     public static void reset() {
         currentAnswers = null;
         lastAnnounced = "";
+        correctOption = -1;
+        weirdosNpc.clear();
+    }
+
+    /**
+     * The colour an Oruo answer line should be tinted - green for the right answer, red for a wrong
+     * one - or 0 to leave it alone. Used to recolour the options in chat as Oruo lists them.
+     */
+    public static int quizOptionColor(String plain) {
+        PuzzleSolversModule mod = PuzzleSolversModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || !mod.quiz() || currentAnswers == null || plain.isEmpty()) {
+            return 0;
+        }
+        char c = plain.charAt(0);
+        if (c != 'ⓐ' && c != 'ⓑ' && c != 'ⓒ') {
+            return 0;
+        }
+        for (String answer : currentAnswers) {
+            if (plain.endsWith(answer)) {
+                return 0x55FF55;   // correct
+            }
+        }
+        return 0xFF5555;   // wrong
     }
 
     /** Exposed so the module can report how many answers are known. */

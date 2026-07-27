@@ -54,7 +54,7 @@ public class IntroScreen extends DiegoScreen {
 
         UiButton open = new UiButton(left, by, halfW, bh, "Open menu", UiButton.Kind.SECONDARY, () -> {
             finish();
-            minecraft.setScreen(new ClickGuiScreen());
+            new DiegoClickGuiView().open();
         });
         UiButton go = new UiButton(left + halfW + gap, by, halfW, bh, "Get started", UiButton.Kind.PRIMARY, () -> {
             finish();

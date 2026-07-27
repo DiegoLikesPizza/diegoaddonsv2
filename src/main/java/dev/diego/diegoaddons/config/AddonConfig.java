@@ -45,6 +45,13 @@ public class AddonConfig {
     /** Name-plate terms highlighted by the Custom ESP module, managed with /da esp. */
     public List<String> espTerms = new ArrayList<>();
 
+    /** Player-inventory slot indices (0-40) locked against moving/dropping (Slot Lock module). */
+    public java.util.Set<Integer> lockedSlots = new java.util.HashSet<>();
+
     /** Commands bound to keys (see the Command Hotkeys module). */
     public List<CommandHotkey> commandHotkeys = new ArrayList<>();
+
+    /** User-recorded mining routes, and the one currently being drawn (see the Mining Routes module). */
+    public List<MiningRoute> miningRoutes = new ArrayList<>();
+    public String activeMiningRoute = "";
 }
