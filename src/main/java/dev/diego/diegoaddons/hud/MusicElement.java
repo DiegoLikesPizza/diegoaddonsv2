@@ -9,7 +9,6 @@ import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
 import dev.diego.diegoaddons.util.CoverArt;
 import dev.diego.diegoaddons.util.MediaWatcher;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +36,7 @@ public class MusicElement extends HudElement {
     private boolean lastCover;
     private boolean lastBar;
     private int lastColor;
-    private Identifier lastArt;
+    private String lastArt;
     private boolean plainMode = true;
 
     public MusicElement(MusicDisplayModule module, ContainerComponent root) {
@@ -75,11 +74,13 @@ public class MusicElement extends HudElement {
         }
 
         if (wantCover) {
-            Identifier art = CoverArt.get(MediaWatcher.artist(), MediaWatcher.title());
+            // The URL, not the registered texture: ImageComponent.resource() loads pack assets, so
+            // a texture-manager id gave us nothing but the placeholder tint underneath.
+            String art = CoverArt.artworkUrl(MediaWatcher.artist(), MediaWatcher.title());
             if (!Objects.equals(art, lastArt)) {
                 lastArt = art;
                 if (art != null) {
-                    cover.resource(art);
+                    cover.url(art);
                 }
                 cover.visible(art != null);
             }

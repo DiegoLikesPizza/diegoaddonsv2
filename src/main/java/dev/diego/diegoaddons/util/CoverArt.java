@@ -39,6 +39,12 @@ public final class CoverArt {
 
     /** Track key -> texture, or null once a lookup has failed (so it is not retried). */
     private static final Map<String, Identifier> CACHE = new HashMap<>();
+    /**
+     * The artwork's URL per track. RenderLib's image component fetches a URL itself, and a texture
+     * registered with the texture manager is not something it can load, so this is what the HUD
+     * element uses.
+     */
+    private static final Map<String, String> URLS = new HashMap<>();
     private static volatile String inFlight;
     private static int counter;
 
@@ -74,6 +80,27 @@ public final class CoverArt {
         return null;
     }
 
+    /**
+     * The artwork URL for a track, or {@code null} until the lookup lands. Starts the lookup if it
+     * has not run yet, exactly as {@link #get} does.
+     */
+    public static String artworkUrl(String artist, String title) {
+        if (artist == null || title == null || title.isBlank()) {
+            return null;
+        }
+        String key = key(artist, title);
+        synchronized (CACHE) {
+            String url = URLS.get(key);
+            if (url != null) {
+                return url;
+            }
+        }
+        get(artist, title);   // kicks the lookup off, or leaves a running one alone
+        synchronized (CACHE) {
+            return URLS.get(key);
+        }
+    }
+
     private static void fetch(String key, String artist, String title) {
         try {
             String term = URLEncoder.encode(artist + " " + title, StandardCharsets.UTF_8);
@@ -87,6 +114,9 @@ public final class CoverArt {
             String art = results.get(0).getAsJsonObject().get("artworkUrl100").getAsString();
             // Apple serves any size from the same path; ask for a larger PNG than the 100px JPEG.
             String big = art.replace("100x100bb.jpg", "512x512bb.png");
+            synchronized (CACHE) {
+                URLS.put(key, big);
+            }
             byte[] png = readBytes(big);
             upload(key, png);
         } catch (Exception e) {
