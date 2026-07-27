@@ -59,7 +59,7 @@ public class TextChipElement extends HudElement {
         for (String line : lines) {
             width = Math.max(width, steadyWidth(line, TEXT_PX));
         }
-        root.width(width + PAD_X * 2f);
+        sizeRoot(width + PAD_X * 2f, lines.size() * ROW_H + PAD_Y * 2f);
         root.alignItems(centered ? GuiAlignment.CENTER : GuiAlignment.START);
 
         while (rows.size() > lines.size()) {
