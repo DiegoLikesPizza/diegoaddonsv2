@@ -34,10 +34,27 @@ import java.util.Set;
  * bookkeeping it needs: a tracked entity stops being tracked when nothing asks for it this tick.
  */
 public final class EspWorld {
-    /** One queued box: outline or fill, one colour or a fade up its height. */
-    private record Box(AABB box, int argbA, int argbB, boolean gradient, boolean filled,
-                       double thickness) {
+    /**
+     * One queued box, with everything needed to draw it already built.
+     *
+     * <p>The paint, the stroke and the eight corners used to be rebuilt inside the render callback,
+     * which runs <em>per frame</em>, for every box - about twenty-five allocations each. A dungeon
+     * room full of starred mobs made that tens of thousands of short-lived objects a second, and the
+     * collector spent the frame time on them.
+     *
+     * <p>None of it can change between ticks: the boxes are replaced wholesale by {@link #flip()}.
+     * So it is all built once, here, when the box is queued.
+     */
+    private record Box(AABB box, WorldMaterial material, WorldStroke stroke, Vec3[] corners,
+                       boolean filled) {
     }
+
+    /** The twelve edges of a cuboid, as index pairs into {@link Box#corners}. */
+    private static final int[][] EDGE_PAIRS = {
+            {0, 1}, {1, 2}, {2, 3}, {3, 0},     // bottom ring
+            {4, 5}, {5, 6}, {6, 7}, {7, 4},     // top ring
+            {0, 4}, {1, 5}, {2, 6}, {3, 7},     // uprights
+    };
 
     private static final List<Box> BUILDING = new ArrayList<>();
     private static volatile List<Box> RENDER = new ArrayList<>();
@@ -64,22 +81,54 @@ public final class EspWorld {
 
     /** An outlined box in one colour. */
     public static void outline(AABB box, int argb, double thickness) {
-        submit(new Box(box, argb, argb, false, false, thickness));
+        submit(build(box, argb, argb, false, false, thickness));
     }
 
     /** An outlined box fading from {@code argbA} at the bottom to {@code argbB} at the top. */
     public static void outlineFade(AABB box, int argbA, int argbB, double thickness) {
-        submit(new Box(box, argbA, argbB, true, false, thickness));
+        submit(build(box, argbA, argbB, true, false, thickness));
     }
 
     /** A filled box in one colour. */
     public static void fill(AABB box, int argb) {
-        submit(new Box(box, argb, argb, false, true, 0));
+        submit(build(box, argb, argb, false, true, 0));
     }
 
     /** A filled box fading up its height. */
     public static void fillFade(AABB box, int argbA, int argbB) {
-        submit(new Box(box, argbA, argbB, true, true, 0));
+        submit(build(box, argbA, argbB, true, true, 0));
+    }
+
+    /** Does the whole cost of a box once, at queue time, so the render callback only submits it. */
+    private static Box build(AABB a, int argbA, int argbB, boolean gradient, boolean filled,
+                             double thickness) {
+        WorldMaterial.Builder builder = WorldMaterial.builder()
+                .depthMode(WorldDepthMode.SEE_THROUGH)
+                .doubleSided(true);
+        if (gradient) {
+            builder.paint(WorldPaint.gradient(WorldGradient.linear(
+                    new Vec3(a.minX, a.minY, a.minZ),
+                    new Vec3(a.minX, a.maxY, a.minZ),
+                    new WorldGradient.Stop(0f, RenderColor.argb(argbA)),
+                    new WorldGradient.Stop(1f, RenderColor.argb(argbB)))));
+        } else {
+            builder.color(RenderColor.argb(argbA));
+        }
+        WorldMaterial material = builder.build();
+
+        if (filled) {
+            return new Box(a, material, null, null, true);
+        }
+        WorldStroke stroke = new WorldStroke(material.paint(), (float) thickness,
+                WorldWidthMode.WORLD, com.render.api.world.WorldLineJoin.MITER,
+                com.render.api.world.WorldLineCap.BUTT, null, 0f);
+        Vec3[] corners = {
+                new Vec3(a.minX, a.minY, a.minZ), new Vec3(a.maxX, a.minY, a.minZ),
+                new Vec3(a.maxX, a.minY, a.maxZ), new Vec3(a.minX, a.minY, a.maxZ),
+                new Vec3(a.minX, a.maxY, a.minZ), new Vec3(a.maxX, a.maxY, a.minZ),
+                new Vec3(a.maxX, a.maxY, a.maxZ), new Vec3(a.minX, a.maxY, a.maxZ),
+        };
+        return new Box(a, material, stroke, corners, false);
     }
 
     private static void submit(Box box) {
@@ -139,59 +188,22 @@ public final class EspWorld {
 
     // --- drawing ------------------------------------------------------------------------------------
 
+    /**
+     * Submits this tick's boxes. Deliberately does no work beyond submitting - everything else was
+     * done when the box was queued, because this runs once per frame and that runs once per tick.
+     */
     private static void extract(WorldRenderContext ctx) {
         List<Box> boxes = RENDER;
         for (Box b : boxes) {
-            WorldMaterial material = material(b);
             if (b.filled()) {
-                ctx.box(b.box(), material);
-            } else {
-                edges(ctx, b, material);
+                ctx.box(b.box(), b.material());
+                continue;
+            }
+            Vec3[] c = b.corners();
+            for (int[] p : EDGE_PAIRS) {
+                ctx.line(c[p[0]], c[p[1]], b.stroke(), b.material());
             }
         }
     }
 
-    /** Through walls, and a fade up the box when one was asked for. */
-    private static WorldMaterial material(Box b) {
-        WorldMaterial.Builder builder = WorldMaterial.builder()
-                .depthMode(WorldDepthMode.SEE_THROUGH)
-                .doubleSided(true);
-        if (b.gradient()) {
-            AABB box = b.box();
-            builder.paint(WorldPaint.gradient(WorldGradient.linear(
-                    new Vec3(box.minX, box.minY, box.minZ),
-                    new Vec3(box.minX, box.maxY, box.minZ),
-                    new WorldGradient.Stop(0f, RenderColor.argb(b.argbA())),
-                    new WorldGradient.Stop(1f, RenderColor.argb(b.argbB())))));
-        } else {
-            builder.color(RenderColor.argb(b.argbA()));
-        }
-        return builder.build();
-    }
-
-    /** The twelve edges of the box, as lines rather than as twelve thin boxes. */
-    private static void edges(WorldRenderContext ctx, Box b, WorldMaterial material) {
-        AABB a = b.box();
-        WorldStroke stroke = new WorldStroke(material.paint(), (float) b.thickness(),
-                WorldWidthMode.WORLD, com.render.api.world.WorldLineJoin.MITER,
-                com.render.api.world.WorldLineCap.BUTT, null, 0f);
-        double[][] corners = {
-                {a.minX, a.minY, a.minZ}, {a.maxX, a.minY, a.minZ},
-                {a.maxX, a.minY, a.maxZ}, {a.minX, a.minY, a.maxZ},
-                {a.minX, a.maxY, a.minZ}, {a.maxX, a.maxY, a.minZ},
-                {a.maxX, a.maxY, a.maxZ}, {a.minX, a.maxY, a.maxZ},
-        };
-        int[][] pairs = {
-                {0, 1}, {1, 2}, {2, 3}, {3, 0},     // bottom ring
-                {4, 5}, {5, 6}, {6, 7}, {7, 4},     // top ring
-                {0, 4}, {1, 5}, {2, 6}, {3, 7},     // uprights
-        };
-        for (int[] p : pairs) {
-            ctx.line(vec(corners[p[0]]), vec(corners[p[1]]), stroke, material);
-        }
-    }
-
-    private static Vec3 vec(double[] xyz) {
-        return new Vec3(xyz[0], xyz[1], xyz[2]);
-    }
 }

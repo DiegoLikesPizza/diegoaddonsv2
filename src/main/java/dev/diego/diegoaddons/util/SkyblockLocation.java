@@ -23,8 +23,33 @@ public final class SkyblockLocation {
     private SkyblockLocation() {
     }
 
-    /** Every sidebar (right-hand scoreboard) line, colour codes stripped. */
+    /**
+     * Both readings, held for the tick that produced them.
+     *
+     * <p>These are read from eighteen places - the dungeon, slayer and Hollows trackers all want the
+     * sidebar, and several want it more than once - and each read walked every scoreboard entry or
+     * every player in tab, stripping colour codes into a fresh list. On a full lobby that was a few
+     * hundred string allocations, twenty times a second, for answers that cannot change between
+     * ticks. Neither can change without a packet, so once per tick is once too often already.
+     */
+    private static List<String> sidebarCache;
+    private static List<String> tabCache;
+
+    /** Dropped at the top of each client tick. Rendering may read a reading up to a tick old. */
+    public static void invalidate() {
+        sidebarCache = null;
+        tabCache = null;
+    }
+
+    /** Every sidebar (right-hand scoreboard) line, colour codes stripped. Do not modify the result. */
     public static List<String> sidebarLines(Minecraft mc) {
+        if (sidebarCache != null) {
+            return sidebarCache;
+        }
+        return sidebarCache = readSidebar(mc);
+    }
+
+    private static List<String> readSidebar(Minecraft mc) {
         List<String> out = new ArrayList<>();
         if (mc.player == null || mc.player.connection == null) {
             return out;
@@ -51,7 +76,15 @@ public final class SkyblockLocation {
         return out;
     }
 
+    /** Every tab-list entry, colour codes stripped. Do not modify the result. */
     public static List<String> tabLines(Minecraft mc) {
+        if (tabCache != null) {
+            return tabCache;
+        }
+        return tabCache = readTab(mc);
+    }
+
+    private static List<String> readTab(Minecraft mc) {
         List<String> out = new ArrayList<>();
         if (mc.getConnection() == null) {
             return out;

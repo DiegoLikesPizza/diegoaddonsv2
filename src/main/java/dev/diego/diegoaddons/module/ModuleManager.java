@@ -198,6 +198,9 @@ public final class ModuleManager {
 
         // Always-on dispatch hooks.
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+            // The scoreboard and tab list are read from all over the mod, several times per tick.
+            // They cannot change without a packet, so they are read once and held for the tick.
+            dev.diego.diegoaddons.util.SkyblockLocation.invalidate();
             dev.diego.diegoaddons.util.SkyblockHud.tick(mc);
             dev.diego.diegoaddons.util.DungeonState.tick(mc);
             // Before anything reads the room grid: has the run changed under us?
