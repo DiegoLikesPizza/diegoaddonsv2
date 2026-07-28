@@ -16,9 +16,11 @@ public abstract class EspModule extends Module {
     public static final int OUTLINE = 0;
     public static final int BOX = 1;
     public static final int SQUARE_2D = 2;
+    /** The entity's own model outlined, rather than a box around it. */
+    public static final int MODEL = 3;
 
-    private final CycleSetting style =
-            new CycleSetting(this, "espStyle", "Style", OUTLINE, "Outline", "Box", "2D square");
+    private final CycleSetting style = new CycleSetting(this, "espStyle", "Style", OUTLINE,
+            "Box outline", "Filled box", "2D square", "Player outline");
     private final ColorSetting color;
 
     protected EspModule(String id, Category category, String name, String description,

@@ -59,13 +59,13 @@ public final class EntityEsp {
         for (Entity e : mc.level.getEntities(mc.player, area)) {
             // Bats are real entities, not name plates, so they are matched by type.
             if (doBat && e instanceof Bat) {
-                EspRender.draw(e.getBoundingBox().inflate(0.1), bats);
+                EspRender.draw(e, e.getBoundingBox().inflate(0.1), bats);
                 continue;
             }
             // Real players, hiding the NPCs that share the player model.
             if (doPlayer && e instanceof Player p && p != mc.player) {
                 if (isRealPlayer(mc, p)) {
-                    EspRender.draw(p.getBoundingBox().inflate(0.05), players);
+                    EspRender.draw(p, p.getBoundingBox().inflate(0.05), players);
                 }
                 continue;
             }
@@ -118,7 +118,7 @@ public final class EntityEsp {
                 it.remove();   // out of range: forget it rather than hold a stale box
                 continue;
             }
-            EspRender.draw(body.getBoundingBox().inflate(0.05), DungeonMinibossEspModule.INSTANCE);
+            EspRender.draw(body, body.getBoundingBox().inflate(0.05), DungeonMinibossEspModule.INSTANCE);
         }
     }
 
@@ -168,6 +168,9 @@ public final class EntityEsp {
         AABB box = new AABB(
                 stand.getX() - 0.45, stand.getY() - 2.1, stand.getZ() - 0.45,
                 stand.getX() + 0.45, stand.getY() - 0.3, stand.getZ() + 0.45);
-        EspRender.draw(box, module);
+        // The mob the plate belongs to, when it can be found: the model outline needs an entity,
+        // and a plate is not the thing you want outlined.
+        Entity body = stand.getVehicle();
+        EspRender.draw(body, box, module);
     }
 }

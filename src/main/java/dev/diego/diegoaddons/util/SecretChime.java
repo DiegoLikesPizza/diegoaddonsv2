@@ -2,34 +2,39 @@ package dev.diego.diegoaddons.util;
 
 import dev.diego.diegoaddons.module.modules.SecretChimeModule;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Watches the dungeon secret count and chimes when it goes up.
+ * Chimes when you get a dungeon secret.
  *
- * <p>The count comes from {@link DungeonState}, which the score and the map already run on. It used
- * to read the tab list itself, with a pattern loose enough to match "Secrets Found: 40%" as well as
- * a count - so on a floor where the tab shows the percentage first it was watching a number that
- * moves in steps of several secrets, and mostly never chimed at all.
+ * <p>It used to watch the secret counter and chime when it went up. That number comes from the tab
+ * list, which updates when Hypixel feels like it: the sound landed a second or more after the thing
+ * that earned it, or not at all. A sound that arrives late is worse than none - it tells you about a
+ * moment that has already passed.
  *
- * <p>It is checked every tick rather than a few times a second: the count itself only moves when
- * the tab list updates, so anything on top of that is delay for its own sake.
- *
- * <p>Only increases chime. The count resets to zero on entering a dungeon, and jumping from a high
- * number back to zero is a new run rather than progress.
+ * <p>So it listens for the acts themselves instead, which the client knows the instant they happen:
+ * opening a secret chest, taking a wither essence, pulling a lever, and picking an item up off the
+ * floor. The count is still watched as a backstop for the kinds it cannot see, with a short window
+ * that stops one secret chiming twice.
  */
 public final class SecretChime {
-    /** Recheck a few times a second; the tab list does not change faster than that. */
-    private static final int INTERVAL = 5;
+    /** How long after an act its counter tick is taken to be the same secret. */
+    private static final long DOUBLE_MS = 1500;
 
     private static int lastCount = -1;
+    private static long lastChime;
 
     private SecretChime() {
     }
 
     public static void reset() {
         lastCount = -1;
+        lastChime = 0;
     }
 
+    /** Called every client tick: the backstop for secrets no interaction announces. */
     public static void tick(Minecraft mc) {
         SecretChimeModule mod = SecretChimeModule.INSTANCE;
         if (mod == null || !mod.isEnabled() || mc.player == null) {
@@ -41,9 +46,49 @@ public final class SecretChime {
             return;
         }
         if (lastCount >= 0 && count > lastCount) {
-            mc.player.playSound(mod.chosenSound(), 1.0f, mod.pitch());
+            chime(mc);
         }
         lastCount = count;
     }
 
+    /**
+     * Called when the player interacts with a block. Chimes for the ones a secret is made of.
+     *
+     * <p>The block is checked rather than the outcome, because the outcome arrives from the server
+     * and the point is to be immediate. A chest that turns out to be empty still chimes, which is
+     * the same thing the room already told you by having a chest in it.
+     */
+    public static void onUseBlock(Minecraft mc, BlockPos pos) {
+        SecretChimeModule mod = SecretChimeModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || !mod.onInteract()
+                || mc.level == null || !DungeonState.inDungeons()) {
+            return;
+        }
+        BlockState state = mc.level.getBlockState(pos);
+        if (state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST) || state.is(Blocks.LEVER)
+                || state.getBlock() instanceof net.minecraft.world.level.block.SkullBlock
+                || state.getBlock() instanceof net.minecraft.world.level.block.WallSkullBlock) {
+            chime(mc);
+        }
+    }
+
+    /** Called when the player picks an item up off the floor. */
+    public static void onPickup(Minecraft mc) {
+        SecretChimeModule mod = SecretChimeModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || !mod.onPickup() || !DungeonState.inDungeons()) {
+            return;
+        }
+        chime(mc);
+    }
+
+    /** Plays the chosen sound, unless something else just did. */
+    private static void chime(Minecraft mc) {
+        SecretChimeModule mod = SecretChimeModule.INSTANCE;
+        long now = System.currentTimeMillis();
+        if (mc.player == null || now - lastChime < DOUBLE_MS) {
+            return;
+        }
+        lastChime = now;
+        mc.player.playSound(mod.chosenSound(), 1.0f, mod.pitch());
+    }
 }

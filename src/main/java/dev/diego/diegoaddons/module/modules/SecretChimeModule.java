@@ -25,12 +25,20 @@ public class SecretChimeModule extends Module {
             SecretChimeModule::openBrowser);
     private final NumberSetting pitch =
             new NumberSetting(this, "pitch", "Pitch", 2.0, 0.5, 2.0, 0.1);
+    private final dev.diego.diegoaddons.module.BooleanSetting onInteract =
+            new dev.diego.diegoaddons.module.BooleanSetting(this, "onInteract",
+                    "Chime on chests, essences and levers", true);
+    private final dev.diego.diegoaddons.module.BooleanSetting onPickup =
+            new dev.diego.diegoaddons.module.BooleanSetting(this, "onPickup",
+                    "Chime on picking an item up", true);
 
     public SecretChimeModule() {
         super("secretchime", Category.DUNGEONS, "Secret Chime",
                 "Play a sound when a dungeon secret is found.");
         settings.add(sound);
         settings.add(pitch);
+        settings.add(onInteract);
+        settings.add(onPickup);
         INSTANCE = this;
     }
 
@@ -57,6 +65,14 @@ public class SecretChimeModule extends Module {
 
     public float pitch() {
         return (float) pitch.get();
+    }
+
+    public boolean onInteract() {
+        return onInteract.get();
+    }
+
+    public boolean onPickup() {
+        return onPickup.get();
     }
 
     @Override

@@ -170,6 +170,16 @@ public final class ModuleManager {
             m.setEnabled(ConfigManager.moduleConfig(m.id).enabled);
         }
 
+        // A secret is usually a block you clicked: the chime listens for that rather than for the
+        // counter catching up with it.
+        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (level.isClientSide()) {
+                dev.diego.diegoaddons.util.SecretChime.onUseBlock(
+                        Minecraft.getInstance(), hit.getBlockPos());
+            }
+            return net.minecraft.world.InteractionResult.PASS;
+        });
+
         // Always-on dispatch hooks.
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             dev.diego.diegoaddons.util.SkyblockHud.tick(mc);
@@ -192,6 +202,7 @@ public final class ModuleManager {
             // boxes stay solid instead of flickering between ticks.
             dev.diego.diegoaddons.util.WorldRender.flip();
             dev.diego.diegoaddons.util.EspDraw.flip();
+            dev.diego.diegoaddons.util.EspWorld.flip();
         });
         HudElementRegistry.addLast(
                 Identifier.fromNamespaceAndPath(DiegoAddonsV2Client.MOD_ID, "hud"),
@@ -270,16 +281,12 @@ public final class ModuleManager {
                     dev.diego.diegoaddons.util.SlotLocks.keys((AbstractContainerScreen<?>) scr, mx, my);
                     Toasts.render(g);
                 });
-                // Deny the click to the menu when it lands on one of our buttons (so the press is not
-                // also read as a slot click) or on a locked slot.
-                ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) -> {
-                    AbstractContainerScreen<?> cs = (AbstractContainerScreen<?>) scr;
-                    // Inventory buttons are absent here on purpose: a RenderLib button consumes its
-                    // own press, so the click never reaches the menu and needs no veto.
-                    boolean ours = PartyFinder.click(cs, ev.x(), ev.y(), ev.button());
-                    boolean locked = dev.diego.diegoaddons.util.SlotLocks.locksClick(cs, ev.x(), ev.y());
-                    return !ours && !locked;
-                });
+                // Deny the click to the menu when it lands on a locked slot. Our own buttons are
+                // absent here on purpose: they are RenderLib components now, and a RenderLib button
+                // consumes its own press, so the click never reaches the menu and needs no veto.
+                ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) ->
+                        !dev.diego.diegoaddons.util.SlotLocks.locksClick(
+                                (AbstractContainerScreen<?>) scr, ev.x(), ev.y()));
                 // Deny hotbar-swap / drop keys that would move a locked slot's item.
                 ScreenKeyboardEvents.allowKeyPress(screen).register((scr, event) ->
                         !dev.diego.diegoaddons.util.SlotLocks.locksKey((AbstractContainerScreen<?>) scr, event));
@@ -316,6 +323,7 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.EtherwarpHelper.reset();
             dev.diego.diegoaddons.util.WorldRender.clear();
             dev.diego.diegoaddons.util.EspDraw.clear();
+            dev.diego.diegoaddons.util.EspWorld.clear();
             PartyCommands.reset();
         });
 

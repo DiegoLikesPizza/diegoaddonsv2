@@ -52,7 +52,7 @@ public class SlayerBossHighlightModule extends EspModule {
         AABB box = boss.getBoundingBox().inflate(0.05);
         Vec3 center = box.getCenter();
 
-        dev.diego.diegoaddons.util.EspRender.draw(box, this, color);
+        dev.diego.diegoaddons.util.EspRender.draw(boss, box, this, color);
         if (tracer.get()) {
             EspDraw.tracer(center, color);
         }

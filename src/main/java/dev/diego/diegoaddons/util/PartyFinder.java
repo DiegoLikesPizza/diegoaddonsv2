@@ -89,7 +89,6 @@ public final class PartyFinder {
                 }
             }
         }
-        drawToggles(screen, g, leftPos, topPos, acc.diego$imageWidth());
     }
 
     /** The hover panel, drawn after the items so they cannot paint over it. */
@@ -182,62 +181,5 @@ public final class PartyFinder {
             }
         }
         return out;
-    }
-
-    // --- in-menu class toggles ------------------------------------------------------------------
-
-    private static int panelX(int leftPos, int imageWidth) {
-        return leftPos + imageWidth + PANEL_GAP;
-    }
-
-    private static void drawToggles(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
-                                    int leftPos, int topPos, int imageWidth) {
-        PartyFinderModule mod = PartyFinderModule.INSTANCE;
-        Theme t = Themes.current();
-        boolean sm = ConfigManager.get().smoothCorners;
-        Minecraft mc = Minecraft.getInstance();
-
-        int x = panelX(leftPos, imageWidth);
-        int y = topPos;
-        int h = 16 + CLASSES.length * ROW_H + 6;
-
-        UiRender.fillRounded(g, x, y, PANEL_W, h, 6, (0xEE << 24) | (t.surface() & 0x00FFFFFF), sm);
-        UiRender.strokeRounded(g, x, y, PANEL_W, h, 6, Theme.withAlpha(t.border(), 0.9f), sm);
-        UiRender.text(g, mc.font, "HIGHLIGHT", Fonts.SMALL, x + 6, y + 5, t.textFaint());
-
-        for (int i = 0; i < CLASSES.length; i++) {
-            int ry = y + 16 + i * ROW_H;
-            boolean on = mod.wants(i);
-            int bx = x + 6;
-            int by = ry + (ROW_H - BOX) / 2;
-            UiRender.fillRounded(g, bx, by, BOX, BOX, 2,
-                    on ? HIGHLIGHT : Theme.withAlpha(t.textFaint(), 0.35f), sm);
-            UiRender.strokeRounded(g, bx, by, BOX, BOX, 2, Theme.withAlpha(t.border(), 0.9f), sm);
-            UiRender.text(g, mc.font, CLASS_NAMES[i], Fonts.SMALL, bx + BOX + 5, ry + 4,
-                    on ? t.text() : t.textMuted());
-        }
-    }
-
-    /**
-     * Handles a click on the toggle strip.
-     *
-     * @return true when a toggle was hit, so the menu must not also process the click
-     */
-    public static boolean click(AbstractContainerScreen<?> screen, double mouseX, double mouseY, int button) {
-        PartyFinderModule mod = PartyFinderModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || button != 0 || !isPartyFinder(screen)) {
-            return false;
-        }
-        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
-        int x = panelX(acc.diego$leftPos(), acc.diego$imageWidth());
-        int y = acc.diego$topPos();
-        for (int i = 0; i < CLASSES.length; i++) {
-            int ry = y + 16 + i * ROW_H;
-            if (UiRender.inside(mouseX, mouseY, x, ry, PANEL_W, ROW_H)) {
-                mod.toggle(i);
-                return true;
-            }
-        }
-        return false;
     }
 }

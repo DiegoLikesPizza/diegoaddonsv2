@@ -22,6 +22,7 @@
     "HudEffectsMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",
+    "ItemPickupMixin",
     "LightmapMixin",
     "LivingEntitySwingMixin",
     "PlayerDropMixin",

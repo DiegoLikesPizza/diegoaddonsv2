@@ -2,95 +2,84 @@ package dev.diego.diegoaddons.util;
 
 import dev.diego.diegoaddons.module.ColorSetting;
 import dev.diego.diegoaddons.module.EspModule;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 
 /**
- * Draws an ESP box in whichever shape and colour its module is set to, so every ESP feature reaches
- * for one call and they all end up looking the same.
+ * Draws an ESP in whichever shape and colour its module is set to, so every ESP feature reaches for
+ * one call and they all end up looking the same.
  *
- * <p>A gradient is drawn <b>up</b> the box: the bottom edges take the first colour, the top edges
- * the second, and the uprights are split into bands between them. There is no per-vertex colour to
- * be had here - the outline is built from thin solid boxes - so the blend is made out of the pieces
- * the shape already has.
+ * <p>A gradient runs <b>up</b> whatever is drawn, and it is one gradient rather than a stack of
+ * slices pretending to be one: see {@link EspWorld}, which hands the fade to RenderLib as a property
+ * of the paint.
  */
 public final class EspRender {
     private static final double EDGE = 0.05;
-    /** How many bands an upright is cut into for a gradient. Enough to read as a blend, cheap enough. */
-    private static final int BANDS = 6;
 
     private EspRender() {
     }
 
     /** Draws {@code box} the way {@code module} is set to draw it. */
     public static void draw(AABB box, EspModule module) {
-        switch (module.espStyle()) {
-            case EspModule.BOX -> filled(box, module.espColor());
-            case EspModule.SQUARE_2D -> EspDraw.square2d(box, module.espColor().argb());
-            default -> outline(box, module.espColor());
-        }
+        drawImpl(null, box, module, module.espColor().argb());
+    }
+
+    /** As above, for a feature whose colour means something of its own (a slayer tier). */
+    public static void draw(AABB box, EspModule module, int argb) {
+        drawImpl(null, box, module, argb);
+    }
+
+    /** Both at once: an entity to outline, and a colour that is not the module's own. */
+    public static void draw(Entity entity, AABB box, EspModule module, int argb) {
+        drawImpl(entity, box, module, argb);
     }
 
     /**
-     * As {@link #draw}, in a colour of the caller's choosing - for the features whose colour carries
-     * meaning of its own, like a slayer boss coloured by its tier. The shape is still the module's.
+     * Draws around an entity, which is what lets the model itself be outlined.
+     *
+     * <p>Without an entity the model style has nothing to outline, so it falls back to the box - a
+     * name plate hovering over a mob identifies the mob, not an entity we can hand to RenderLib.
      */
-    public static void draw(AABB box, EspModule module, int argb) {
+    public static void draw(Entity entity, AABB box, EspModule module) {
+        drawImpl(entity, box, module, module.espColor().argb());
+    }
+
+    private static void drawImpl(Entity entity, AABB box, EspModule module, int argb) {
+        ColorSetting colour = module.espColor();
+        boolean fade = colour.mode() != ColorSetting.SINGLE;
+        int top = fade ? colour.argbAt(1f) : argb;
+        int bottom = fade ? colour.argbAt(0f) : argb;
+
         switch (module.espStyle()) {
-            case EspModule.BOX -> WorldRender.filledBox(box, translucent(argb), true);
+            case EspModule.BOX -> {
+                if (fade) {
+                    EspWorld.fillFade(box, translucent(bottom), translucent(top));
+                } else {
+                    EspWorld.fill(box, translucent(argb));
+                }
+            }
             case EspModule.SQUARE_2D -> EspDraw.square2d(box, argb);
-            default -> WorldRender.thickBox(box, argb, EDGE, true);
-        }
-    }
-
-    /** The classic: twelve edges, drawn through walls. */
-    private static void outline(AABB box, ColorSetting colour) {
-        if (colour.mode() == ColorSetting.SINGLE) {
-            WorldRender.thickBox(box, colour.argb(), EDGE, true);
-            return;
-        }
-        // Bottom ring, top ring, then the uprights banded between them.
-        WorldRender.thickBox(flat(box, box.minY), colour.argbAt(0f), EDGE, true);
-        WorldRender.thickBox(flat(box, box.maxY), colour.argbAt(1f), EDGE, true);
-        for (int i = 0; i < BANDS; i++) {
-            double y1 = box.minY + (box.maxY - box.minY) * i / (double) BANDS;
-            double y2 = box.minY + (box.maxY - box.minY) * (i + 1) / (double) BANDS;
-            int argb = colour.argbAt((i + 0.5f) / BANDS);
-            uprights(box, y1, y2, argb);
-        }
-    }
-
-    /** A solid box; a gradient is stacked as slices, since a fill has one colour at a time. */
-    private static void filled(AABB box, ColorSetting colour) {
-        if (colour.mode() == ColorSetting.SINGLE) {
-            WorldRender.filledBox(box, translucent(colour.argb()), true);
-            return;
-        }
-        for (int i = 0; i < BANDS; i++) {
-            double y1 = box.minY + (box.maxY - box.minY) * i / (double) BANDS;
-            double y2 = box.minY + (box.maxY - box.minY) * (i + 1) / (double) BANDS;
-            WorldRender.filledBox(new AABB(box.minX, y1, box.minZ, box.maxX, y2, box.maxZ),
-                    translucent(colour.argbAt((i + 0.5f) / BANDS)), true);
+            case EspModule.MODEL -> {
+                if (entity != null) {
+                    EspWorld.outlineModel(entity, argb);
+                } else if (fade) {
+                    EspWorld.outlineFade(box, bottom, top, EDGE);
+                } else {
+                    EspWorld.outline(box, argb, EDGE);
+                }
+            }
+            default -> {
+                if (fade) {
+                    EspWorld.outlineFade(box, bottom, top, EDGE);
+                } else {
+                    EspWorld.outline(box, argb, EDGE);
+                }
+            }
         }
     }
 
     /** A filled ESP at full alpha hides the thing it is pointing at. */
     private static int translucent(int argb) {
         return (argb & 0x00FFFFFF) | (0x66 << 24);
-    }
-
-    /** The box flattened to a ring at one height. */
-    private static AABB flat(AABB box, double y) {
-        return new AABB(box.minX, y, box.minZ, box.maxX, y, box.maxZ);
-    }
-
-    /** The four vertical edges between two heights. */
-    private static void uprights(AABB box, double y1, double y2, int argb) {
-        double t = EDGE / 2.0;
-        for (double[] xz : new double[][]{
-                {box.minX, box.minZ}, {box.maxX, box.minZ},
-                {box.minX, box.maxZ}, {box.maxX, box.maxZ}}) {
-            WorldRender.filledBox(new AABB(
-                    xz[0] - t, y1, xz[1] - t, xz[0] + t, y2, xz[1] + t), argb, true);
-        }
     }
 }

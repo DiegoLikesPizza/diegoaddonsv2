@@ -43,6 +43,9 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
         // screen whether it applies, so this stays registered for the client's lifetime.
         INVENTORY_BUTTONS = com.render.api.RenderLibScreen.register(
                 new dev.diego.diegoaddons.gui.InventoryButtonsExtension());
+        // Same story for the party finder's class picker, which decides per screen whether the menu
+        // in front of it is the party finder.
+        com.render.api.RenderLibScreen.register(new dev.diego.diegoaddons.gui.PartyFinderExtension());
         dev.diego.diegoaddons.util.WorldRender.init();
         dev.diego.diegoaddons.command.DiegoCommands.register();
 
