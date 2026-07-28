@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use RenderLib"
+  short_description: "Build Fabric mods safely with RenderLib"
+  default_prompt: "Use $use-renderlib to add a retained RenderLib feature to my Fabric mod."
