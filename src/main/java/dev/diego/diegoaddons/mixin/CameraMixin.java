@@ -17,12 +17,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * <ul>
  *   <li><b>Distance</b> replaces the requested distance on the way in, so the block check still runs
  *       against the new value.</li>
- *   <li><b>Camera clip</b> throws the shortened result away on the way out and returns the requested
- *       distance instead, letting the camera pass through blocks.</li>
+ *   <li><b>Camera clip</b> answers the question itself, before any of the block checks run.</li>
  * </ul>
  *
- * <p>Splitting them across entry and exit keeps the order unambiguous: by the time the exit runs, the
- * parameter already holds the custom distance, so clipping returns the right number.
+ * <p>Clipping cannot be done on the way out. Vanilla walks eight rays and narrows the distance by
+ * <b>writing the shorter value back into its own parameter</b>, then returns that parameter - so at
+ * {@code RETURN} the parameter no longer holds what was asked for, it holds what the walls allowed.
+ * Returning it there sets the result to the value it already had, which is why the option did
+ * nothing at all. Answering at {@code HEAD} skips the walk entirely, and reads the wanted distance
+ * from the module rather than from the parameter, so it does not depend on whether the injection
+ * above it has run yet.
  */
 @Mixin(Camera.class)
 public class CameraMixin {
@@ -35,11 +39,12 @@ public class CameraMixin {
         return mod.distance();
     }
 
-    @Inject(method = "getMaxZoom(F)F", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getMaxZoom(F)F", at = @At("HEAD"), cancellable = true)
     private void diego$clip(float requested, CallbackInfoReturnable<Float> cir) {
         CustomF5 mod = CustomF5.INSTANCE;
-        if (mod != null && mod.isEnabled() && mod.cameraClip()) {
-            cir.setReturnValue(requested);
+        if (mod == null || !mod.isEnabled() || !mod.cameraClip()) {
+            return;
         }
+        cir.setReturnValue(mod.customDistance() ? mod.distance() : requested);
     }
 }

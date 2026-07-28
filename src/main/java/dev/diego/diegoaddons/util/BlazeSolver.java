@@ -93,7 +93,7 @@ public final class BlazeSolver {
             }
         }
 
-        Boolean useHighest = highestFirst != null ? highestFirst : mod.blazeFallbackOrder();
+        Boolean useHighest = highestFirst;
         if (useHighest == null) {
             return;
         }

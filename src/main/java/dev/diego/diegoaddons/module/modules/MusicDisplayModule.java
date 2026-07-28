@@ -56,6 +56,9 @@ public class MusicDisplayModule extends HudModule {
         settings.add(hideWhenPaused);
         settings.add(progress);
         settings.add(cover);
+        // The shared text chip offers this; this element lays its rows out itself and never asks,
+        // so the row would have been a switch wired to nothing.
+        settings.remove(centered);
     }
 
     @Override

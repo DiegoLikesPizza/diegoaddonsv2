@@ -20,6 +20,7 @@
     "ForceNametagMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",
+    "LightmapMixin",
     "LivingEntitySwingMixin",
     "ScoreboardSidebarMixin"
   ],

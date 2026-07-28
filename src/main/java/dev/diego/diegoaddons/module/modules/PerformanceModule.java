@@ -33,7 +33,7 @@ public class PerformanceModule extends HudModule {
     private final BooleanSetting showIp = new BooleanSetting(this, "ip", "Server IP", true);
 
     public PerformanceModule() {
-        super("performance", "Performance", "Combined FPS / ping / TPS / version / IP readout.");
+        super("performance", "Performance HUD", "Combined FPS / ping / TPS / version / IP readout.");
         settings.add(showFps);
         settings.add(showPing);
         settings.add(showVersion);

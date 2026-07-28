@@ -43,14 +43,6 @@ public class PuzzleSolversModule extends Module {
             new BooleanSetting(this, "waterShort", "Water Board: short route", false);
     private final BooleanSetting tpMaze =
             new BooleanSetting(this, "tpMaze", "Teleport Maze", true);
-    /**
-     * Only consulted when the puzzle's own instruction text was not found. Off means "do not guess":
-     * a wrong order is worse than no highlight, since it reads as confident and is not.
-     */
-    private final BooleanSetting blazeGuess =
-            new BooleanSetting(this, "blazeGuess", "Blaze: guess order if unknown", false);
-    private final BooleanSetting blazeGuessHighest =
-            new BooleanSetting(this, "blazeHigh", "Blaze: guess highest first", true);
     /** Off by default: it speaks in party chat, which is not something to switch on silently. */
     private final BooleanSetting announceToParty =
             new BooleanSetting(this, "announce", "Announce in party chat", false);
@@ -83,8 +75,6 @@ public class PuzzleSolversModule extends Module {
         settings.add(waterBoard);
         settings.add(waterShort);
         settings.add(tpMaze);
-        settings.add(blazeGuess);
-        settings.add(blazeGuessHighest);
         settings.add(announceToParty);
         INSTANCE = this;
     }
@@ -139,11 +129,6 @@ public class PuzzleSolversModule extends Module {
 
     public boolean blazeShowAll() {
         return blazeShowAll.get();
-    }
-
-    /** The fallback order, or null when guessing is switched off. */
-    public Boolean blazeFallbackOrder() {
-        return blazeGuess.get() ? blazeGuessHighest.get() : null;
     }
 
     public boolean announceToParty() {
