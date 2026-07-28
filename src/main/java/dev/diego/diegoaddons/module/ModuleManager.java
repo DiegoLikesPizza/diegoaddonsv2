@@ -176,6 +176,8 @@ public final class ModuleManager {
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             dev.diego.diegoaddons.util.SkyblockHud.tick(mc);
             dev.diego.diegoaddons.util.DungeonState.tick(mc);
+            // Before anything reads the room grid: has the run changed under us?
+            dev.diego.diegoaddons.util.DungeonRun.tick(mc);
             dev.diego.diegoaddons.util.SlayerState.tick(mc);
             dev.diego.diegoaddons.util.CrystalHollows.tick(mc);
             // Room detection is shared by every dungeon solver and the map, so it ticks here once -
@@ -288,7 +290,8 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.ChatCompactor.reset();
             PuzzleSolvers.reset();
             dev.diego.diegoaddons.util.BlazeSolver.reset();
-            dev.diego.diegoaddons.util.DungeonRooms.reset();
+            dev.diego.diegoaddons.util.DungeonRun.clear();
+            dev.diego.diegoaddons.util.DungeonRun.forget();
             dev.diego.diegoaddons.util.DungeonState.reset();
             dev.diego.diegoaddons.util.SlayerState.reset();
             dev.diego.diegoaddons.util.VoidgloomSlayer.reset();

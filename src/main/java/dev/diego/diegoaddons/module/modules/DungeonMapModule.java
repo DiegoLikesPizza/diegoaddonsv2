@@ -36,6 +36,9 @@ import java.util.Locale;
  * as an overlay and never affect the layout. Players come from their world positions.
  */
 public class DungeonMapModule extends HudModule {
+    /** So a run change can drop the seams without going through the module list. */
+    public static DungeonMapModule INSTANCE;
+
     private static final int ROOMS = 6;      // rooms per axis (even cells of the 11x11 grid)
     private static final int ROOM = 15;      // room square, px
     private static final int GAP = 4;        // seam width, px
@@ -96,6 +99,7 @@ public class DungeonMapModule extends HudModule {
         settings.add(statCrypts);
         settings.add(statMimic);
         settings.add(statPrince);
+        INSTANCE = this;
     }
 
     @Override
@@ -193,6 +197,13 @@ public class DungeonMapModule extends HudModule {
             }
         }
         return false;
+    }
+
+    /** Drops every seam, so the next run reads its own. Called when the run changes. */
+    public static void forgetSeams() {
+        if (INSTANCE != null) {
+            INSTANCE.clearSeams();
+        }
     }
 
     private void clearSeams() {

@@ -124,8 +124,16 @@ public final class DungeonState {
     }
 
     public static void reset() {
+        resetRun();
         inDungeons = false;
         floor = "";
+    }
+
+    /**
+     * Forgets this run's tally while staying in the dungeon - for when one run ends and the next
+     * begins without ever disconnecting, which is the normal way to play more than one.
+     */
+    public static void resetRun() {
         secretsFound = 0;
         secretsPercent = 0;
         crypts = 0;
