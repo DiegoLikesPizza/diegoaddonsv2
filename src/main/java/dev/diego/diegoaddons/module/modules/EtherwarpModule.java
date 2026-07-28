@@ -34,6 +34,9 @@ public class EtherwarpModule extends Module {
             new CycleSetting(this, "soundType", "Sound", 0, "Pling", "Bell", "Harp", "Anvil", "Orb");
     private final NumberSetting soundPitch =
             new NumberSetting(this, "soundPitch", "Sound pitch", 1.6, 0.5, 2.0, 0.1);
+    /** Temporary: says in chat what the helper sees, to find out why a highlight does not appear. */
+    private final BooleanSetting debug =
+            new BooleanSetting(this, "debug", "Debug (say what it sees)", false);
 
     public EtherwarpModule() {
         super("etherwarp", Category.MISC, "Etherwarp Helper",
@@ -42,6 +45,7 @@ public class EtherwarpModule extends Module {
         settings.add(sound);
         settings.add(soundType);
         settings.add(soundPitch);
+        settings.add(debug);
         INSTANCE = this;
     }
 
@@ -57,6 +61,10 @@ public class EtherwarpModule extends Module {
 
     public float soundPitch() {
         return (float) soundPitch.get();
+    }
+
+    public boolean debug() {
+        return debug.get();
     }
 
     @Override

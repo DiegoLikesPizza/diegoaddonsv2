@@ -209,7 +209,11 @@ public final class WaterSolver {
         // puzzle has already been started and the board no longer matches what was recorded.
         if (extended.length() != 3) {
             scanned = true;
-            say(mc, "Water Board: already started, cannot read the board");
+            // Say what was read, not what it was taken to mean. Every recorded solution is for a
+            // board with three slots out, so any other count is as likely to be a misread of the
+            // room as a puzzle somebody has already started - and only the reading tells them apart.
+            say(mc, "Water Board: read " + extended.length() + " wool slots, expected 3 ["
+                    + slotReadout(mc) + "]");
             return;
         }
         Integer pattern = patternOf(mc);
@@ -257,7 +261,13 @@ public final class WaterSolver {
         say(mc, sb.toString());
     }
 
-    /** The indices of the extended wool slots, e.g. "013". */
+    /**
+     * The indices of the extended wool slots, e.g. "013".
+     *
+     * <p>The probe asks for wool specifically rather than "not air". Any solid block counted before,
+     * so a probe landing a block off - on the frame around the slots, say - read as five extended
+     * and the solver announced the puzzle was already under way when nobody had touched it.
+     */
     private static String extendedSlots(Minecraft mc) {
         StringBuilder sb = new StringBuilder(3);
         for (int i = 0; i < WOOL.length; i++) {
@@ -265,9 +275,29 @@ public final class WaterSolver {
             if (pos == null) {
                 return null;
             }
-            if (!mc.level.getBlockState(pos).isAir()) {
+            if (mc.level.getBlockState(pos).is(net.minecraft.tags.BlockTags.WOOL)) {
                 sb.append(i);
             }
+        }
+        return sb.toString();
+    }
+
+    /** What the five probes actually found, so a bad reading can be reported instead of guessed at. */
+    private static String slotReadout(Minecraft mc) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < WOOL.length; i++) {
+            BlockPos pos = DungeonRooms.toWorld(WOOL[i]);
+            if (i > 0) {
+                sb.append(", ");
+            }
+            if (pos == null) {
+                sb.append(i).append("=?");
+                continue;
+            }
+            String name = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                    .getKey(mc.level.getBlockState(pos).getBlock()).getPath();
+            sb.append(i).append('=').append(name)
+                    .append('@').append(pos.getX()).append(',').append(pos.getY()).append(',').append(pos.getZ());
         }
         return sb.toString();
     }

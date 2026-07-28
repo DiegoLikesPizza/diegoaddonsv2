@@ -138,12 +138,15 @@ public class DungeonMapModule extends HudModule {
             for (int rx = 0; rx < ROOMS; rx++) {
                 int i = rx + rz * ROOMS;
 
-                // A seam that has already been resolved must not be reset to NONE just because its
-                // roof column has since unloaded out of view - that is what collapsed multi-tile
-                // rooms back to 1x1 when walking away. Only overwrite a seam once its column is loaded.
+                // A seam is read once and kept. Guarding on the chunk being loaded was not enough:
+                // past the server's own view distance the client holds chunks that are loaded and
+                // empty, so the roof probe found air and happily reported "no seam", which is what
+                // split multi-tile rooms back into single ones once you walked a few rooms away.
+                // The layout does not change during a run, so a seam that has resolved to anything
+                // is never asked again.
                 if (rx + 1 < ROOMS) {
                     int wx = rx * 32 - 169, wz = rz * 32 - 185;
-                    if (loaded(mc, wx, wz)) {
+                    if (rightSeam[i] == NONE && hasWorldHere(mc, wx, wz)) {
                         rightSeam[i] = seamKind(mc, wx, wz, rx, rz);
                     }
                 } else {
@@ -152,7 +155,7 @@ public class DungeonMapModule extends HudModule {
 
                 if (rz + 1 < ROOMS) {
                     int wx = rx * 32 - 185, wz = rz * 32 - 169;
-                    if (loaded(mc, wx, wz)) {
+                    if (downSeam[i] == NONE && hasWorldHere(mc, wx, wz)) {
                         downSeam[i] = seamKind(mc, wx, wz, rx, rz);
                     }
                 } else {
@@ -161,7 +164,7 @@ public class DungeonMapModule extends HudModule {
 
                 if (rx + 1 < ROOMS && rz + 1 < ROOMS) {
                     int wx = rx * 32 - 169, wz = rz * 32 - 169;
-                    if (loaded(mc, wx, wz)) {
+                    if (!centreFill[i] && hasWorldHere(mc, wx, wz)) {
                         centreFill[i] = roofHeight(mc, wx, wz) > 0;
                     }
                 } else {
@@ -171,9 +174,25 @@ public class DungeonMapModule extends HudModule {
         }
     }
 
-    /** True when the chunk holding this column is loaded, so a roof probe there is meaningful. */
-    private boolean loaded(Minecraft mc, int wx, int wz) {
-        return mc.level.hasChunkAt(new BlockPos(wx, 70, wz));
+    /**
+     * Whether there is real world at this column, so a roof probe there means something.
+     *
+     * <p>Asking whether the chunk is loaded is not the same question. Past the server's view distance
+     * the client still holds a chunk there - an empty one - and a probe into it reads air and reports
+     * "no roof, no seam" with total confidence. So the column has to actually contain something: a
+     * dungeon always has floor under it, at any point that is inside the dungeon at all.
+     */
+    private boolean hasWorldHere(Minecraft mc, int wx, int wz) {
+        if (!mc.level.hasChunkAt(new BlockPos(wx, 70, wz))) {
+            return false;
+        }
+        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        for (int y = mc.level.getMinY(); y < 140; y++) {
+            if (!mc.level.getBlockState(probe.set(wx, y, wz)).isAir()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void clearSeams() {
@@ -297,6 +316,35 @@ public class DungeonMapModule extends HudModule {
         return colorRoom(mc, primary, nx, nz);
     }
 
+    /**
+     * The colour of a tile, taken from Hypixel's own map rather than from the world.
+     *
+     * <p>The world scan only knows a room once you have been near enough to identify it, so tiles it
+     * had no answer for were left unpainted - while the seam between them was drawn anyway. That is
+     * what the stray lines across big rooms were: not the seam being wrong, the room around it being
+     * missing. The map item carries every room's type from the moment it is discovered, at any
+     * distance, so it decides the colour and the world scan is left to do what only it can - names
+     * and secret counts.
+     */
+    public static int tileColor(int rx, int rz, DungeonRooms.RoomData data) {
+        if (DungeonMapData.valid()) {
+            DungeonMapData.Type t = DungeonMapData.type(rx * 2, rz * 2);
+            if (t != null && t != DungeonMapData.Type.UNKNOWN) {
+                return typeColor(t.name());
+            }
+        }
+        return data == null ? 0 : typeColor(data.type());
+    }
+
+    /** Whether the map knows of a room on this tile at all. */
+    public static boolean tileIsRoom(int rx, int rz) {
+        if (!DungeonMapData.valid()) {
+            return false;
+        }
+        DungeonMapData.Type t = DungeonMapData.type(rx * 2, rz * 2);
+        return t != null && t != DungeonMapData.Type.UNKNOWN;
+    }
+
     /** The stats block as data, so the element can lay it out as text components. */
     public List<StatLine> statLines() {
         List<StatLine> out = new ArrayList<>();
@@ -332,6 +380,9 @@ public class DungeonMapModule extends HudModule {
             for (int rx = 0; rx < ROOMS; rx++) {
                 DungeonRooms.RoomData room = DungeonRooms.roomAt(mc, rx, rz);
                 sb.append(room == null ? '-' : room.type() == null ? '?' : room.type().charAt(0));
+                // The map's own answer is part of the layout too: a room it learns about while the
+                // world scan still has nothing has to redraw the grid.
+                sb.append(tileIsRoom(rx, rz) ? '+' : '.');
                 sb.append((char) ('a' + rightSeamAt(rx, rz)));
                 sb.append((char) ('a' + downSeamAt(rx, rz)));
                 sb.append(centreFillAt(rx, rz) ? '#' : '.');

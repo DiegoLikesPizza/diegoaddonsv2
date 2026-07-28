@@ -25,7 +25,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(ClientPacketListener.class)
 public class EtherwarpSoundMixin {
-    /** How far from the landing spot the sound may be and still be taken as this warp's. */
+    /**
+     * How far from you - or from the block you aimed at - the sound may be and still be taken as
+     * this warp's.
+     *
+     * <p>Checking only your own position was why the etherwarp itself was missed while a plain
+     * Instant Transmission was caught: the warp's sound is played where you land, which is the block
+     * you aimed at, and the sound packet arrives before the move does. So at that moment you are
+     * still standing at the far end of it - up to fifty-odd blocks away from its own noise.
+     */
     private static final double NEAR = 3.0;
 
     @Inject(method = "handleSoundEvent", at = @At("HEAD"), cancellable = true)
@@ -44,7 +52,17 @@ public class EtherwarpSoundMixin {
         if (mc.player == null) {
             return;
         }
-        if (mc.player.distanceToSqr(packet.getX(), packet.getY(), packet.getZ()) > NEAR * NEAR) {
+        boolean atPlayer =
+                mc.player.distanceToSqr(packet.getX(), packet.getY(), packet.getZ()) <= NEAR * NEAR;
+        boolean atTarget = false;
+        var target = EtherwarpHelper.target();
+        if (target != null) {
+            double dx = packet.getX() - (target.getX() + 0.5);
+            double dy = packet.getY() - (target.getY() + 1.0);
+            double dz = packet.getZ() - (target.getZ() + 0.5);
+            atTarget = dx * dx + dy * dy + dz * dz <= NEAR * NEAR;
+        }
+        if (!atPlayer && !atTarget) {
             return;
         }
         ci.cancel();

@@ -40,8 +40,12 @@ public final class EtherwarpHelper {
      */
     private static long armedAt = Long.MIN_VALUE;
     private static long ticks;
-    /** How long after aiming a valid warp its sound is still taken to be ours. */
-    private static final long ARMED_TICKS = 20;
+    /**
+     * How long after aiming a valid warp its sound is still taken to be ours. Kept short on purpose:
+     * a second was long enough to sneak, stand up, and fire a plain Instant Transmission - which
+     * then got the etherwarp's sound.
+     */
+    private static final long ARMED_TICKS = 5;
 
     private EtherwarpHelper() {
     }
@@ -75,7 +79,11 @@ public final class EtherwarpHelper {
         if (mod == null || !mod.isEnabled() || mc.player == null || mc.level == null) {
             return;
         }
-        if (!mc.player.isShiftKeyDown() || !holdsEtherwarpItem(mc)) {
+        boolean sneaking = mc.player.isShiftKeyDown();
+        boolean holding = holdsEtherwarpItem(mc);
+        if (!sneaking || !holding) {
+            debug(mc, mod, "sneaking=" + sneaking + " etherwarpItem=" + holding
+                    + " held=" + mc.player.getMainHandItem().getHoverName().getString());
             return;
         }
 
@@ -84,6 +92,7 @@ public final class EtherwarpHelper {
         BlockHitResult hit = mc.level.clip(new ClipContext(
                 eye, end, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, mc.player));
         if (hit.getType() != HitResult.Type.BLOCK) {
+            debug(mc, mod, "aiming at nothing within " + (int) RANGE + " blocks");
             return;
         }
         target = hit.getBlockPos();
@@ -92,10 +101,24 @@ public final class EtherwarpHelper {
             armedAt = ticks;
         }
 
+        debug(mc, mod, "target=" + target.toShortString() + " valid=" + valid
+                + " highlight=" + mod.highlight());
         if (mod.highlight()) {
             WorldRender.thickBox(new AABB(target), valid ? OK : BAD, EDGE, true);
         }
     }
+
+    /** Says what the helper is seeing, at most once a second, while the debug option is on. */
+    private static void debug(Minecraft mc, EtherwarpModule mod, String what) {
+        if (!mod.debug() || ticks - lastSaid < 20 || mc.gui == null) {
+            return;
+        }
+        lastSaid = ticks;
+        mc.gui.getChat().addClientSystemMessage(
+                net.minecraft.network.chat.Component.literal("§b[Etherwarp] §f" + what));
+    }
+
+    private static long lastSaid = Long.MIN_VALUE;
 
     /** The warp puts you on top of the block, so the two blocks above it have to be free. */
     private static boolean hasHeadroom(Minecraft mc, BlockPos pos) {

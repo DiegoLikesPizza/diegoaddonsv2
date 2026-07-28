@@ -102,7 +102,9 @@ public final class BlazeSolver {
                 ? Comparator.comparingInt((Blaze b) -> b.health).reversed()
                 : Comparator.comparingInt(b -> b.health));
 
-        int shown = mod.blazeShowAll() ? blazes.size() : Math.min(2, blazes.size());
+        // The whole order, always: knowing only the next two is what makes you stop and look
+        // again halfway through, and the colours already say which is next.
+        int shown = blazes.size();
         for (int i = 0; i < shown; i++) {
             int color = i == 0 ? NEXT : (i == 1 ? SECOND : REST);
             WorldRender.thickBox(blazes.get(i).box, color, EDGE, true);

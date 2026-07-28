@@ -25,8 +25,6 @@ public class PuzzleSolversModule extends Module {
             new BooleanSetting(this, "tictactoe", "Tic Tac Toe", true);
     private final BooleanSetting blaze =
             new BooleanSetting(this, "blaze", "Higher Or Lower (Blaze)", true);
-    private final BooleanSetting blazeShowAll =
-            new BooleanSetting(this, "blazeAll", "Blaze: show whole order", true);
     private final BooleanSetting beams =
             new BooleanSetting(this, "beams", "Creeper Beams", true);
     private final BooleanSetting boulder =
@@ -66,7 +64,6 @@ public class PuzzleSolversModule extends Module {
         settings.add(weirdos);
         settings.add(tictactoe);
         settings.add(blaze);
-        settings.add(blazeShowAll);
         settings.add(beams);
         settings.add(boulder);
         settings.add(boulderShowAll);
@@ -125,10 +122,6 @@ public class PuzzleSolversModule extends Module {
 
     public boolean tpMaze() {
         return tpMaze.get();
-    }
-
-    public boolean blazeShowAll() {
-        return blazeShowAll.get();
     }
 
     public boolean announceToParty() {

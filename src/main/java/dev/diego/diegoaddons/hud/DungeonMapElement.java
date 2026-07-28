@@ -119,7 +119,7 @@ public class DungeonMapElement extends HudElement {
 
                 if (right == DungeonMapModule.MAP_SEP) {
                     field.add(block(x + room - BLEED, y, gap + BLEED * 2f, room,
-                            DungeonMapModule.colorOfType(map.seamType(mc, primary, rx + 1, rz))));
+                            seamColour(mc, rx, rz, rx + 1, rz, primary)));
                 } else if (right >= DungeonMapModule.MAP_DOOR_NORMAL) {
                     field.add(block(x + room, y + (room - bar) / 2f, gap, bar,
                             DungeonMapModule.colorOfDoor(right)));
@@ -127,7 +127,7 @@ public class DungeonMapElement extends HudElement {
 
                 if (down == DungeonMapModule.MAP_SEP) {
                     field.add(block(x, y + room - BLEED, room, gap + BLEED * 2f,
-                            DungeonMapModule.colorOfType(map.seamType(mc, primary, rx, rz + 1))));
+                            seamColour(mc, rx, rz, rx, rz + 1, primary)));
                 } else if (down >= DungeonMapModule.MAP_DOOR_NORMAL) {
                     field.add(block(x + (room - bar) / 2f, y + room, bar, gap,
                             DungeonMapModule.colorOfDoor(down)));
@@ -142,10 +142,24 @@ public class DungeonMapElement extends HudElement {
                         && map.rightSeamAt(rx, rz + 1) == DungeonMapModule.MAP_SEP;
                 if (interior || map.centreFillAt(rx, rz)) {
                     field.add(block(x + room - BLEED, y + room - BLEED, gap + BLEED * 2f, gap + BLEED * 2f,
-                            DungeonMapModule.colorOfType(map.seamType(mc, primary, rx + 1, rz + 1))));
+                            seamColour(mc, rx, rz, rx + 1, rz + 1, primary)));
                 }
             }
         }
+    }
+
+    /**
+     * The colour of the fill that joins two tiles of one room: the room's own, taken from whichever
+     * of the two tiles the map can answer for. A seam is only ever drawn between tiles of the same
+     * room, so either answer is the same colour.
+     */
+    private static int seamColour(Minecraft mc, int rx, int rz, int nx, int nz,
+                                  DungeonRooms.RoomData primary) {
+        int here = DungeonMapModule.tileColor(rx, rz, primary);
+        if (here != 0) {
+            return here;
+        }
+        return DungeonMapModule.tileColor(nx, nz, DungeonRooms.roomAt(mc, nx, nz));
     }
 
     private void buildRooms(Minecraft mc) {
@@ -157,14 +171,19 @@ public class DungeonMapElement extends HudElement {
         for (int rz = 0; rz < rooms; rz++) {
             for (int rx = 0; rx < rooms; rx++) {
                 DungeonRooms.RoomData data = DungeonRooms.roomAt(mc, rx, rz);
-                if (data == null) {
+                // The map item knows a room is there long before the world scan can identify it, so
+                // the tile is painted whenever either of them says so. Skipping the ones the scan
+                // had no answer for left the seam between them drawn against nothing - the stray
+                // lines across the big rooms were the room missing, not the seam.
+                int colour = DungeonMapModule.tileColor(rx, rz, data);
+                if (colour == 0) {
                     continue;
                 }
                 float x = roomX(rx);
                 float y = roomY(rz);
-                field.add(block(x, y, room, room, DungeonMapModule.colorOfType(data.type())));
+                field.add(block(x, y, room, room, colour));
 
-                if (!map.roomCorner(rx, rz)) {
+                if (data == null || !map.roomCorner(rx, rz)) {
                     continue;
                 }
                 if (map.showChecks() && states) {
@@ -243,6 +262,9 @@ public class DungeonMapElement extends HudElement {
             float half = DungeonMapModule.MAP_ROOM / 2f;
             for (Player p : mc.level.players()) {
                 boolean self = p == mc.player;
+                if (!self && !isRealPlayer(mc, p)) {
+                    continue;   // a mob wearing a player model, not somebody in your party
+                }
                 float ex = half + (float) ((p.getX() + 185.0) / 32.0) * stride;
                 float ez = half + (float) ((p.getZ() + 185.0) / 32.0) * stride;
                 if (ex < 0f || ex > DungeonMapModule.MAP_SIZE
@@ -270,6 +292,19 @@ public class DungeonMapElement extends HudElement {
             dots.get(i).visible(false);
             ticks.get(i).visible(false);
         }
+    }
+
+    /**
+     * Whether a player entity is a person rather than one of SkyBlock's mobs, which are very often
+     * player entities - which is why half a dungeon's mobs were turning up as party markers. A real
+     * account has a version-4 UUID and an entry in the player list; the server's mobs have neither.
+     */
+    private static boolean isRealPlayer(Minecraft mc, Player player) {
+        if (mc.getConnection() == null) {
+            return false;
+        }
+        return player.getUUID().version() == 4
+                && mc.getConnection().getPlayerInfo(player.getUUID()) != null;
     }
 
     private void marker(int index) {
