@@ -53,6 +53,7 @@ import dev.diego.diegoaddons.module.modules.DungeonMinibossEspModule;
 import dev.diego.diegoaddons.module.modules.FishingRareAlertModule;
 import dev.diego.diegoaddons.module.modules.LeapOverlayModule;
 import dev.diego.diegoaddons.module.modules.CustomScoreboardModule;
+import dev.diego.diegoaddons.module.modules.CustomTitleScreenModule;
 import dev.diego.diegoaddons.module.modules.PlayerEspModule;
 import dev.diego.diegoaddons.module.modules.ShowHiddenMobsModule;
 import dev.diego.diegoaddons.module.modules.SlotLockModule;
@@ -129,6 +130,8 @@ public final class ModuleManager {
         register(new InventoryButtonsModule(), false);
         register(new ChatModule(), false);
         register(new ShowHiddenMobsModule(), false);
+        // On by default: it was asked for as the menu, not as an option to go looking for.
+        register(new CustomTitleScreenModule(), true);
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);
