@@ -57,6 +57,7 @@ import dev.diego.diegoaddons.module.modules.CustomScoreboardModule;
 import dev.diego.diegoaddons.module.modules.PlayerEspModule;
 import dev.diego.diegoaddons.module.modules.ShowHiddenMobsModule;
 import dev.diego.diegoaddons.module.modules.SlotLockModule;
+import dev.diego.diegoaddons.module.modules.TitleScreenModule;
 import dev.diego.diegoaddons.module.modules.SlayerBossHighlightModule;
 import dev.diego.diegoaddons.module.modules.SlayerMinibossEspModule;
 import dev.diego.diegoaddons.module.modules.VoidgloomSlayerModule;
@@ -131,6 +132,7 @@ public final class ModuleManager {
         register(new ChatModule(), false);
         register(new ShowHiddenMobsModule(), false);
         register(new BorderlessFullscreenModule(), false);
+        register(new TitleScreenModule(), true);
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);

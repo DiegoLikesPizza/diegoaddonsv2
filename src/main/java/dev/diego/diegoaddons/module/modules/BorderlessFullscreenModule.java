@@ -25,6 +25,14 @@ import java.nio.IntBuffer;
 public class BorderlessFullscreenModule extends Module {
     public static BorderlessFullscreenModule INSTANCE;
 
+    private final dev.diego.diegoaddons.module.BooleanSetting keepRunning =
+            new dev.diego.diegoaddons.module.BooleanSetting(this, "keepRunning",
+                    "Keep playing when unfocused", true);
+
+    /** Whether the mouse was grabbed when focus went, so it can be taken back when focus returns. */
+    private boolean wasGrabbed;
+    private boolean wasFocused = true;
+
     /** Where the window was before it was made borderless, so it can be put back. */
     private int savedX;
     private int savedY;
@@ -35,7 +43,41 @@ public class BorderlessFullscreenModule extends Module {
     public BorderlessFullscreenModule() {
         super("borderless", Category.RENDER, "Borderless Fullscreen",
                 "Fill the screen with a borderless window instead of exclusive fullscreen.");
+        settings.add(keepRunning);
         INSTANCE = this;
+    }
+
+    /** Whether losing focus should be a non-event rather than a pause. */
+    public boolean keepRunning() {
+        return keepRunning.get();
+    }
+
+    /**
+     * Hands the mouse back to the desktop the moment focus goes, and takes it again when it returns.
+     *
+     * <p>Suppressing the pause menu is only half of "stop taking my input": the cursor is still
+     * captured, so the Start menu opens behind a game that is quietly eating the mouse. Vanilla only
+     * lets go because the pause screen opens - with no pause screen, nothing lets go.
+     */
+    @Override
+    public void onClientTick(Minecraft mc) {
+        if (!keepRunning.get() || mc.getWindow() == null) {
+            return;
+        }
+        boolean focused = mc.getWindow().isFocused();
+        if (focused == wasFocused) {
+            return;
+        }
+        wasFocused = focused;
+        if (!focused) {
+            wasGrabbed = mc.mouseHandler.isMouseGrabbed();
+            if (wasGrabbed) {
+                mc.mouseHandler.releaseMouse();
+            }
+        } else if (wasGrabbed && mc.screen == null && mc.level != null) {
+            mc.mouseHandler.grabMouse();
+            wasGrabbed = false;
+        }
     }
 
     @Override
