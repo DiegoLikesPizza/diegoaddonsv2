@@ -79,11 +79,28 @@ public class AutoCloseChestModule extends Module {
         return false;
     }
 
-    /** Dungeon secret chests are plain chest screens; the title is how they are told from menus. */
+    /**
+     * Dungeon secret chests are plain chest screens; the title is how they are told from the
+     * hundreds of menus SkyBlock builds out of chests.
+     *
+     * <p>The title is stripped of colour codes first. Comparing the raw string meant a title the
+     * server had coloured never matched anything, and the feature simply never fired - which is
+     * indistinguishable from it being broken. What it declined is logged once per container, so a
+     * title that still does not match can be read off rather than guessed at.
+     */
     private boolean isChest(AbstractContainerScreen<?> cs) {
-        String title = cs.getTitle().getString().trim();
-        return title.equals("Chest") || title.equals("Large Chest");
+        String title = dev.diego.diegoaddons.util.LegacyText.strip(cs.getTitle().getString()).trim();
+        boolean chest = title.equals("Chest") || title.equals("Large Chest");
+        if (!chest && cs.getMenu().containerId != declined) {
+            declined = cs.getMenu().containerId;
+            dev.diego.diegoaddons.DiegoAddonsV2Client.LOGGER.info(
+                    "[DiegoAddons] Auto Close Chests ignored a container titled \"{}\"", title);
+        }
+        return chest;
     }
+
+    /** The container already logged as "not a chest", so it is said once and not every tick. */
+    private int declined = -1;
 
     private void forget() {
         watchedMenu = -1;

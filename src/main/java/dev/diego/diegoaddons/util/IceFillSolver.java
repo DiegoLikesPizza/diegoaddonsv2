@@ -39,7 +39,14 @@ public final class IceFillSolver {
     /** How many ticks to wait before re-attempting a scan that turned up nothing. */
     private static final int RETRY_TICKS = 10;
 
-    private static final List<Vec3> PATH = new ArrayList<>();
+    /**
+     * One path per floor, kept apart.
+     *
+     * <p>All three used to go into a single list and be drawn as one run of connected points, which
+     * put a line from where each floor's route ends to where the next one begins - across the room,
+     * through the wall, over ice you must not step on. Three routes are three lines.
+     */
+    private static final List<List<Vec3>> PATHS = new ArrayList<>();
     private static String lastRoom;
     private static boolean scanned;
     private static int retryIn;
@@ -48,7 +55,7 @@ public final class IceFillSolver {
     }
 
     public static void reset() {
-        PATH.clear();
+        PATHS.clear();
         lastRoom = null;
         scanned = false;
         retryIn = 0;
@@ -71,7 +78,7 @@ public final class IceFillSolver {
             lastRoom = room;
             scanned = false;
             retryIn = 0;
-            PATH.clear();
+            PATHS.clear();
         }
         // Keep trying (throttled) until a path is actually found: the floors' blocks may not be
         // readable the instant the room resolves, and a single early miss must not give up for good.
@@ -85,8 +92,8 @@ public final class IceFillSolver {
                 }
             }
         }
-        if (!PATH.isEmpty()) {
-            WorldRender.lines(PATH, COLOR);
+        for (List<Vec3> path : PATHS) {
+            WorldRender.lines(path, COLOR);
         }
     }
 
@@ -98,7 +105,7 @@ public final class IceFillSolver {
             return;
         }
         List<List<List<int[]>>> patterns = shortRoute ? hard : easy;
-        PATH.clear();
+        PATHS.clear();
 
         for (int floor = 0; floor < identifiers.size(); floor++) {
             List<List<int[]>> candidates = identifiers.get(floor);
@@ -114,19 +121,23 @@ public final class IceFillSolver {
                 }
                 if (mc.level.getBlockState(mustBeAir).isAir()
                         && !mc.level.getBlockState(mustBeSolid).isAir()) {
+                    List<Vec3> path = new ArrayList<>();
                     for (int[] p : patterns.get(floor).get(i)) {
                         BlockPos w = DungeonRooms.toWorld(pos(p));
                         if (w != null) {
                             // Slightly above the floor so the line is not buried in the ice.
-                            PATH.add(new Vec3(w.getX() + 0.5, w.getY() + 0.1, w.getZ() + 0.5));
+                            path.add(new Vec3(w.getX() + 0.5, w.getY() + 0.1, w.getZ() + 0.5));
                         }
+                    }
+                    if (!path.isEmpty()) {
+                        PATHS.add(path);
                     }
                     break;
                 }
             }
         }
         // Only consider the room solved once a path was built; otherwise the caller retries.
-        if (!PATH.isEmpty()) {
+        if (!PATHS.isEmpty()) {
             scanned = true;
         }
     }

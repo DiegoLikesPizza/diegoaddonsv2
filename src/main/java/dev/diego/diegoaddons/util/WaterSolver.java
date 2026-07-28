@@ -207,6 +207,12 @@ public final class WaterSolver {
         }
         // Three extended slots is what every recorded solution assumes; anything else means the
         // puzzle has already been started and the board no longer matches what was recorded.
+        if (extended.isEmpty()) {
+            // Not one wool anywhere: the room's blocks have not arrived yet. Every probe reading air
+            // is what a room looks like before it loads, and announcing "already started" for it was
+            // simply wrong - so wait and look again instead.
+            return;
+        }
         if (extended.length() != 3) {
             scanned = true;
             // Say what was read, not what it was taken to mean. Every recorded solution is for a
