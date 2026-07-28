@@ -61,7 +61,19 @@ public class BorderlessFullscreenModule extends Module {
      */
     @Override
     public void onClientTick(Minecraft mc) {
-        if (!keepRunning.get() || mc.getWindow() == null) {
+        if (mc.getWindow() == null) {
+            return;
+        }
+        if (pending != 0 && mc.screen == null) {
+            int what = pending;
+            pending = 0;
+            if (what > 0) {
+                apply();
+            } else {
+                restore();
+            }
+        }
+        if (!keepRunning.get()) {
             return;
         }
         boolean focused = mc.getWindow().isFocused();
@@ -80,22 +92,27 @@ public class BorderlessFullscreenModule extends Module {
         }
     }
 
+    /**
+     * The window change waits for the screen to close.
+     *
+     * <p>You switch this on from the menu, and resizing the window out from under an open screen is
+     * what crashed the game: the screen is mid-layout, its scroll containers ask to be clipped to a
+     * box that no longer exists, and the clip is null. So the change is queued and applied on the
+     * first tick with nothing open - which is a moment later, when you have closed the menu to go
+     * and look at it anyway.
+     */
+    private int pending;   // +1 apply, -1 restore, 0 nothing
+
     @Override
     protected void onEnable() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.getWindow() == null) {
-            return;
-        }
-        mc.execute(this::apply);
+        pending = 1;
     }
 
     @Override
     protected void onDisable() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.getWindow() == null) {
-            return;
-        }
-        mc.execute(this::restore);
+        pending = -1;
+        // A module that is off does not tick, so this one cannot wait for a quiet moment.
+        flushPending();
     }
 
     /** Drops the border and grows the window to the monitor it is currently on. */
@@ -127,6 +144,19 @@ public class BorderlessFullscreenModule extends Module {
     }
 
     /** Puts the border and the old geometry back. */
+    /** Runs the queued change now - used on disable, since a disabled module stops ticking. */
+    public void flushPending() {
+        if (pending == 0) {
+            return;
+        }
+        int what = pending;
+        pending = 0;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null) {
+            mc.execute(what > 0 ? this::apply : this::restore);
+        }
+    }
+
     private void restore() {
         Minecraft mc = Minecraft.getInstance();
         long handle = mc.getWindow().handle();

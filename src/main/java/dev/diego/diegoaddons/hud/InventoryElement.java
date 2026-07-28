@@ -95,14 +95,6 @@ public class InventoryElement extends HudElement {
     private final List<Slot> grid = new ArrayList<>();
     private final List<Slot> hotbar = new ArrayList<>();
     private final List<ItemStack> shown = new ArrayList<>();
-    private Slot petSlot;
-    private ContainerComponent petCard;
-    private ContainerComponent petIconRow;
-    private ContainerComponent petNameRow;
-    private ContainerComponent petLevelRow;
-    private TextComponent petName;
-    private TextComponent petLevel;
-    private float petWidth;
 
     private String lastShape = "";
     private int lastSelected = -1;
@@ -133,7 +125,6 @@ public class InventoryElement extends HudElement {
         grid.clear();
         hotbar.clear();
         shown.clear();
-        petSlot = null;
         lastSelected = -1;
 
         asRow(root, 0f, SECTION_GAP).autoWidth().alignItems(GuiAlignment.CENTER).padding(PAD);
@@ -150,10 +141,8 @@ public class InventoryElement extends HudElement {
             }
             switch (section) {
                 case "armor" -> root.add(slotColumn(armor, 4));
-                case "player" -> root.add(playerModel());
                 case "equipment" -> root.add(slotColumn(equipment, 4));
                 case "storage" -> root.add(storage());
-                case "pet" -> root.add(petCard());
                 default -> {
                 }
             }
@@ -230,82 +219,7 @@ public class InventoryElement extends HudElement {
         if (inv.showArmor() || inv.showEquipment()) {
             h = Math.max(h, 4 * CELL + 3 * SLOT_GAP);
         }
-        if (inv.showPet()) {
-            h = Math.max(h, PET_ITEM + 2f + (PET_NAME_PX + 2f) + (PET_LINE + 2f));
-        }
         return h;
-    }
-
-    private ContainerComponent playerModel() {
-        float height = contentHeight();
-        float width = height * MODEL_ASPECT;
-        ContainerComponent holder = row(width, 0f);
-        holder.height(height).justifyContent(GuiAlignment.CENTER);
-        EntityModelComponent model = new EntityModelComponent();
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            model.playerUuid(mc.player.getUUID());
-        }
-        model.size(width, height);
-        // Solve RenderLib's own scale for "the body fills MODEL_FILL of the box height".
-        model.zoom(MODEL_FILL * height
-                / (RENDERLIB_FIT * PLAYER_BB_H * Math.min(width, height)));
-        model.yPivot(PLAYER_PIVOT);
-        model.yRotation(MODEL_FACING);
-        holder.add(model);
-        return holder;
-    }
-
-    private ContainerComponent petCard() {
-        petWidth = PET_MIN_W;
-        petCard = column(petWidth, 2f);
-        petCard.alignItems(GuiAlignment.CENTER);
-        petSlot = slot(PET_ITEM);
-        // The icon sits in a row of the card's full width so it stays over the middle of the name,
-        // whatever the name does to that width.
-        petIconRow = row(petWidth, 0f);
-        petIconRow.height(PET_ITEM);
-        petIconRow.add(petSlot.box());
-        centrePetIcon();
-        petCard.add(petIconRow);
-        petName = text("", Themes.current().text(), PET_NAME_PX)
-                .textAlignment(GuiTextAlignment.CENTER).lineHeight(LINE_HEIGHT).width(petWidth);
-        petLevel = small("", Themes.current().textMuted(), PET_LINE)
-                .textAlignment(GuiTextAlignment.CENTER).lineHeight(LINE_HEIGHT).width(petWidth);
-        petNameRow = textRow(petName, petWidth, PET_NAME_PX + 2f);
-        petLevelRow = textRow(petLevel, petWidth, PET_LINE + 2f);
-        petCard.add(petNameRow);
-        petCard.add(petLevelRow);
-        return petCard;
-    }
-
-    /** Widens the card so the name and the level line each stay on one row. */
-    private void fitPetCard(String name, String level) {
-        float wanted = Math.max(PET_MIN_W,
-                Math.max(width(name, PET_NAME_PX), width(level, PET_LINE)));
-        if (wanted == petWidth) {
-            return;
-        }
-        petWidth = wanted;
-        petCard.width(wanted);
-        petIconRow.width(wanted);
-        centrePetIcon();
-        petNameRow.width(wanted);
-        petLevelRow.width(wanted);
-        petName.width(wanted);
-        petLevel.width(wanted);
-    }
-
-    /**
-     * Puts the pet icon over the middle of the card by padding the row it sits in, rather than by
-     * asking the layout to centre it. Two goes at alignment - the row's {@code justifyContent}, the
-     * icon's {@code alignSelf} - both left it sitting off to one side, and a width is a width: the
-     * row is as wide as the card, its padding leaves exactly the icon's width in the middle, so
-     * there is nowhere else for the icon to go.
-     */
-    private void centrePetIcon() {
-        float side = Math.max(0f, (petWidth - PET_ITEM) / 2f);
-        petIconRow.padding(0f, side);
     }
 
     /** One slot: a box, the item centred in it, and the count label in its corner. */
@@ -356,17 +270,6 @@ public class InventoryElement extends HudElement {
         for (int h = 0; h < hotbar.size(); h++) {
             i = put(hotbar.get(h), bag.getItem(h), i);
         }
-        if (petSlot != null) {
-            put(petSlot, SkyblockHud.pet(), i);
-            SkyblockHud.PetInfo info = SkyblockHud.petInfo();
-            Theme t = Themes.current();
-            String name = info == null ? "No pet" : info.name();
-            String level = info == null ? "" : inv.levelText(info);
-            fitPetCard(name, level);
-            petName.text(name).color(GuiColors.of(info == null ? t.textFaint() : info.colour()));
-            petLevel.text(level).color(GuiColors.of(t.textMuted()));
-        }
-
         if (!hotbar.isEmpty()) {
             int selected = bag.getSelectedSlot();
             if (selected != lastSelected) {

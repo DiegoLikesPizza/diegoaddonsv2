@@ -48,6 +48,8 @@ public final class SkyblockHud {
 
     private static final ItemStack[] equipment = new ItemStack[4];
     private static boolean equipmentLocked = false;   // true once the *equipped* set has been captured
+    /** The wardrobe screen the lock belongs to; a new one starts the reading again. */
+    private static Object lastEquipmentScreen;
     private static ItemStack pet = ItemStack.EMPTY;
 
     /** False until the persisted equipment/pet have been restored this session. */
@@ -260,6 +262,13 @@ public final class SkyblockHud {
         }
 
         if (title.contains(EQUIPMENT_TITLE)) {
+            // The lock is meant to survive flipping between pages of one wardrobe, not the rest of
+            // the session: without this it never let go, so changing a piece left the HUD showing
+            // what you were wearing the first time you ever opened the menu.
+            if (screen != lastEquipmentScreen) {
+                lastEquipmentScreen = screen;
+                equipmentLocked = false;
+            }
             scanEquipment(slots, limit);
             persist(mc);
         } else if (title.contains(PETS_TITLE)) {

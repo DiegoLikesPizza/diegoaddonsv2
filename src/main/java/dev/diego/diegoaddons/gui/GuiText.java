@@ -61,7 +61,11 @@ public final class GuiText {
      * drawn properly.
      */
     private static GuiFont ttf(String file, int weight) {
-        return GuiFont.ttf(Identifier.fromNamespaceAndPath("diegoaddonsv2", "font/" + file + ".ttf"))
+        // No "font/" here: Minecraft's own TTF loader prefixes that, so naming it again asked for
+        // assets/diegoaddonsv2/font/font/... - which does not exist, so the id came back null and
+        // every label quietly fell back to the default font. The id is the same one the .json
+        // providers use in their "file" field.
+        return GuiFont.ttf(Identifier.fromNamespaceAndPath("diegoaddonsv2", file + ".ttf"))
                 .weight(weight);
     }
 

@@ -55,6 +55,8 @@ import dev.diego.diegoaddons.module.modules.DungeonMinibossEspModule;
 import dev.diego.diegoaddons.module.modules.FishingRareAlertModule;
 import dev.diego.diegoaddons.module.modules.LeapOverlayModule;
 import dev.diego.diegoaddons.module.modules.CustomScoreboardModule;
+import dev.diego.diegoaddons.module.modules.PlayerHudModule;
+import dev.diego.diegoaddons.module.modules.PetHudModule;
 import dev.diego.diegoaddons.module.modules.PlayerEspModule;
 import dev.diego.diegoaddons.module.modules.ShowHiddenMobsModule;
 import dev.diego.diegoaddons.module.modules.SlotLockModule;
@@ -135,6 +137,8 @@ public final class ModuleManager {
         register(new BorderlessFullscreenModule(), false);
         register(new TitleScreenModule(), true);
         register(new HydrationReminderModule(), false);
+        register(new PlayerHudModule(), false);
+        register(new PetHudModule(), false);
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);

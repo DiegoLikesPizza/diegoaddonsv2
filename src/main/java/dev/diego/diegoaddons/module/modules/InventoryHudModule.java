@@ -16,8 +16,8 @@ import java.util.List;
  * A HUD element that mirrors the player's inventory on screen as a grid of item slots, so you can
  * see your inventory without opening it.
  *
- * <p>The element is built from optional <b>sections</b> - armour, player model, equipment, the
- * storage grid and the pet card - laid out left to right in whatever order you arrange them in
+ * <p>The element is built from optional <b>sections</b> - armour, equipment and the storage grid -
+ * laid out left to right in whatever order you arrange them in
  * ({@link InventoryLayoutScreen}, from this feature's settings). Whichever section is tallest sets
  * the height and the storage grid grows its slots to match, so the element has no half-empty column.
  *
@@ -29,9 +29,7 @@ public class InventoryHudModule extends HudModule {
     private final BooleanSetting slotBoxes = new BooleanSetting(this, "slots", "Slot boxes", true);
     private final BooleanSetting hotbar = new BooleanSetting(this, "hotbar", "Show hotbar", false);
     private final BooleanSetting armor = new BooleanSetting(this, "armor", "Armor", false);
-    private final BooleanSetting playerModel = new BooleanSetting(this, "player", "Player model", false);
     private final BooleanSetting equipment = new BooleanSetting(this, "equipment", "Equipment (SkyBlock)", false);
-    private final BooleanSetting pet = new BooleanSetting(this, "pet", "Pet (SkyBlock)", false);
     private final BooleanSetting debugScan = new BooleanSetting(this, "debug", "Debug scan (log)", false);
     private final ActionSetting layout =
             new ActionSetting(this, "layout", "Section order", "Arrange", this::openLayoutEditor);
@@ -42,9 +40,7 @@ public class InventoryHudModule extends HudModule {
         settings.add(slotBoxes);
         settings.add(hotbar);
         settings.add(armor);
-        settings.add(playerModel);
         settings.add(equipment);
-        settings.add(pet);
         settings.add(layout);
         settings.add(debugScan);
     }
@@ -58,7 +54,7 @@ public class InventoryHudModule extends HudModule {
         if (mc.player == null || ConfigManager.get().sbHintShown) {
             return;
         }
-        if (!pet.get() && !equipment.get()) {
+        if (!equipment.get() && !petWanted()) {
             return;
         }
         mc.gui.getChat().addClientSystemMessage(Component.literal(
@@ -76,12 +72,6 @@ public class InventoryHudModule extends HudModule {
     @Override
     protected String value(Minecraft mc) {
         return null; // custom-drawn; see drawLocal
-    }
-
-    /** The pet's level line, as shown under its icon. */
-    private static String levelLine(SkyblockHud.PetInfo info) {
-        String lvl = info.level() >= 0 ? "Lvl " + info.level() : "Lvl ?";
-        return info.xp() == null ? lvl : lvl + "  " + info.xp();
     }
 
     // --- read by the RenderLib element -----------------------------------------------------------
@@ -102,21 +92,14 @@ public class InventoryHudModule extends HudModule {
         return armor.get();
     }
 
-    public boolean showPlayerModel() {
-        return playerModel.get();
-    }
-
     public boolean showEquipment() {
         return equipment.get();
     }
 
-    public boolean showPet() {
-        return pet.get();
-    }
-
-    /** The pet's level line, shared with the RenderLib element. */
-    public String levelText(SkyblockHud.PetInfo info) {
-        return levelLine(info);
+    /** Whether anything is asking for the pet cache - the pet HUD is its own module now. */
+    private static boolean petWanted() {
+        PetHudModule pet = PetHudModule.INSTANCE;
+        return pet != null && pet.isEnabled();
     }
 
     /**
@@ -125,23 +108,20 @@ public class InventoryHudModule extends HudModule {
      */
     public String sectionSignature() {
         return "" + background.get() + slotBoxes.get() + hotbar.get() + armor.get()
-                + playerModel.get() + equipment.get() + pet.get() + String.join(",", sectionOrder());
+                + equipment.get() + String.join(",", sectionOrder());
     }
 
     // --- section order ----------------------------------------------------------------------------
 
     /** The sections, in the order they are laid out in unless you rearrange them. */
-    public static final List<String> SECTIONS =
-            List.of("armor", "player", "equipment", "storage", "pet");
+    public static final List<String> SECTIONS = List.of("armor", "equipment", "storage");
 
     /** What a section is called in the arranging screen. */
     public static String sectionName(String section) {
         return switch (section) {
             case "armor" -> "Armor";
-            case "player" -> "Player model";
             case "equipment" -> "Equipment";
             case "storage" -> "Inventory";
-            case "pet" -> "Pet";
             default -> section;
         };
     }
@@ -150,9 +130,7 @@ public class InventoryHudModule extends HudModule {
     public boolean sectionShown(String section) {
         return switch (section) {
             case "armor" -> armor.get();
-            case "player" -> playerModel.get();
             case "equipment" -> equipment.get();
-            case "pet" -> pet.get();
             default -> true;
         };
     }
