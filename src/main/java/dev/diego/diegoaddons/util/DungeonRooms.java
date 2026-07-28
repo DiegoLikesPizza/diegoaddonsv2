@@ -71,6 +71,9 @@ public final class DungeonRooms {
      * every tick - the chunk may simply not have arrived yet, but hashing a full column is not free. */
     private static final int RETRY_TICKS = 20;
     private static int retryIn;
+    /** Ticks spent in a room that will not resolve, and the room already complained about. */
+    private static int unresolved;
+    private static int warnedTile = -1;
 
     private static int tileX = -1;
     private static int tileZ = -1;
@@ -152,6 +155,8 @@ public final class DungeonRooms {
 
     public static void reset() {
         IDENTIFIED.clear();
+        unresolved = 0;
+        warnedTile = -1;
         retryIn = 0;
         rotation = null;
         marker = null;
@@ -182,6 +187,9 @@ public final class DungeonRooms {
             marker = null;
             rotationTile = -1;
         }
+        if (key != warnedTile) {
+            unresolved = 0;
+        }
 
         RoomData known = IDENTIFIED.get(key);
         if (known != null) {
@@ -203,6 +211,31 @@ public final class DungeonRooms {
             retryIn = RETRY_TICKS;
         }
         current = found;
+        complain(mc, key);
+    }
+
+    /**
+     * Says once, in a room that will not resolve, that it will not resolve.
+     *
+     * <p>Every coordinate solver - Boulder, Creeper Beams, Ice Fill, Water Board, Teleport Maze -
+     * hangs off {@link #toWorld}, which needs both the room's identity and its rotation. When either
+     * is missing they all draw nothing, and they do it silently, which is indistinguishable from
+     * being switched off or broken. A room that has not resolved after a few seconds of standing in
+     * it is not going to, so it says so rather than leaving you wondering.
+     */
+    private static void complain(Minecraft mc, int key) {
+        if (current != null && rotation != null) {
+            unresolved = 0;
+            return;
+        }
+        if (++unresolved < 60 || key == warnedTile || mc.gui == null) {
+            return;
+        }
+        warnedTile = key;
+        String why = current == null ? "not in the room list" : "orientation not found";
+        mc.gui.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal(
+                "§b[DiegoAddons] §7This room could not be identified (" + why
+                        + ") - the coordinate solvers stay quiet here."));
     }
 
     /**

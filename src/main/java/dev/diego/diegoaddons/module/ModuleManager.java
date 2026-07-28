@@ -183,7 +183,7 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.DungeonRooms.tick(mc);
             for (Module m : MODULES) {
                 if (m.isEnabled()) {
-                    m.onClientTick(mc);
+                    tickSafely(m, mc);
                 }
             }
             // Both ESP features read the same name plates, so they share a single pass.
@@ -369,6 +369,28 @@ public final class ModuleManager {
             }
         }
         return out;
+    }
+
+    /** Modules already told off for throwing, so a broken one says so once and not sixty times a second. */
+    private static final java.util.Set<String> FAILED = new java.util.HashSet<>();
+
+    /**
+     * Ticks one module, and keeps its failure to itself.
+     *
+     * <p>The dispatch used to be a plain loop, so anything thrown by one module ended the tick for
+     * every module after it - a whole run of silent solvers with nothing in the log to say why, and
+     * the cause depending on registration order. A module that throws is now reported once, by name,
+     * and everything else carries on.
+     */
+    private static void tickSafely(Module m, Minecraft mc) {
+        try {
+            m.onClientTick(mc);
+        } catch (RuntimeException | LinkageError e) {
+            if (FAILED.add(m.id)) {
+                DiegoAddonsV2Client.LOGGER.error("[DiegoAddons] {} threw while ticking and was left running; "
+                        + "the rest of the modules are unaffected", m.id, e);
+            }
+        }
     }
 
     private static void renderHud(GuiGraphicsExtractor g, DeltaTracker delta) {

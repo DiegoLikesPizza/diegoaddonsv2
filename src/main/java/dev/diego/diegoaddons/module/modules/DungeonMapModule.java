@@ -187,7 +187,7 @@ public class DungeonMapModule extends HudModule {
             return false;
         }
         BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
-        for (int y = mc.level.getMinY(); y < 140; y++) {
+        for (int y = 60; y < 140; y++) {   // the band a dungeon is built in
             if (!mc.level.getBlockState(probe.set(wx, y, wz)).isAir()) {
                 return true;
             }
@@ -327,13 +327,20 @@ public class DungeonMapModule extends HudModule {
      * and secret counts.
      */
     public static int tileColor(int rx, int rz, DungeonRooms.RoomData data) {
+        // The world scan answers first. It reads the room's own marker, so when it knows a room it
+        // is right; the map is a palette lookup of a picture, and letting it overrule the scan had
+        // rooms changing type as you walked up to them. The map is here to fill the tiles the scan
+        // has not reached yet, which is what stopped the stray lines across big rooms.
+        if (data != null && data.type() != null) {
+            return typeColor(data.type());
+        }
         if (DungeonMapData.valid()) {
             DungeonMapData.Type t = DungeonMapData.type(rx * 2, rz * 2);
             if (t != null && t != DungeonMapData.Type.UNKNOWN) {
                 return typeColor(t.name());
             }
         }
-        return data == null ? 0 : typeColor(data.type());
+        return 0;
     }
 
     /** Whether the map knows of a room on this tile at all. */
@@ -455,7 +462,10 @@ public class DungeonMapModule extends HudModule {
 
     private static int doorColor(byte kind) {
         return switch (kind) {
-            case DOOR_WITHER -> 0xFF202020;
+            // Hypixel draws these black, which on a dark panel is indistinguishable from
+            // no door at all - they were simply invisible. Dark enough to still read as a
+            // wither door, light enough to exist.
+            case DOOR_WITHER -> 0xFF5A5A5A;
             case DOOR_BLOOD -> 0xFFD03030;
             case DOOR_ENTRANCE -> 0xFF3CA83C;
             default -> 0xFF6E5535;

@@ -76,10 +76,14 @@ public final class BlazeSolver {
 
         List<Blaze> blazes = new ArrayList<>();
         scan(mc, blazes);
-        if (blazes.size() < 2) {
+        if (blazes.isEmpty()) {
             debugPrinted = false;   // re-arm the diagnostic for the next blaze room
             return;   // not the puzzle, or it is already finished
         }
+        // One blaze left is still one blaze to shoot. Waiting for two meant the solver went quiet
+        // exactly when the last one was left, which is when a room full of dead blazes makes it
+        // hardest to see which is which. The room check below is what keeps a stray blaze elsewhere
+        // in the dungeon from lighting up.
 
         // TEMP DIAGNOSTIC: prints the detected room name + core hash once per blaze room so a
         // mislabelled variant (Higher reading as Lower) can be corrected in rooms.json. Remove once
