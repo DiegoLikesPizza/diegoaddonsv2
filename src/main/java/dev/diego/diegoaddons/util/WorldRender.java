@@ -63,7 +63,31 @@ public final class WorldRender {
         }
         registered = true;
         LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(WorldRender::draw);
+        // Labels go through RenderLib rather than the hand-rolled billboard that used to sit in
+        // draw(). Text in the world is more than a quad - it is the font atlas, the see-through
+        // pass, the camera-facing transform and the distance scaling - and RenderLib maintains all
+        // of that against the game's renderer. Ours drew nothing at all, and none of the features
+        // that ask for a label ever showed one.
+        com.render.api.RenderLibWorld.register(WorldRender::extractLabels);
     }
+
+    /** Emits this tick's labels through RenderLib, once per frame. */
+    private static void extractLabels(com.render.api.world.WorldRenderContext ctx) {
+        List<Label> labels = RENDER_LABELS;
+        if (labels.isEmpty()) {
+            return;
+        }
+        for (Label l : labels) {
+            ctx.text(l.text(), l.pos(), LABEL_MATERIAL, l.scale());
+        }
+    }
+
+    /** White, drawn through walls: a label you cannot see is not worth queuing. */
+    private static final com.render.api.world.WorldMaterial LABEL_MATERIAL =
+            com.render.api.world.WorldMaterial.builder()
+                    .color(com.render.api.RenderColor.WHITE)
+                    .depthMode(com.render.api.world.WorldDepthMode.SEE_THROUGH)
+                    .build();
 
     /** Queues an outlined box. Submit it every tick it should stay visible; {@link #flip()} keeps it
      * drawn on the frames in between. */
@@ -192,9 +216,8 @@ public final class WorldRender {
 
     private static void draw(LevelRenderContext ctx) {
         List<Box> boxes = RENDER;
-        List<Label> labels = RENDER_LABELS;
         List<Line> segments = RENDER_LINES;
-        if (boxes.isEmpty() && labels.isEmpty() && segments.isEmpty()) {
+        if (boxes.isEmpty() && segments.isEmpty()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
@@ -225,9 +248,6 @@ public final class WorldRender {
         } catch (Throwable ignored) {
             // A line-render hiccup must never take the whole batch (boxes/labels) down with it.
         }
-        for (Label l : labels) {
-            label(mc, pose, buffers, l, cam);
-        }
         buffers.endBatch();
     }
 
@@ -247,24 +267,6 @@ public final class WorldRender {
         // Each line vertex must carry a line width, or the buffer fails to flush and the game crashes.
         vc.addVertex(p, ax, ay, az).setColor(l.argb()).setNormal(p, nx, ny, nz).setLineWidth(2.0f);
         vc.addVertex(p, bx, by, bz).setColor(l.argb()).setNormal(p, nx, ny, nz).setLineWidth(2.0f);
-    }
-
-    /**
-     * Draws a label as a billboard: rotated by the camera so it always faces the viewer, and flipped
-     * on X and Y because text is laid out top-down while the world is not.
-     */
-    private static void label(Minecraft mc, PoseStack pose, MultiBufferSource.BufferSource buffers,
-                              Label l, Vec3 cam) {
-        var font = mc.font;
-        var text = net.minecraft.network.chat.Component.literal(l.text());
-        pose.pushPose();
-        pose.translate((float) (l.pos().x - cam.x), (float) (l.pos().y - cam.y), (float) (l.pos().z - cam.z));
-        pose.mulPose(mc.gameRenderer.getMainCamera().rotation());
-        pose.scale(-0.025f * l.scale(), -0.025f * l.scale(), 0.025f * l.scale());
-        font.drawInBatch(text, -font.width(text) / 2f, 0f, 0xFFFFFFFF, false,
-                pose.last().pose(), buffers, net.minecraft.client.gui.Font.DisplayMode.SEE_THROUGH,
-                0, 15728880);
-        pose.popPose();
     }
 
     /** The six faces of a box, wound so it is solid from any side. */
