@@ -51,6 +51,23 @@ public final class GuiText {
     }
 
     /**
+     * A label that wraps inside {@code width} - for copy rather than for a name.
+     *
+     * <p>Wrapping is the default RenderLib behaviour that {@link #label} exists to avoid, so this is
+     * simply a label handed the width to wrap at rather than the width it measured.
+     */
+    public static TextComponent paragraph(String s, int color, float scale, float width) {
+        return new TextComponent().text(s).color(GuiColors.of(color)).font(BODY)
+                .textScalePixels(scale).width(width);
+    }
+
+    /** How tall {@link #paragraph} comes out at that width, in whole lines. */
+    public static float paragraphHeight(String s, float scale, float width) {
+        int lines = Math.max(1, (int) Math.ceil(width(s, scale) / width));
+        return lines * scale * 1.45f;
+    }
+
+    /**
      * A symbol drawn in Minecraft's own font. The bundled Poppins faces carry no glyph for the
      * category icons or the close cross, so through {@link #label} they come out as tofu boxes.
      */

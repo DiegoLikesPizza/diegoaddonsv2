@@ -58,12 +58,23 @@ public abstract class DiegoView extends GuiView {
                 .borderWidth(2f).borderColor(GuiColors.of(t.border()))
                 .clipChildren(true);
         root().add(panel);
-        panel.add(header());
-        content(panelW, panelH - HEADER_H);
+        if (showHeader()) {
+            panel.add(header());
+        }
+        content(panelW, showHeader() ? panelH - HEADER_H : panelH);
     }
 
     /** Fills the panel below the header. Called once per build. */
     protected abstract void content(float width, float height);
+
+    /**
+     * Whether the standard title-and-close bar is drawn. A screen that is its own front page - the
+     * welcome - says what it is by its own content, and a Close button on it would be a third way
+     * out beside the two it already offers.
+     */
+    protected boolean showHeader() {
+        return true;
+    }
 
     private ContainerComponent header() {
         // The header carries the panel's own radius: clipping the children was not enough to stop
