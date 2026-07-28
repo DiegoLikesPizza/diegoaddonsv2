@@ -33,6 +33,15 @@ public final class EtherwarpHelper {
 
     private static BlockPos target;
     private static boolean valid;
+    /**
+     * When a warp was last lined up, in client ticks. The sound swap needs to know that a warp was
+     * actually about to happen: the teleport sound arrives from the server a moment after the aim
+     * is released, by which time nothing is being aimed at any more.
+     */
+    private static long armedAt = Long.MIN_VALUE;
+    private static long ticks;
+    /** How long after aiming a valid warp its sound is still taken to be ours. */
+    private static final long ARMED_TICKS = 20;
 
     private EtherwarpHelper() {
     }
@@ -49,11 +58,18 @@ public final class EtherwarpHelper {
     public static void reset() {
         target = null;
         valid = false;
+        armedAt = Long.MIN_VALUE;
+    }
+
+    /** Whether a valid warp was lined up just now - see {@link #armedAt}. */
+    public static boolean armedRecently() {
+        return ticks - armedAt <= ARMED_TICKS;
     }
 
     /** Called every client tick while the module is on. */
     public static void tick(Minecraft mc) {
         EtherwarpModule mod = EtherwarpModule.INSTANCE;
+        ticks++;
         target = null;
         valid = false;
         if (mod == null || !mod.isEnabled() || mc.player == null || mc.level == null) {
@@ -72,8 +88,13 @@ public final class EtherwarpHelper {
         }
         target = hit.getBlockPos();
         valid = hasHeadroom(mc, target);
+        if (valid) {
+            armedAt = ticks;
+        }
 
-        WorldRender.thickBox(new AABB(target), valid ? OK : BAD, EDGE, true);
+        if (mod.highlight()) {
+            WorldRender.thickBox(new AABB(target), valid ? OK : BAD, EDGE, true);
+        }
     }
 
     /** The warp puts you on top of the block, so the two blocks above it have to be free. */

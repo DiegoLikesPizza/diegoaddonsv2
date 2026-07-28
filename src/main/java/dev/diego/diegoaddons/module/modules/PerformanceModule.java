@@ -5,7 +5,6 @@ import dev.diego.diegoaddons.module.HudModule;
 import dev.diego.diegoaddons.util.TpsTracker;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.multiplayer.ServerData;
 
 import java.util.ArrayList;
@@ -14,11 +13,16 @@ import java.util.Locale;
 
 /**
  * A combined performance / connection readout drawn as one multi-line HUD chip. Each metric - FPS,
- * ping, mod version, server TPS and server IP - has its own toggle in the module's settings, so you
- * pick exactly which rows appear. When no metric is enabled the chip hides itself.
+ * mod version, server TPS and server IP - has its own toggle in the module's settings, so you pick
+ * exactly which rows appear. When no metric is enabled the chip hides itself.
  *
- * <p>Server TPS is estimated by {@link TpsTracker} (fed from server time packets); ping comes from
- * the player list entry; the IP is the address of the current server (or "Singleplayer").
+ * <p>Server TPS is estimated by {@link TpsTracker} (fed from server time packets); the IP is the
+ * address of the current server (or "Singleplayer").
+ *
+ * <p>There is deliberately no ping row. A client cannot time a round trip of its own - the play
+ * protocol has no ping it may send - so the only latency available is the number the server hands
+ * out in the player list. Behind Hypixel's proxy that is measured from the backend server, which is
+ * why it read about 1 ms: a true measurement of a hop that is not the one you care about.
  */
 public class PerformanceModule extends HudModule {
     private static final String MOD_VERSION = FabricLoader.getInstance()
@@ -27,15 +31,13 @@ public class PerformanceModule extends HudModule {
             .orElse("1.0.0");
 
     private final BooleanSetting showFps = new BooleanSetting(this, "fps", "FPS", true);
-    private final BooleanSetting showPing = new BooleanSetting(this, "ping", "Ping", true);
     private final BooleanSetting showVersion = new BooleanSetting(this, "version", "Mod version", true);
     private final BooleanSetting showTps = new BooleanSetting(this, "tps", "Server TPS", true);
     private final BooleanSetting showIp = new BooleanSetting(this, "ip", "Server IP", true);
 
     public PerformanceModule() {
-        super("performance", "Performance HUD", "Combined FPS / ping / TPS / version / IP readout.");
+        super("performance", "Performance HUD", "Combined FPS / TPS / version / IP readout.");
         settings.add(showFps);
-        settings.add(showPing);
         settings.add(showVersion);
         settings.add(showTps);
         settings.add(showIp);
@@ -67,9 +69,6 @@ public class PerformanceModule extends HudModule {
         if (showFps.get()) {
             out.add(row("FPS", String.valueOf(mc.getFps())));
         }
-        if (showPing.get()) {
-            out.add(row("Ping", ping(mc, editor)));
-        }
         if (showVersion.get()) {
             out.add(row("Mod", MOD_VERSION));
         }
@@ -84,16 +83,6 @@ public class PerformanceModule extends HudModule {
 
     private String row(String label, String value) {
         return showLabel.get() ? label + ": " + value : value;
-    }
-
-    private String ping(Minecraft mc, boolean editor) {
-        if (mc.getConnection() != null && mc.player != null) {
-            PlayerInfo info = mc.getConnection().getPlayerInfo(mc.player.getUUID());
-            if (info != null) {
-                return info.getLatency() + " ms";
-            }
-        }
-        return editor ? "42 ms" : "—";
     }
 
     private String tps(boolean editor) {

@@ -32,6 +32,16 @@ public class DungeonMapElement extends HudElement {
     private static final float STAT_GAP = 5f;
     private static final float STAT_LINE = 9f;
     private static final float LABEL_PX = 7f;
+    /**
+     * How far a seam fill reaches into the two room tiles it joins.
+     *
+     * <p>The grid's numbers are whole pixels, but the element is drawn at whatever scale it is
+     * placed at, so a tile edge and the fill that continues it can land either side of the same
+     * device pixel and leave a hairline across the room - the lines that showed up on rooms spanning
+     * several tiles. Overlapping cannot open a gap, and the fill is the room's own colour, so the
+     * overlap is invisible.
+     */
+    private static final float BLEED = 0.5f;
 
     private final DungeonMapModule map;
 
@@ -108,7 +118,7 @@ public class DungeonMapElement extends HudElement {
                 byte down = map.downSeamAt(rx, rz);
 
                 if (right == DungeonMapModule.MAP_SEP) {
-                    field.add(block(x + room, y, gap, room,
+                    field.add(block(x + room - BLEED, y, gap + BLEED * 2f, room,
                             DungeonMapModule.colorOfType(map.seamType(mc, primary, rx + 1, rz))));
                 } else if (right >= DungeonMapModule.MAP_DOOR_NORMAL) {
                     field.add(block(x + room, y + (room - bar) / 2f, gap, bar,
@@ -116,7 +126,7 @@ public class DungeonMapElement extends HudElement {
                 }
 
                 if (down == DungeonMapModule.MAP_SEP) {
-                    field.add(block(x, y + room, room, gap,
+                    field.add(block(x, y + room - BLEED, room, gap + BLEED * 2f,
                             DungeonMapModule.colorOfType(map.seamType(mc, primary, rx, rz + 1))));
                 } else if (down >= DungeonMapModule.MAP_DOOR_NORMAL) {
                     field.add(block(x + (room - bar) / 2f, y + room, bar, gap,
@@ -131,7 +141,7 @@ public class DungeonMapElement extends HudElement {
                         && map.downSeamAt(rx + 1, rz) == DungeonMapModule.MAP_SEP
                         && map.rightSeamAt(rx, rz + 1) == DungeonMapModule.MAP_SEP;
                 if (interior || map.centreFillAt(rx, rz)) {
-                    field.add(block(x + room, y + room, gap, gap,
+                    field.add(block(x + room - BLEED, y + room - BLEED, gap + BLEED * 2f, gap + BLEED * 2f,
                             DungeonMapModule.colorOfType(map.seamType(mc, primary, rx + 1, rz + 1))));
                 }
             }

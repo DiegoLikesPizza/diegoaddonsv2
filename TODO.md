@@ -9,20 +9,19 @@ build, a deploy and a run in game before the next starts.
 
 - [x] **CustomF5** — camera clip does nothing
 - [x] **Fullbright** — does nothing
-- [~] **Performance HUD** — renamed; ping needs a decision (see below)
+- [x] **Performance HUD** — renamed; the ping row is gone (see the note below)
 - [x] **Music Display** — drop the "Centered" toggle (does nothing on the custom layout)
 - [x] **Puzzle Solvers** — Blaze guessing options removed ("show whole order" already existed)
 - [x] **Armor Hider** — stops hiding armour on mobs that use a player model
 
 ## Batch 2 — bugs that need real work
 
-- [ ] **Dungeon Map** — stray lines across rooms that span several tiles
-- [ ] **Etherwarp Helper** — remove the zoom settings; the sound setting *replaces* the teleport
-      sound instead of firing when ready; highlight the aimed block green when the warp would work
-      and red when it would not, only while sneaking with an Etherwarp item
-- [ ] **Slot Locking** — a locked hotbar slot cannot be dropped with the drop key while the
+- [x] **Dungeon Map** — stray lines across rooms that span several tiles
+- [x] **Etherwarp Helper** — zoom gone; the sound replaces the teleport's own; the highlight is a
+      setting of its own
+- [x] **Slot Locking** — a locked hotbar slot cannot be dropped with the drop key while the
       inventory is closed either
-- [ ] **Pet Display** — the pet icon still is not centred over its name
+- [x] **Pet Display** — the pet icon is centred by padding now, not by asking the layout
 
 ## Batch 3 — ESP and item drawing (shared groundwork first)
 
@@ -62,5 +61,5 @@ build, a deploy and a run in game before the next starts.
 - **Ping**: the client has no way to time a round trip of its own - the play protocol has no
   client-initiated ping, so the only number available is the one the server hands out
   (`PlayerInfo.setLatency`). On Hypixel that is measured behind the proxy, which is why it reads
-  1 ms. Options: leave it, drop the row, or read Hypixel's own `/ping` on a timer. Waiting on a call.
+  1 ms. **Decided: the row is gone** - better no number than a confident wrong one.
 - **Auto GFS custom items** - whether "custom item" means any item id, or SkyBlock items by name.

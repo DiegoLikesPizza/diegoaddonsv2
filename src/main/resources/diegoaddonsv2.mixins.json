@@ -15,13 +15,14 @@
     "ClientboundPingPacketMixin",
     "CustomHeadLayerMixin",
     "EffectsInInventoryMixin",
-    "EtherwarpZoomMixin",
+    "EtherwarpSoundMixin",
     "FontMixin",
     "ForceNametagMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",
     "LightmapMixin",
     "LivingEntitySwingMixin",
+    "PlayerDropMixin",
     "ScoreboardSidebarMixin"
   ],
   "injectors": {

@@ -264,9 +264,9 @@ public class InventoryElement extends HudElement {
         // The icon sits in a row of the card's full width so it stays over the middle of the name,
         // whatever the name does to that width.
         petIconRow = row(petWidth, 0f);
-        petIconRow.height(PET_ITEM).justifyContent(GuiAlignment.CENTER);
-        petSlot.box().alignSelf(GuiAlignment.CENTER);
+        petIconRow.height(PET_ITEM);
         petIconRow.add(petSlot.box());
+        centrePetIcon();
         petCard.add(petIconRow);
         petName = text("", Themes.current().text(), PET_NAME_PX)
                 .textAlignment(GuiTextAlignment.CENTER).lineHeight(LINE_HEIGHT).width(petWidth);
@@ -289,10 +289,23 @@ public class InventoryElement extends HudElement {
         petWidth = wanted;
         petCard.width(wanted);
         petIconRow.width(wanted);
+        centrePetIcon();
         petNameRow.width(wanted);
         petLevelRow.width(wanted);
         petName.width(wanted);
         petLevel.width(wanted);
+    }
+
+    /**
+     * Puts the pet icon over the middle of the card by padding the row it sits in, rather than by
+     * asking the layout to centre it. Two goes at alignment - the row's {@code justifyContent}, the
+     * icon's {@code alignSelf} - both left it sitting off to one side, and a width is a width: the
+     * row is as wide as the card, its padding leaves exactly the icon's width in the middle, so
+     * there is nowhere else for the icon to go.
+     */
+    private void centrePetIcon() {
+        float side = Math.max(0f, (petWidth - PET_ITEM) / 2f);
+        petIconRow.padding(0f, side);
     }
 
     /** One slot: a box, the item centred in it, and the count label in its corner. */

@@ -11,60 +11,61 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
 /**
- * Highlights the block an etherwarp would land you on while sneaking, green when the warp would work
- * and red when it would not. See {@link EtherwarpHelper} for what "would work" checks.
+ * Shows where an etherwarp would land you while you sneak with an etherwarp item, and optionally
+ * gives the warp itself a different sound.
  *
- * <p>The optional zoom narrows the field of view while aiming, which makes distant blocks easier to
- * pick out - the same reason a spyglass exists.
+ * <p>The highlight is green when the warp would work and red when it would not - see
+ * {@link EtherwarpHelper} for what "would work" means, which is mostly about the two blocks of
+ * headroom you cannot see from where you are standing.
+ *
+ * <p>The sound <b>replaces</b> the teleport's own noise rather than announcing that the aim has gone
+ * valid. A tone on becoming ready fired over and over while you swept the aim around; on the warp it
+ * lands once, when something actually happened. See
+ * {@link dev.diego.diegoaddons.mixin.EtherwarpSoundMixin}.
  */
 public class EtherwarpModule extends Module {
     public static EtherwarpModule INSTANCE;
 
-    private final BooleanSetting zoom =
-            new BooleanSetting(this, "zoom", "Zoom while aiming", false);
-    private final NumberSetting zoomAmount =
-            new NumberSetting(this, "zoomAmount", "Zoom strength", 1.5, 1.1, 4.0, 0.1);
+    private final BooleanSetting highlight =
+            new BooleanSetting(this, "highlight", "Highlight landing block", true);
     private final BooleanSetting sound =
-            new BooleanSetting(this, "sound", "Sound when ready", false);
+            new BooleanSetting(this, "sound", "Replace teleport sound", false);
     private final CycleSetting soundType =
             new CycleSetting(this, "soundType", "Sound", 0, "Pling", "Bell", "Harp", "Anvil", "Orb");
     private final NumberSetting soundPitch =
             new NumberSetting(this, "soundPitch", "Sound pitch", 1.6, 0.5, 2.0, 0.1);
 
-    /** Was the aim on a valid block last tick, so the sound fires once on becoming ready. */
-    private boolean wasValid;
-
     public EtherwarpModule() {
         super("etherwarp", Category.MISC, "Etherwarp Helper",
                 "Show where an etherwarp would land while sneaking.");
-        settings.add(zoom);
-        settings.add(zoomAmount);
+        settings.add(highlight);
         settings.add(sound);
         settings.add(soundType);
         settings.add(soundPitch);
         INSTANCE = this;
     }
 
-    /** The divisor to apply to the field of view, or 1 when the zoom is off or not aiming. */
-    public double zoomFactor() {
-        if (!zoom.get() || EtherwarpHelper.target() == null) {
-            return 1.0;
-        }
-        return zoomAmount.get();
+    /** Whether to draw the box on the aimed block. */
+    public boolean highlight() {
+        return highlight.get();
+    }
+
+    /** Whether the teleport's own sound should be swapped for the one picked here. */
+    public boolean replacesSound() {
+        return sound.get();
+    }
+
+    public float soundPitch() {
+        return (float) soundPitch.get();
     }
 
     @Override
     public void onClientTick(Minecraft mc) {
         EtherwarpHelper.tick(mc);
-        boolean valid = EtherwarpHelper.valid();
-        if (valid && !wasValid && sound.get() && mc.player != null) {
-            mc.player.playSound(chosenSound(), 1.0f, (float) soundPitch.get());
-        }
-        wasValid = valid;
     }
 
     /** The sound event picked by the cycle setting. */
-    private SoundEvent chosenSound() {
+    public SoundEvent chosenSound() {
         return switch (soundType.get()) {
             case 1 -> SoundEvents.NOTE_BLOCK_BELL.value();
             case 2 -> SoundEvents.NOTE_BLOCK_HARP.value();

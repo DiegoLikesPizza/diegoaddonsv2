@@ -19,6 +19,9 @@ import java.util.Set;
  * key, the drop key - so the action never reaches the server; no server-side mixin is needed.
  *
  * <p>Toggle a lock by pointing at a slot in any container screen and pressing the module's key.
+ *
+ * <p>The drop key is the one input that also has to be caught outside a screen, since with the
+ * inventory closed it never passes through one; see {@link dev.diego.diegoaddons.mixin.PlayerDropMixin}.
  */
 public final class SlotLocks {
     /** Player-inventory index of the off-hand slot, for the swap-offhand key. */
@@ -113,6 +116,11 @@ public final class SlotLocks {
     private static boolean enabled() {
         SlotLockModule mod = SlotLockModule.INSTANCE;
         return mod != null && mod.isEnabled();
+    }
+
+    /** Whether locks are being enforced at all - read from outside, by the drop-key mixin. */
+    public static boolean locksEnabled() {
+        return enabled();
     }
 
     /** The slot under a GUI-space point, or null. */
