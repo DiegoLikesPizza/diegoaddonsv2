@@ -1,7 +1,7 @@
 package dev.diego.diegoaddons.util;
 
 import dev.diego.diegoaddons.mixin.ChatComponentAccessor;
-import dev.diego.diegoaddons.module.modules.ChatCompactModule;
+import dev.diego.diegoaddons.module.modules.ChatModule;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
@@ -41,8 +41,8 @@ public final class ChatCompactor {
      *         the previous copy already removed from the chat
      */
     public static Component compact(ChatComponent chat, Component message) {
-        ChatCompactModule mod = ChatCompactModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || message == null) {
+        ChatModule mod = ChatModule.INSTANCE;
+        if (mod == null || !mod.compacting() || message == null) {
             return message;
         }
         String plain = strip(message.getString());

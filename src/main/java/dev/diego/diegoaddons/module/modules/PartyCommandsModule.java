@@ -19,6 +19,8 @@ import dev.diego.diegoaddons.util.PartyCommands;
 public class PartyCommandsModule extends Module {
     public static PartyCommandsModule INSTANCE;
 
+
+
     private final BooleanSetting transfer =
             new BooleanSetting(this, "transfer", "!pt / !transfer", true);
     private final BooleanSetting warp =
@@ -33,6 +35,9 @@ public class PartyCommandsModule extends Module {
             new BooleanSetting(this, "promote", "!promote / !demote", false);
     private final BooleanSetting disband =
             new BooleanSetting(this, "disband", "!disband (ends the party)", false);
+    /** The ones that only ever answer: they say something in party chat and run nothing. */
+    private final BooleanSetting fun =
+            new BooleanSetting(this, "fun", "!8ball / !cf / !roll / !rps / !pick", true);
 
     public PartyCommandsModule() {
         super("partycommands", Category.MISC, "Party Commands",
@@ -44,6 +49,7 @@ public class PartyCommandsModule extends Module {
         settings.add(kick);
         settings.add(promote);
         settings.add(disband);
+        settings.add(fun);
         INSTANCE = this;
     }
 
@@ -73,5 +79,10 @@ public class PartyCommandsModule extends Module {
 
     public boolean allowDisband() {
         return disband.get();
+    }
+
+    /** Whether the answer-only commands are on. */
+    public boolean allowFun() {
+        return fun.get();
     }
 }

@@ -17,9 +17,7 @@ import dev.diego.diegoaddons.module.modules.FullbrightModule;
 import dev.diego.diegoaddons.module.modules.ItemRarityModule;
 import dev.diego.diegoaddons.module.modules.AutoGfsModule;
 import dev.diego.diegoaddons.module.modules.BetterIgnoreListModule;
-import dev.diego.diegoaddons.module.modules.ChatCompactModule;
-import dev.diego.diegoaddons.module.modules.ChatHistoryModule;
-import dev.diego.diegoaddons.module.modules.ChatSearchModule;
+import dev.diego.diegoaddons.module.modules.ChatModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
 import dev.diego.diegoaddons.module.modules.CustomEspModule;
@@ -128,9 +126,7 @@ public final class ModuleManager {
         register(new MusicDisplayModule(), false);
         register(new OldMasterStarsModule(), false);
         register(new InventoryButtonsModule(), false);
-        register(new ChatHistoryModule(), false);
-        register(new ChatSearchModule(), false);
-        register(new ChatCompactModule(), false);
+        register(new ChatModule(), false);
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);
@@ -257,7 +253,7 @@ public final class ModuleManager {
                 // of it and the slot highlight sits behind the item rather than over it.
                 ScreenEvents.afterBackground(screen).register((scr, g, mx, my, dt) -> {
                     dev.diego.diegoaddons.util.ItemRarity.render((AbstractContainerScreen<?>) scr, g);
-                    PartyFinder.render((AbstractContainerScreen<?>) scr, g);
+                    PartyFinder.render((AbstractContainerScreen<?>) scr, g, mx, my);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
                     // Inventory buttons are not drawn here any more - they are a RenderLib screen

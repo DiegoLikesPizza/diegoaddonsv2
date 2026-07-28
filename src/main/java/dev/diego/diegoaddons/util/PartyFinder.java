@@ -68,7 +68,8 @@ public final class PartyFinder {
         return t.contains("party finder");
     }
 
-    public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g) {
+    public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
+                              int mouseX, int mouseY) {
         PartyFinderModule mod = PartyFinderModule.INSTANCE;
         if (mod == null || !mod.isEnabled() || !isPartyFinder(screen)) {
             return;
@@ -90,6 +91,57 @@ public final class PartyFinder {
             }
         }
         drawToggles(screen, g, leftPos, topPos, acc.diego$imageWidth());
+        if (mod.showMissing()) {
+            drawMissing(screen, g, leftPos, topPos, mouseX, mouseY);
+        }
+    }
+
+    /**
+     * Names the classes nobody in the hovered listing is playing, beside the cursor.
+     *
+     * <p>The highlight only answers "does this party want what I picked". This answers the question
+     * you actually have while reading the list - what is this party short of - without making you
+     * count five names in the tooltip yourself.
+     */
+    private static void drawMissing(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
+                                    int leftPos, int topPos, int mouseX, int mouseY) {
+        List<Slot> slots = screen.getMenu().slots;
+        int chestCount = Math.max(0, slots.size() - PLAYER_INV_SLOTS);
+        for (int i = 0; i < chestCount && i < slots.size(); i++) {
+            Slot s = slots.get(i);
+            int x = leftPos + s.x;
+            int y = topPos + s.y;
+            if (mouseX < x || mouseX >= x + SLOT || mouseY < y || mouseY >= y + SLOT) {
+                continue;
+            }
+            ItemStack stack = s.getItem();
+            if (stack.isEmpty()
+                    || !LISTING.matcher(LegacyText.strip(stack.getHoverName().getString()).trim()).matches()) {
+                return;
+            }
+            List<String> taken = memberClasses(stack);
+            if (taken.isEmpty()) {
+                return;   // unreadable listing; saying "missing everything" would be a lie
+            }
+            List<String> missing = new ArrayList<>();
+            for (int c = 0; c < CLASSES.length; c++) {
+                if (!taken.contains(CLASSES[c])) {
+                    missing.add(CLASS_NAMES[c]);
+                }
+            }
+            Theme t = Themes.current();
+            boolean sm = ConfigManager.get().smoothCorners;
+            Minecraft mc = Minecraft.getInstance();
+            String line = missing.isEmpty() ? "Full party" : "Missing: " + String.join(", ", missing);
+            int w = mc.font.width(line) + 12;
+            int px = Math.min(mouseX + 10, screen.width - w - 2);
+            int py = Math.max(2, mouseY - 18);
+            UiRender.fillRounded(g, px, py, w, 16, 5, (0xEE << 24) | (t.surface() & 0x00FFFFFF), sm);
+            UiRender.strokeRounded(g, px, py, w, 16, 5, t.border(), sm);
+            g.text(mc.font, net.minecraft.network.chat.Component.literal(line), px + 6, py + 4,
+                    missing.isEmpty() ? t.textMuted() : t.text(), false);
+            return;
+        }
     }
 
     /** True when the listing has nobody playing any of the classes you selected. */

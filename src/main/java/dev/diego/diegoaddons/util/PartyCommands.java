@@ -62,7 +62,8 @@ public final class PartyCommands {
         String arg = parts.length > 1 ? parts[1] : sender;
 
         String toRun = resolve(mod, cmd, sender, arg);
-        if (toRun == null) {
+        String toSay = toRun != null ? null : fun(mod, cmd, sender, message);
+        if (toRun == null && toSay == null) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -76,9 +77,14 @@ public final class PartyCommands {
         if (mc.player == null) {
             return;
         }
-        mc.player.connection.sendCommand(toRun);
-        mc.gui.getChat().addClientSystemMessage(Component.literal(
-                "§b[DiegoAddons] §e" + sender + " §fran §e!" + cmd));
+        if (toRun != null) {
+            mc.player.connection.sendCommand(toRun);
+            mc.gui.getChat().addClientSystemMessage(Component.literal(
+                    "§b[DiegoAddons] §e" + sender + " §fran §e!" + cmd));
+        } else {
+            // The answer goes to the party, since the question was asked there.
+            mc.player.connection.sendCommand("pc " + toSay);
+        }
     }
 
     /**
@@ -100,6 +106,61 @@ public final class PartyCommands {
             case "unmute" -> mod.allowMute() ? "party unmute" : null;
             default -> null;
         };
+    }
+
+    /** The 8ball's repertoire, which is the traditional one. */
+    private static final String[] EIGHT_BALL = {
+            "It is certain", "Without a doubt", "You may rely on it", "Yes, definitely",
+            "As I see it, yes", "Most likely", "Signs point to yes", "Reply hazy, try again",
+            "Ask again later", "Better not tell you now", "Cannot predict now",
+            "Don't count on it", "My reply is no", "My sources say no", "Outlook not so good",
+            "Very doubtful",
+    };
+
+    private static final String[] RPS = {"Rock", "Paper", "Scissors"};
+
+    /**
+     * The commands that answer rather than do: they reply in party chat instead of running anything.
+     *
+     * <p>Kept apart from {@link #resolve} on purpose. Those hand someone a party command on your
+     * account; these hand them a sentence, so they sit behind one option rather than seven.
+     *
+     * @return what to say, or null when this is not one of them
+     */
+    private static String fun(PartyCommandsModule mod, String cmd, String sender, String message) {
+        if (!mod.allowFun()) {
+            return null;
+        }
+        String rest = message.length() > cmd.length() + 1
+                ? message.substring(cmd.length() + 1).trim() : "";
+        return switch (cmd) {
+            case "8ball" -> sender + ": " + pick(EIGHT_BALL);
+            case "coinflip", "cf" -> sender + " flipped " + (Math.random() < 0.5 ? "Heads" : "Tails");
+            case "rps" -> sender + ": " + pick(RPS);
+            case "dice", "roll" -> {
+                int sides = 6;
+                try {
+                    if (!rest.isEmpty()) {
+                        sides = Math.max(2, Math.min(1000, Integer.parseInt(rest.split("\\s+")[0])));
+                    }
+                } catch (NumberFormatException ignored) {
+                    // "!roll a lot" is a d6 like everything else
+                }
+                yield sender + " rolled " + (1 + (int) (Math.random() * sides)) + " / " + sides;
+            }
+            case "pick", "choose" -> {
+                String[] options = rest.split("\\s*(?:\\||,| or )\\s*");
+                if (rest.isEmpty() || options.length < 2) {
+                    yield null;   // nothing to pick between; say nothing rather than something silly
+                }
+                yield sender + ": " + pick(options).trim();
+            }
+            default -> null;
+        };
+    }
+
+    private static String pick(String[] from) {
+        return from[(int) (Math.random() * from.length)];
     }
 
     /** Clears the per-player cooldowns, e.g. on disconnect. */

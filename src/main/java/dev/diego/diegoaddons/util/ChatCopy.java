@@ -1,7 +1,7 @@
 package dev.diego.diegoaddons.util;
 
 import dev.diego.diegoaddons.mixin.ChatComponentAccessor;
-import dev.diego.diegoaddons.module.modules.ChatSearchModule;
+import dev.diego.diegoaddons.module.modules.ChatModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
@@ -31,8 +31,8 @@ public final class ChatCopy {
      * @return true when a message was copied, so the click should not also do anything else
      */
     public static boolean tryCopy(double mouseX, double mouseY) {
-        ChatSearchModule mod = ChatSearchModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || !mod.ctrlClickCopy()) {
+        ChatModule mod = ChatModule.INSTANCE;
+        if (mod == null || !mod.copyOnCtrlClick()) {
             return false;
         }
         Minecraft mc = Minecraft.getInstance();

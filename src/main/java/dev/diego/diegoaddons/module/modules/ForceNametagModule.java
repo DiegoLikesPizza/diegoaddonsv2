@@ -1,5 +1,6 @@
 package dev.diego.diegoaddons.module.modules;
 
+import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
 
@@ -11,9 +12,18 @@ import dev.diego.diegoaddons.module.Module;
 public class ForceNametagModule extends Module {
     public static ForceNametagModule INSTANCE;
 
+    private final BooleanSetting showOwn =
+            new BooleanSetting(this, "showOwn", "Show your own tag in F5", false);
+
     public ForceNametagModule() {
         super("forcenametag", Category.RENDER, "Force Nametag",
                 "Show player tags even when invisible or sneaking.");
+        settings.add(showOwn);
         INSTANCE = this;
+    }
+
+    /** Whether your own name plate is drawn while the camera is in third person. */
+    public boolean showOwn() {
+        return showOwn.get();
     }
 }

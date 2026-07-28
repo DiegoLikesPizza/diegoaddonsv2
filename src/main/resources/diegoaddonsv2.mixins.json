@@ -18,6 +18,7 @@
     "EtherwarpSoundMixin",
     "FontMixin",
     "ForceNametagMixin",
+    "HudEffectsMixin",
     "HumanoidArmorLayerMixin",
     "ItemInHandRendererMixin",
     "LightmapMixin",

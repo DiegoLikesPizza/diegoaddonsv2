@@ -2,7 +2,7 @@ package dev.diego.diegoaddons.gui;
 
 import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.mixin.ChatComponentAccessor;
-import dev.diego.diegoaddons.module.modules.ChatSearchModule;
+import dev.diego.diegoaddons.module.modules.ChatModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
@@ -79,7 +79,7 @@ public class ChatSearchScreen extends Screen {
         if (q.isBlank() || minecraft == null) {
             return;
         }
-        boolean cs = ChatSearchModule.INSTANCE != null && ChatSearchModule.INSTANCE.caseSensitive();
+        boolean cs = ChatModule.INSTANCE != null && ChatModule.INSTANCE.caseSensitive();
         String needle = cs ? q : q.toLowerCase(Locale.ROOT);
         List<GuiMessage> all = ((ChatComponentAccessor) minecraft.gui.getChat()).diego$allMessages();
         for (GuiMessage m : all) {

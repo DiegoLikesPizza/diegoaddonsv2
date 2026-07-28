@@ -35,13 +35,12 @@ build, a deploy and a run in game before the next starts.
 
 ## Batch 4 — chat, party and small additions
 
-- [ ] **Chat** — rename Chat Search to "Chat" and fold in Unlimited Chat History and Compact Chat.
-      Settings: unlimited history · compact chat · compact window (s, slider) · Ctrl+F to search ·
-      Ctrl+click to copy
-- [ ] **Party Commands** — !8ball, !coinflip / !cf, and more in the spirit of Odin's
-- [ ] **Party Finder** — show a party's missing classes on hover; drop the per-class toggles
-- [ ] **Force Nametag** — option to show your own nametag in F5
-- [ ] **Hide Effects** — also hide the effect icons in the top-right corner
+- [x] **Chat** — one module: unlimited history · compact chat · compact window (s) · Ctrl+F search ·
+      Ctrl+click copy · case-sensitive search
+- [x] **Party Commands** — !8ball, !cf/!coinflip, !roll/!dice, !rps, !pick, behind one option
+- [x] **Party Finder** — missing classes on hover; the class picks left in the in-menu strip only
+- [x] **Force Nametag** — option to show your own nametag in F5
+- [x] **Hide Effects** — also hide the effect icons in the top-right corner
 
 ## Batch 5 — the bigger features
 

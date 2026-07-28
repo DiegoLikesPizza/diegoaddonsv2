@@ -19,15 +19,21 @@ public class PartyFinderModule extends Module {
     public static PartyFinderModule INSTANCE;
 
     private final BooleanSetting[] classes = new BooleanSetting[PartyFinder.CLASSES.length];
+    private final BooleanSetting showMissing =
+            new BooleanSetting(this, "showMissing", "Show missing classes on hover", true);
 
     public PartyFinderModule() {
         super("partyfinder", Category.RENDER, "Party Finder",
                 "Highlight parties still missing a class you picked.");
+        // The class picks are deliberately *not* added to the settings list. They are chosen from
+        // the strip inside the party finder itself, where you are actually looking at parties -
+        // having them in two places meant two lists that could disagree, and a settings card that
+        // was five rows of something you never set from there.
         for (int i = 0; i < classes.length; i++) {
             classes[i] = new BooleanSetting(this, "class_" + PartyFinder.CLASSES[i],
                     PartyFinder.CLASS_NAMES[i], false);
-            settings.add(classes[i]);
         }
+        settings.add(showMissing);
         INSTANCE = this;
     }
 
@@ -41,6 +47,11 @@ public class PartyFinderModule extends Module {
     /** Whether the class at {@code index} is one you are looking to play. */
     public boolean wants(int index) {
         return index >= 0 && index < classes.length && classes[index].get();
+    }
+
+    /** Whether hovering a listing names the classes nobody in it is playing. */
+    public boolean showMissing() {
+        return showMissing.get();
     }
 
     /** False when nothing is selected, in which case there is nothing to highlight. */
