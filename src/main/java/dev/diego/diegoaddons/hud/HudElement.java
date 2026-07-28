@@ -44,6 +44,16 @@ public abstract class HudElement {
     public static final float TEXT_PX = 10f;
     /** One row's height - the stride the mod's HUD has always used for 10px text. */
     public static final float ROW_H = 12f;
+    /**
+     * What to pass to {@code TextComponent.lineHeight(...)} for a {@link #ROW_H} row.
+     *
+     * <p>That setter takes a <b>multiple of the font size</b>, not a pixel height - RenderLib stores
+     * it as a line-height multiplier. Handing it {@code ROW_H} asked for lines twelve times the size
+     * of 10px text, so every chip's laid-out box was ten-odd rows tall even though it drew one line.
+     * Nothing looked wrong on the HUD itself, but the placement screen outlines the union of what an
+     * element lays out - which is why the chips sat in tall empty rectangles there.
+     */
+    public static final float LINE_HEIGHT = ROW_H / TEXT_PX;
     public static final float PAD_X = 8f;
     public static final float PAD_Y = 5f;
 

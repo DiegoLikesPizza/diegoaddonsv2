@@ -2,6 +2,7 @@ package dev.diego.diegoaddons.hud;
 
 import com.render.api.gui.ContainerComponent;
 import com.render.api.gui.EntityModelComponent;
+import com.render.api.gui.GuiTextAlignment;
 import com.render.api.gui.ItemModelComponent;
 import com.render.api.gui.TextComponent;
 import com.render.api.gui.layout.GuiAlignment;
@@ -38,25 +39,36 @@ public class InventoryElement extends HudElement {
     private static final float SECTION_GAP = 6f;
     private static final float HOTBAR_GAP = 6f;
     /**
-     * Player-model framing. RenderLib scales a preview entity by
-     * {@code min(boxW, boxH) * 0.625 * zoom / bbHeight}, so the body only fills its box at a zoom
-     * derived from that - at the default zoom of 1 it renders at a bit over a third of the box and
-     * sits wherever the pivot leaves it. The default {@code yPivot} of {@code -1.0625} is
-     * {@code 2.0 / 2 + 0.0625}, the vanilla centring for a <em>two-block</em> entity; a player is
-     * 1.8 tall, so the model hung low in its box with the head cropped away.
+     * Player-model framing, which is two separate numbers RenderLib expects in its own terms.
+     *
+     * <p><b>Size.</b> It renders a preview entity at {@code min(boxW, boxH) * 0.625 * zoom} pixels
+     * <em>per block</em>, so the body comes out {@code that * bbHeight} tall - the height of the
+     * entity is a factor, not a divisor. Solving for "the body fills {@link #MODEL_FILL} of the box"
+     * therefore has to divide by {@link #PLAYER_BB_H}; leaving it out asked for a model most of two
+     * box-heights tall, which is what pushed the head out of the top of the frame.
+     *
+     * <p><b>Position.</b> It offsets by {@code bbHeight / 2 + yPivot}, so {@code yPivot} is the
+     * nudge on top of a centred entity, not the centring itself - the same {@code 0.0625} vanilla's
+     * inventory preview uses. Cancelling the centring instead (a negative half-height) dropped the
+     * model a full block in its box.
      */
     private static final float MODEL_ASPECT = 0.7f;      // vanilla's 49x70 inventory preview
-    private static final float MODEL_FILL = 0.9f;        // share of the box height the body takes
+    private static final float MODEL_FILL = 0.8f;        // share of the box height the body takes
     private static final float RENDERLIB_FIT = 0.625f;   // the constant in RenderLib's scale
     private static final float PLAYER_BB_H = 1.8f;
-    private static final float PLAYER_PIVOT = -(PLAYER_BB_H / 2f + 0.0625f);
+    private static final float PLAYER_PIVOT = 0.0625f;
 
     // Pet card: a double-size item over the name and level. At slot size under two 7px rows it read
     // as a stray icon filling about half the column next to four rows of armour.
     private static final float PET_ITEM = 32f;
     private static final float PET_LINE = 7f;
     private static final float PET_NAME_PX = 10f;
-    private static final float PET_W = 64f;
+    /**
+     * The card's floor width. It grows to whatever the pet is actually called: a name too wide for
+     * its label wraps onto a second line, and since the rows below it are only as tall as one line,
+     * that second line landed on top of the level row - "Ender Dragon" over its own "Lvl 100".
+     */
+    private static final float PET_MIN_W = 64f;
 
     private static final EquipmentSlot[] ARMOR = {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
@@ -73,8 +85,12 @@ public class InventoryElement extends HudElement {
     private final List<Slot> hotbar = new ArrayList<>();
     private final List<ItemStack> shown = new ArrayList<>();
     private Slot petSlot;
+    private ContainerComponent petCard;
+    private ContainerComponent petNameRow;
+    private ContainerComponent petLevelRow;
     private TextComponent petName;
     private TextComponent petLevel;
+    private float petWidth;
 
     private String lastShape = "";
     private int lastSelected = -1;
@@ -197,22 +213,43 @@ public class InventoryElement extends HudElement {
         }
         model.size(width, height);
         // Solve RenderLib's own scale for "the body fills MODEL_FILL of the box height".
-        model.zoom(MODEL_FILL * height / (RENDERLIB_FIT * Math.min(width, height)));
+        model.zoom(MODEL_FILL * height
+                / (RENDERLIB_FIT * PLAYER_BB_H * Math.min(width, height)));
         model.yPivot(PLAYER_PIVOT);
         holder.add(model);
         return holder;
     }
 
     private ContainerComponent petCard() {
-        ContainerComponent card = column(PET_W, 2f);
-        card.alignItems(GuiAlignment.CENTER);
+        petWidth = PET_MIN_W;
+        petCard = column(petWidth, 2f);
+        petCard.alignItems(GuiAlignment.CENTER);
         petSlot = slot(PET_ITEM);
-        card.add(petSlot.box());
-        petName = text("", Themes.current().text(), PET_NAME_PX).width(PET_W);
-        petLevel = small("", Themes.current().textMuted(), PET_LINE).width(PET_W);
-        card.add(textRow(petName, PET_W, PET_NAME_PX + 2f));
-        card.add(textRow(petLevel, PET_W, PET_LINE + 2f));
-        return card;
+        petCard.add(petSlot.box());
+        petName = text("", Themes.current().text(), PET_NAME_PX)
+                .textAlignment(GuiTextAlignment.CENTER).lineHeight(LINE_HEIGHT).width(petWidth);
+        petLevel = small("", Themes.current().textMuted(), PET_LINE)
+                .textAlignment(GuiTextAlignment.CENTER).lineHeight(LINE_HEIGHT).width(petWidth);
+        petNameRow = textRow(petName, petWidth, PET_NAME_PX + 2f);
+        petLevelRow = textRow(petLevel, petWidth, PET_LINE + 2f);
+        petCard.add(petNameRow);
+        petCard.add(petLevelRow);
+        return petCard;
+    }
+
+    /** Widens the card so the name and the level line each stay on one row. */
+    private void fitPetCard(String name, String level) {
+        float wanted = Math.max(PET_MIN_W,
+                Math.max(width(name, PET_NAME_PX), width(level, PET_LINE)));
+        if (wanted == petWidth) {
+            return;
+        }
+        petWidth = wanted;
+        petCard.width(wanted);
+        petNameRow.width(wanted);
+        petLevelRow.width(wanted);
+        petName.width(wanted);
+        petLevel.width(wanted);
     }
 
     /** One slot: a box, the item centred in it, and the count label in its corner. */
@@ -267,9 +304,11 @@ public class InventoryElement extends HudElement {
             put(petSlot, SkyblockHud.pet(), i);
             SkyblockHud.PetInfo info = SkyblockHud.petInfo();
             Theme t = Themes.current();
-            petName.text(info == null ? "No pet" : info.name())
-                    .color(info == null ? t.textFaint() : info.colour());
-            petLevel.text(info == null ? "" : inv.levelText(info)).color(t.textMuted());
+            String name = info == null ? "No pet" : info.name();
+            String level = info == null ? "" : inv.levelText(info);
+            fitPetCard(name, level);
+            petName.text(name).color(info == null ? t.textFaint() : info.colour());
+            petLevel.text(level).color(t.textMuted());
         }
 
         if (!hotbar.isEmpty()) {

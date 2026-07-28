@@ -79,8 +79,9 @@ public class TextChipElement extends HudElement {
             // The label is as wide as the whole chip - which is the digit-normalised width, wider
             // than the text itself - so centring has to happen inside the label, not just around it.
             labels.get(i).text(lines.get(i)).color(color).width(width)
-                    // The line box has to be the row's height, or the glyphs sit against its top.
-                    .lineHeight(ROW_H)
+                    // The line box has to be the row's height, or the glyphs sit against its top -
+                    // as a multiple of the text size, which is what lineHeight actually takes.
+                    .lineHeight(LINE_HEIGHT)
                     .textAlignment(centered ? GuiTextAlignment.CENTER : GuiTextAlignment.LEFT);
         }
     }
