@@ -52,6 +52,9 @@ public class IgnoreListView extends DiegoView {
         list = new ScrollContainerComponent();
         list.size(inner, height - PAD * 2f - 36f - 12f);
         asColumn(list, inner, 8f);
+        // Without this the rows are laid out past the bottom of the box instead of
+        // scrolling inside it - which reads as every row drawn on top of the last.
+        list.overflowY(com.render.api.gui.GuiOverflowMode.AUTO);
         body.add(list);
         panel.add(body);
         fill(inner);

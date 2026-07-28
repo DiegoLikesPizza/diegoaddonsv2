@@ -66,8 +66,11 @@ public abstract class DiegoView extends GuiView {
     protected abstract void content(float width, float height);
 
     private ContainerComponent header() {
+        // The header carries the panel's own radius: clipping the children was not enough to stop
+        // its square corners showing through the rounded ones above them.
         ContainerComponent bar = row(panelW, 12f).height(HEADER_H).padding(0f, PAD)
                 .backgroundColor(GuiColors.of(t.surfaceAlt()))
+                .cornerRadius(16f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN);
         bar.add(textBox(GuiText.label(title, t.text(), 20f), 0f, HEADER_H).flexGrow(1f));
         ButtonComponent close = clickable(t.surface(), this::close);

@@ -68,8 +68,7 @@ public final class PartyFinder {
         return t.contains("party finder");
     }
 
-    public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
-                              int mouseX, int mouseY) {
+    public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g) {
         PartyFinderModule mod = PartyFinderModule.INSTANCE;
         if (mod == null || !mod.isEnabled() || !isPartyFinder(screen)) {
             return;
@@ -91,9 +90,17 @@ public final class PartyFinder {
             }
         }
         drawToggles(screen, g, leftPos, topPos, acc.diego$imageWidth());
-        if (mod.showMissing()) {
-            drawMissing(screen, g, leftPos, topPos, mouseX, mouseY);
+    }
+
+    /** The hover panel, drawn after the items so they cannot paint over it. */
+    public static void hover(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
+                             int mouseX, int mouseY) {
+        PartyFinderModule mod = PartyFinderModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || !mod.showMissing() || !isPartyFinder(screen)) {
+            return;
         }
+        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
+        drawMissing(screen, g, acc.diego$leftPos(), acc.diego$topPos(), mouseX, mouseY);
     }
 
     /**

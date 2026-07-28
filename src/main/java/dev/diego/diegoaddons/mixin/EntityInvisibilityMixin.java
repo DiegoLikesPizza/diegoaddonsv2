@@ -32,6 +32,11 @@ public class EntityInvisibilityMixin {
         if (self == mc.player || !(self instanceof LivingEntity)) {
             return;
         }
+        // Every name plate in SkyBlock is an invisible armour stand. Revealing those reveals the
+        // scaffolding the whole server is built out of, which is not what "show hidden mobs" means.
+        if (self instanceof net.minecraft.world.entity.decoration.ArmorStand) {
+            return;
+        }
         if (self instanceof Player && !mod.includePlayers()) {
             return;   // Shadow Assassins are player entities; some people would rather not see NPCs
         }

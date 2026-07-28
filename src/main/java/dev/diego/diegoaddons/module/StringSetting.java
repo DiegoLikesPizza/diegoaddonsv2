@@ -34,10 +34,16 @@ public class StringSetting extends Setting {
         ConfigManager.save();
     }
 
-    /** Opens this setting's chooser, if it has one. */
+    /**
+     * Opens this setting's chooser - the one it was given, or the plain typing screen when it has
+     * none. A row that does nothing when clicked is not a setting, it is a label.
+     */
     public void choose() {
         if (chooser != null) {
             chooser.run();
+            return;
         }
+        net.minecraft.client.Minecraft.getInstance().execute(() ->
+                new dev.diego.diegoaddons.gui.TextEntryView(name, get(), "Text", this::set).open());
     }
 }

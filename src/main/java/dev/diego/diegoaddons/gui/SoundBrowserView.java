@@ -60,8 +60,9 @@ public class SoundBrowserView extends DiegoView {
             query = s;
             refresh();
         }));
-        countLabel = GuiText.label("", t.textFaint(), 13f);
-        top.add(textBox(countLabel, 0f, 36f));
+        countLabel = GuiText.label("", t.textFaint(), 13f).width(320f)
+                .textAlignment(com.render.api.gui.GuiTextAlignment.RIGHT);
+        top.add(textBox(countLabel, 320f, 36f));
         body.add(top);
 
         body.add(textBox(GuiText.label("Now: " + current, t.textMuted(), 13f), inner, 24f));
@@ -69,6 +70,9 @@ public class SoundBrowserView extends DiegoView {
         list = new ScrollContainerComponent();
         list.size(inner, height - PAD * 2f - 36f - 24f - 24f);
         asColumn(list, inner, 6f);
+        // Without this the rows are laid out past the bottom of the box instead of
+        // scrolling inside it - which reads as every row drawn on top of the last.
+        list.overflowY(com.render.api.gui.GuiOverflowMode.AUTO);
         body.add(list);
         panel.add(body);
         refresh();

@@ -255,13 +255,19 @@ public final class ModuleManager {
                 // of it and the slot highlight sits behind the item rather than over it.
                 ScreenEvents.afterBackground(screen).register((scr, g, mx, my, dt) -> {
                     dev.diego.diegoaddons.util.ItemRarity.render((AbstractContainerScreen<?>) scr, g);
-                    PartyFinder.render((AbstractContainerScreen<?>) scr, g, mx, my);
+                    // With the background rather than after everything: drawn last it sat on
+                    // top of item tooltips.
+                    dev.diego.diegoaddons.util.SlotLocks.render((AbstractContainerScreen<?>) scr, g);
+                    PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
                     // Inventory buttons are not drawn here any more - they are a RenderLib screen
                     // extension (see InventoryButtonsExtension), which owns their hit testing too.
                     dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
-                    dev.diego.diegoaddons.util.SlotLocks.render((AbstractContainerScreen<?>) scr, g, mx, my);
+                    // On top of the items: drawn with the background it was painted over by the
+                    // very listings it describes.
+                    PartyFinder.hover((AbstractContainerScreen<?>) scr, g, mx, my);
+                    dev.diego.diegoaddons.util.SlotLocks.keys((AbstractContainerScreen<?>) scr, mx, my);
                     Toasts.render(g);
                 });
                 // Deny the click to the menu when it lands on one of our buttons (so the press is not

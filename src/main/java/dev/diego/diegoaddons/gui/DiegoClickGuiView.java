@@ -506,7 +506,8 @@ public class DiegoClickGuiView extends GuiView {
         if (s instanceof StringSetting str) {
             // The value is usually long (a sound id is a whole namespace), so it gets the row to
             // itself and the chooser is what a click opens.
-            return valueRow(str.name, str.get(), str::choose);
+            String shown = str.get().isBlank() ? "not set" : str.get();
+            return valueRow(str.name, shown, str::choose);
         }
         if (s instanceof ColorSetting col) {
             return colorRow(col);

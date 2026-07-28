@@ -15,7 +15,7 @@ import java.util.Set;
 /**
  * Locks player-inventory slots so their item cannot be moved, swapped or dropped by accident. A lock
  * is stored by the slot's index in the player inventory (0-40), so it holds in every screen that shows
- * that slot. The block is done entirely client-side by denying the input - the click, the hotbar-swap
+ * that slot, and is shown as a small padlock in the slot's corner. The block is done entirely client-side by denying the input - the click, the hotbar-swap
  * key, the drop key - so the action never reaches the server; no server-side mixin is needed.
  *
  * <p>Toggle a lock by pointing at a slot in any container screen and pressing the module's key.
@@ -81,19 +81,24 @@ public final class SlotLocks {
 
     // --- rendering + toggling -------------------------------------------------------------------
 
-    /** Draws the lock overlay and handles the toggle key. {@code mx,my} are GUI-space mouse coords. */
-    public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g, int mx, int my) {
+    /** Handles the toggle key. {@code mx,my} are GUI-space mouse coords. */
+    public static void keys(AbstractContainerScreen<?> screen, int mx, int my) {
         SlotLockModule mod = SlotLockModule.INSTANCE;
         if (mod == null || !mod.isEnabled()) {
             return;
         }
-        Minecraft mc = Minecraft.getInstance();
         if (mod.lockKey().consumePress()) {
-            toggle(invIndex(mc, slotUnder(screen, mx, my)));
+            toggle(invIndex(Minecraft.getInstance(), slotUnder(screen, mx, my)));
         }
-        if (!mod.overlay()) {
+    }
+
+    /** Draws a padlock on every locked slot. */
+    public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g) {
+        SlotLockModule mod = SlotLockModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || !mod.overlay()) {
             return;
         }
+        Minecraft mc = Minecraft.getInstance();
         AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
         int leftPos = acc.diego$leftPos();
         int topPos = acc.diego$topPos();
@@ -101,14 +106,31 @@ public final class SlotLocks {
             if (s.container != mc.player.getInventory() || !isLocked(s.getContainerSlot())) {
                 continue;
             }
-            int x = leftPos + s.x;
-            int y = topPos + s.y;
-            g.fill(x, y, x + 16, y + 16, 0x40FF3030);            // translucent red wash
-            g.fill(x - 1, y - 1, x + 17, y, 0xFFFF4040);         // top
-            g.fill(x - 1, y + 16, x + 17, y + 17, 0xFFFF4040);   // bottom
-            g.fill(x - 1, y, x, y + 16, 0xFFFF4040);             // left
-            g.fill(x + 16, y, x + 17, y + 16, 0xFFFF4040);       // right
+            padlock(g, leftPos + s.x, topPos + s.y);
         }
+    }
+
+    /**
+     * A small translucent padlock in the corner of a locked slot.
+     *
+     * <p>It used to be a red wash over the whole slot with a border round it, which covered the
+     * item's rarity colour and, being drawn last, sat on top of tooltips as well. A lock is a
+     * marker, not a highlight: it belongs in a corner, faint, out of the way of everything the slot
+     * is already saying.
+     */
+    private static void padlock(GuiGraphicsExtractor g, int x, int y) {
+        int body = 0xC0FF5555;
+        int shackle = 0x90FF8888;
+        int px = x + 9;    // bottom-right corner of the 16x16 slot
+        int py = y + 8;
+        // Shackle: two uprights and a cap.
+        g.fill(px + 1, py, px + 2, py + 2, shackle);
+        g.fill(px + 4, py, px + 5, py + 2, shackle);
+        g.fill(px + 1, py, px + 5, py + 1, shackle);
+        // Body.
+        g.fill(px, py + 2, px + 6, py + 7, body);
+        // Keyhole.
+        g.fill(px + 2, py + 3, px + 4, py + 5, 0x80000000);
     }
 
     // --- helpers --------------------------------------------------------------------------------

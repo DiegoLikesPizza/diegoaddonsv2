@@ -5,6 +5,7 @@ import com.render.api.gui.ContainerComponent;
 import com.render.api.gui.ScrollContainerComponent;
 import com.render.api.gui.layout.GuiAlignment;
 import dev.diego.diegoaddons.mixin.ChatComponentAccessor;
+import dev.diego.diegoaddons.util.Toasts;
 import dev.diego.diegoaddons.module.modules.ChatModule;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
@@ -46,13 +47,22 @@ public class ChatSearchView extends DiegoView {
             query = s;
             refresh(inner);
         }));
-        countLabel = GuiText.label("", t.textFaint(), 13f);
-        top.add(textBox(countLabel, 0f, 36f));
+        // A label with no width wraps at whatever the layout hands it, which here was nothing -
+        // hence one character per line down the side of the screen.
+        countLabel = GuiText.label("", t.textFaint(), 13f).width(320f)
+                .textAlignment(com.render.api.gui.GuiTextAlignment.RIGHT);
+        top.add(textBox(countLabel, 320f, 36f));
         body.add(top);
+        body.add(textBox(GuiText.label(
+                "Click a result to jump to it in chat, or Copy to put it on the clipboard.",
+                t.textFaint(), 12f).width(inner), inner, 20f));
 
         list = new ScrollContainerComponent();
-        list.size(inner, height - PAD * 2f - 36f - 12f);
+        list.size(inner, height - PAD * 2f - 36f - 20f - 24f);
         asColumn(list, inner, 4f);
+        // Without this the rows are laid out past the bottom of the box instead of
+        // scrolling inside it - which reads as every row drawn on top of the last.
+        list.overflowY(com.render.api.gui.GuiOverflowMode.AUTO);
         body.add(list);
         panel.add(body);
         refresh(inner);
@@ -71,12 +81,12 @@ public class ChatSearchView extends DiegoView {
         boolean cs = ChatModule.INSTANCE != null && ChatModule.INSTANCE.caseSensitive();
         String needle = cs ? query : query.toLowerCase(Locale.ROOT);
 
-        List<String> hits = new ArrayList<>();
+        List<GuiMessage> hits = new ArrayList<>();
         for (GuiMessage m : ((ChatComponentAccessor) mc.gui.getChat()).diego$allMessages()) {
             String plain = m.content().getString().replaceAll("§.", "");
             String hay = cs ? plain : plain.toLowerCase(Locale.ROOT);
             if (hay.contains(needle)) {
-                hits.add(plain);
+                hits.add(m);
             }
         }
         countLabel.text(hits.isEmpty() ? "no matches"
@@ -88,18 +98,59 @@ public class ChatSearchView extends DiegoView {
         }
         int shown = 0;
         for (int i = hits.size() - 1; i >= 0 && shown < MAX_ROWS; i--, shown++) {
-            list.add(hitRow(hits.get(i), inner - 24f));
+            GuiMessage m = hits.get(i);
+            list.add(hitRow(m, m.content().getString().replaceAll("§.", ""), inner - 24f));
         }
     }
 
-    private ContainerComponent hitRow(String text, float inner) {
-        ButtonComponent b = clickable(t.surfaceAlt(), () -> {
-            Minecraft.getInstance().keyboardHandler.setClipboard(text);
-        });
-        asRow(b, inner, 0f).height(ROW_H).cornerRadius(8f).padding(0f, 12f)
+    /**
+     * One hit: the message, which jumps the chat to it, and a button that copies it.
+     *
+     * <p>Both used to hang off one row with left and right click. RenderLib's button reports a press
+     * and not which press, so what was a hidden second action is a second button - which also makes
+     * it discoverable without being told.
+     */
+    private ContainerComponent hitRow(GuiMessage message, String text, float inner) {
+        ContainerComponent r = row(inner, 8f).height(ROW_H);
+
+        ButtonComponent jump = clickable(t.surfaceAlt(), () -> jumpTo(message));
+        asRow(jump, inner - 96f, 0f).height(ROW_H).cornerRadius(8f).padding(0f, 12f)
                 .borderWidth(1f).borderColor(GuiColors.of(t.border()));
-        b.add(GuiText.label(text.length() > 140 ? text.substring(0, 140) + "..." : text,
+        jump.add(GuiText.label(text.length() > 130 ? text.substring(0, 130) + "..." : text,
                 t.text(), 13f));
-        return b;
+        r.add(jump);
+
+        ButtonComponent copy = clickable(t.surface(), () -> {
+            Minecraft.getInstance().keyboardHandler.setClipboard(text);
+            Toasts.show("Copied to clipboard", text);
+        });
+        asRow(copy, 88f, 0f).height(ROW_H).cornerRadius(8f)
+                .justifyContent(com.render.api.gui.layout.GuiAlignment.CENTER)
+                .borderWidth(1f).borderColor(GuiColors.of(t.border()));
+        copy.add(GuiText.label("Copy", t.textMuted(), 13f));
+        r.add(copy);
+        return r;
+    }
+
+    /** Scrolls the chat to a message and drops you into it. */
+    private void jumpTo(GuiMessage message) {
+        Minecraft mc = Minecraft.getInstance();
+        ChatComponentAccessor acc = (ChatComponentAccessor) mc.gui.getChat();
+        List<GuiMessage.Line> lines = acc.diego$trimmedMessages();
+        int target = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).parent() == message) {
+                target = i;
+            }
+        }
+        if (target < 0) {
+            // Trimmed away since the search ran - the backlog still has it, the display does not.
+            Toasts.show("Not in view", "That message has scrolled out of the chat");
+            return;
+        }
+        int max = Math.max(0, lines.size() - mc.gui.getChat().getLinesPerPage());
+        acc.diego$setChatScrollbarPos(Math.min(target, max));
+        close();
+        mc.setScreen(new net.minecraft.client.gui.screens.ChatScreen("", false));
     }
 }
