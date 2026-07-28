@@ -113,7 +113,7 @@ public abstract class HudElement {
 
     // --- layout helpers -----------------------------------------------------------------------------
 
-    protected static ContainerComponent row(float width, float gap) {
+    static ContainerComponent row(float width, float gap) {
         return asRow(new ContainerComponent(), width, gap);
     }
 
@@ -121,7 +121,7 @@ public abstract class HudElement {
         return asColumn(new ContainerComponent(), width, gap);
     }
 
-    protected static <T extends ContainerComponent> T asRow(T c, float width, float gap) {
+    static <T extends ContainerComponent> T asRow(T c, float width, float gap) {
         if (width > 0f) {
             c.width(width);
         }
@@ -134,7 +134,7 @@ public abstract class HudElement {
         return c;
     }
 
-    protected static <T extends ContainerComponent> T asColumn(T c, float width, float gap) {
+    static <T extends ContainerComponent> T asColumn(T c, float width, float gap) {
         if (width > 0f) {
             c.width(width);
         }

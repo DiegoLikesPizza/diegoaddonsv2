@@ -1,7 +1,7 @@
 package dev.diego.diegoaddons.gui;
 
 import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.module.modules.InventoryHudModule;
+import dev.diego.diegoaddons.module.modules.PlayerHudModule;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -11,14 +11,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Arranges the inventory HUD's sections: one card per section in a strip, dragged left or right into
- * the order you want them drawn in.
+ * Arranges the player HUD's sections - armour, your character, equipment - one card per section in a
+ * strip, dragged left or right into the order you want them drawn in.
  *
  * <p>The cards reorder <b>while</b> you drag rather than on release, so the strip always reads as the
  * layout you are about to get. Sections that are switched off are still shown - greyed, and labelled
  * as such - because their place in the order still matters for when you turn them back on.
  */
-public class InventoryLayoutScreen extends Screen {
+public class SectionOrderScreen extends Screen {
     private static final int CARD_W = 76;
     private static final int CARD_H = 58;
     private static final int GAP = 8;
@@ -26,7 +26,7 @@ public class InventoryLayoutScreen extends Screen {
     private static final int PAD = 12;
 
     private final Screen parent;
-    private final InventoryHudModule module;
+    private final PlayerHudModule module;
     private final List<String> order = new ArrayList<>();
     private final List<UiButton> buttons = new ArrayList<>();
 
@@ -37,7 +37,7 @@ public class InventoryLayoutScreen extends Screen {
 
     private int panelX, panelY, panelW, panelH, stripX, stripY;
 
-    public InventoryLayoutScreen(Screen parent, InventoryHudModule module) {
+    public SectionOrderScreen(Screen parent, PlayerHudModule module) {
         super(Component.literal("Inventory HUD layout"));
         this.parent = parent;
         this.module = module;
@@ -64,7 +64,7 @@ public class InventoryLayoutScreen extends Screen {
 
     private void reset() {
         order.clear();
-        order.addAll(InventoryHudModule.SECTIONS);
+        order.addAll(PlayerHudModule.SECTIONS);
         module.setSectionOrder(order);
     }
 
@@ -116,7 +116,7 @@ public class InventoryLayoutScreen extends Screen {
 
         UiRender.text(g, font, String.valueOf(position), Fonts.SMALL, x + 8, y + 8,
                 held ? t.accent() : t.textFaint());
-        UiRender.textCentered(g, font, InventoryHudModule.sectionName(section), Fonts.MEDIUM,
+        UiRender.textCentered(g, font, PlayerHudModule.sectionName(section), Fonts.MEDIUM,
                 x + CARD_W / 2, y + 24, on ? t.text() : t.textFaint());
         UiRender.textCentered(g, font, on ? "on" : "off", Fonts.SMALL,
                 x + CARD_W / 2, y + 40, on ? t.accent() : t.textFaint());

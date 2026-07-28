@@ -134,19 +134,7 @@ public class InventoryElement extends HudElement {
             root.backgroundColor(GuiColors.of(0x00000000)).borderWidth(0f);
         }
 
-        // Left to right in whatever order the module was arranged in.
-        for (String section : inv.sectionOrder()) {
-            if (!inv.sectionShown(section)) {
-                continue;
-            }
-            switch (section) {
-                case "armor" -> root.add(slotColumn(armor, 4));
-                case "equipment" -> root.add(slotColumn(equipment, 4));
-                case "storage" -> root.add(storage());
-                default -> {
-                }
-            }
-        }
+        root.add(storage());
     }
 
     private ContainerComponent slotColumn(List<Slot> into, int count) {
@@ -216,9 +204,6 @@ public class InventoryElement extends HudElement {
         float storage = ROWS * CELL + (ROWS - 1) * SLOT_GAP
                 + (inv.showHotbar() ? HOTBAR_GAP + CELL : 0f);
         float h = storage;
-        if (inv.showArmor() || inv.showEquipment()) {
-            h = Math.max(h, 4 * CELL + 3 * SLOT_GAP);
-        }
         return h;
     }
 
