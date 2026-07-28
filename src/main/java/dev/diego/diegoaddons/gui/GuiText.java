@@ -9,6 +9,10 @@ import net.minecraft.resources.Identifier;
 /**
  * Text for the RenderLib menu, in the mod's own typeface.
  *
+ * <p>Everything here is drawn <b>flat</b>: no drop shadow. RenderLib puts one on text by default,
+ * which is Minecraft's look rather than this mod's - the hand-drawn side has always drawn text
+ * without one, and the two sitting side by side is what gives a screen away as two screens.
+ *
  * <p>Two RenderLib facts drive everything here. A {@link TextComponent} with no width wraps at
  * whatever the layout hands it, so every label gets a measured width; and RenderLib shapes these
  * faces about a quarter wider than {@code Font.width} reports, so the measurement carries that
@@ -31,6 +35,13 @@ public final class GuiText {
      * a screenshot.
      */
     private static float slack = 1.25f;
+    /**
+     * Line spacing, as the multiple of the text size that {@code lineHeight} actually takes.
+     *
+     * <p>RenderLib's own default packs lines tight enough that a headline's descenders touch the
+     * line beneath - fine at 12px, not at 38.
+     */
+    private static final float LINE_HEIGHT = 1.35f;
     private static boolean calibrated;
 
     private GuiText() {
@@ -47,7 +58,12 @@ public final class GuiText {
 
     public static TextComponent label(String s, int color, float scale, GuiFont face) {
         return new TextComponent().text(s).color(GuiColors.of(color)).font(face).textScalePixels(scale)
-                .width(width(s, scale));
+                .shadow(false)
+                .lineHeight(LINE_HEIGHT)
+                .width(width(s, scale))
+                // A flex child shrinks to fit by default, and a label shrunk below its own width
+                // wraps - which is how "Galaxy" came out as "Galax" over a "y".
+                .flexShrink(0f);
     }
 
     /**
@@ -58,7 +74,10 @@ public final class GuiText {
      */
     public static TextComponent paragraph(String s, int color, float scale, float width) {
         return new TextComponent().text(s).color(GuiColors.of(color)).font(BODY)
-                .textScalePixels(scale).width(width);
+                .textScalePixels(scale)
+                .shadow(false)
+                .lineHeight(LINE_HEIGHT)
+                .width(width);
     }
 
     /** How tall {@link #paragraph} comes out at that width, in whole lines. */
@@ -74,6 +93,8 @@ public final class GuiText {
     public static TextComponent glyph(String s, int color, float scale) {
         return new TextComponent().text(s).color(GuiColors.of(color)).font(GuiFont.minecraftDefault())
                 .textScalePixels(scale)
+                .shadow(false)
+                .flexShrink(0f)
                 .width(Minecraft.getInstance().font.width(s) * (scale / 8f) + 4f);
     }
 

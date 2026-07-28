@@ -70,8 +70,8 @@ public class IntroView extends DiegoView {
         col.add(spacer(inner, 26f));
 
         String headline = "Your SkyBlock tools, finally in one place.";
-        col.add(textBox(GuiText.paragraph(headline, t.text(), 38f, inner).font(GuiText.TITLE),
-                inner, GuiText.paragraphHeight(headline, 38f, inner)));
+        col.add(textBox(GuiText.paragraph(headline, t.text(), 36f, inner).font(GuiText.TITLE),
+                inner, GuiText.paragraphHeight(headline, 36f, inner)));
         col.add(spacer(inner, 20f));
 
         String blurb = "A focused workspace for combat, mining, dungeons, inventories and everyday "
@@ -203,9 +203,9 @@ public class IntroView extends DiegoView {
                 .borderWidth(current ? 2f : 1f)
                 .borderColor(GuiColors.of(current ? t.accent() : t.border()));
 
-        ContainerComponent leftSide = row(0f, 12f).height(38f);
+        ContainerComponent leftSide = row(width - 110f, 12f).height(38f);
         ContainerComponent dot = new ContainerComponent();
-        dot.size(20f, 20f).cornerRadius(10f)
+        dot.size(20f, 20f).cornerRadius(6f)
                 .backgroundColor(GuiColors.of(th.accent()))
                 .gradient(new GuiGradient()
                         .startColor(GuiColors.of(th.accent()))
@@ -238,7 +238,8 @@ public class IntroView extends DiegoView {
                 .justifyContent(GuiAlignment.CENTER)
                 .backgroundColor(GuiColors.of(t.surfaceAlt()))
                 .borderWidth(1f).borderColor(GuiColors.of(t.border()));
-        chip.add(GuiText.label(key, t.text(), 13f));
+        // The bundled faces carry no glyph for a backslash, so the bind is drawn in Minecraft's own.
+        chip.add(GuiText.glyph(key, t.text(), 13f));
         r.add(chip);
         card.add(r);
         return card;
