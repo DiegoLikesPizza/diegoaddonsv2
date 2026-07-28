@@ -3,6 +3,7 @@ package dev.diego.diegoaddons.hud;
 import com.render.api.gui.ContainerComponent;
 import com.render.api.gui.TextComponent;
 import com.render.api.gui.layout.GuiPositionType;
+import dev.diego.diegoaddons.gui.GuiColors;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.module.modules.CrystalHollowsMapModule;
@@ -59,7 +60,7 @@ public class CrystalMapElement extends HudElement {
                 quadrants.get(q).visible(region != null);
                 if (region != null) {
                     quadrants.get(q)
-                            .backgroundColor(Theme.withAlpha(CrystalHollows.regionColor(region), 0.35f));
+                            .backgroundColor(GuiColors.of(Theme.withAlpha(CrystalHollows.regionColor(region), 0.35f)));
                 }
             }
         }
@@ -69,7 +70,7 @@ public class CrystalMapElement extends HudElement {
             for (CrystalHollows.Waypoint wp : CrystalHollows.waypoints()) {
                 ContainerComponent dot = dot(used++);
                 dot.x(fx(wp.pos().x) - DOT / 2f).y(fz(wp.pos().z) - DOT / 2f)
-                        .backgroundColor(wp.type().color).visible(true);
+                        .backgroundColor(GuiColors.of(wp.type().color)).visible(true);
             }
         }
         for (int i = used; i < dots.size(); i++) {
@@ -78,14 +79,14 @@ public class CrystalMapElement extends HudElement {
 
         float px = fx(mc.player.getX());
         float pz = fz(mc.player.getZ());
-        playerDot.x(px - DOT / 2f).y(pz - DOT / 2f).backgroundColor(t.accent()).visible(true);
+        playerDot.x(px - DOT / 2f).y(pz - DOT / 2f).backgroundColor(GuiColors.of(t.accent())).visible(true);
 
         double yaw = Math.toRadians(mc.player.getYRot());
         float tx = (float) (px - Math.sin(yaw) * 5f);
         float tz = (float) (pz + Math.cos(yaw) * 5f);
         facing.x(Math.min(px, tx)).y(Math.min(pz, tz))
                 .size(Math.max(1f, Math.abs(tx - px)), Math.max(1f, Math.abs(tz - pz)))
-                .backgroundColor(t.accent()).visible(true);
+                .backgroundColor(GuiColors.of(t.accent())).visible(true);
 
         if (coords != null) {
             String area = CrystalHollows.area();
@@ -108,7 +109,7 @@ public class CrystalMapElement extends HudElement {
         field = new ContainerComponent();
         field.size(MAP, MAP).cornerRadius(4f)
                 .position(GuiPositionType.RELATIVE)
-                .backgroundColor(Theme.withAlpha(0xFF101318, 0.85f));
+                .backgroundColor(GuiColors.of(Theme.withAlpha(0xFF101318, 0.85f)));
         root.add(field);
 
         float half = MAP / 2f;

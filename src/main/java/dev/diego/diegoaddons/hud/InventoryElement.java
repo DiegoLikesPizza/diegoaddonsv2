@@ -7,6 +7,7 @@ import com.render.api.gui.ItemModelComponent;
 import com.render.api.gui.TextComponent;
 import com.render.api.gui.layout.GuiAlignment;
 import com.render.api.gui.layout.GuiPositionType;
+import dev.diego.diegoaddons.gui.GuiColors;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
@@ -57,6 +58,16 @@ public class InventoryElement extends HudElement {
     private static final float RENDERLIB_FIT = 0.625f;   // the constant in RenderLib's scale
     private static final float PLAYER_BB_H = 1.8f;
     private static final float PLAYER_PIVOT = 0.0625f;
+    /**
+     * Half a turn, so the preview faces you.
+     *
+     * <p>RenderLib builds the preview from a mannequin wearing your profile and aims it with
+     * {@code setYRot}, which is the <em>head</em> yaw - a living entity is drawn facing its
+     * {@code yBodyRot}, and a mannequin spawns at zero, so the preview stood with its back to the
+     * camera (a cape being the giveaway). The whole model is rotated instead, which does not care
+     * what the body rotation happens to be.
+     */
+    private static final float MODEL_FACING = 180f;
 
     // Pet card: a double-size item over the name and level. At slot size under two 7px rows it read
     // as a stray icon filling about half the column next to four rows of armour.
@@ -129,7 +140,7 @@ public class InventoryElement extends HudElement {
         if (inv.showBackground()) {
             applyBackground(root, 8f);
         } else {
-            root.backgroundColor(0x00000000).borderWidth(0f);
+            root.backgroundColor(GuiColors.of(0x00000000)).borderWidth(0f);
         }
 
         // Left to right in whatever order the module was arranged in.
@@ -240,6 +251,7 @@ public class InventoryElement extends HudElement {
         model.zoom(MODEL_FILL * height
                 / (RENDERLIB_FIT * PLAYER_BB_H * Math.min(width, height)));
         model.yPivot(PLAYER_PIVOT);
+        model.yRotation(MODEL_FACING);
         holder.add(model);
         return holder;
     }
@@ -253,6 +265,7 @@ public class InventoryElement extends HudElement {
         // whatever the name does to that width.
         petIconRow = row(petWidth, 0f);
         petIconRow.height(PET_ITEM).justifyContent(GuiAlignment.CENTER);
+        petSlot.box().alignSelf(GuiAlignment.CENTER);
         petIconRow.add(petSlot.box());
         petCard.add(petIconRow);
         petName = text("", Themes.current().text(), PET_NAME_PX)
@@ -298,7 +311,7 @@ public class InventoryElement extends HudElement {
                 .position(GuiPositionType.RELATIVE)     // anchors the count label
                 .justifyContent(GuiAlignment.CENTER);
         if (inv.showSlotBoxes()) {
-            box.backgroundColor(Theme.withAlpha(t.textFaint(), 0.16f));
+            box.backgroundColor(GuiColors.of(Theme.withAlpha(t.textFaint(), 0.16f)));
         }
 
         ItemModelComponent item = new ItemModelComponent();
@@ -306,7 +319,7 @@ public class InventoryElement extends HudElement {
         box.add(item);
 
         TextComponent count = new TextComponent().font(MEDIUM).textScalePixels(6f)
-                .color(0xFFFFFFFF).width(size)
+                .color(GuiColors.of(0xFFFFFFFF)).width(size)
                 .position(GuiPositionType.ABSOLUTE).x(size * 0.4f).y(size * 0.55f)
                 .visible(false);
         box.add(count);
@@ -337,8 +350,8 @@ public class InventoryElement extends HudElement {
             String name = info == null ? "No pet" : info.name();
             String level = info == null ? "" : inv.levelText(info);
             fitPetCard(name, level);
-            petName.text(name).color(info == null ? t.textFaint() : info.colour());
-            petLevel.text(level).color(t.textMuted());
+            petName.text(name).color(GuiColors.of(info == null ? t.textFaint() : info.colour()));
+            petLevel.text(level).color(GuiColors.of(t.textMuted()));
         }
 
         if (!hotbar.isEmpty()) {
@@ -348,7 +361,7 @@ public class InventoryElement extends HudElement {
                 for (int h = 0; h < hotbar.size(); h++) {
                     boolean on = h == selected;
                     hotbar.get(h).box().borderWidth(on ? 1f : 0f)
-                            .borderColor(on ? t.accent() : 0x00000000);
+                            .borderColor(GuiColors.of(on ? t.accent() : 0x00000000));
                 }
                 lastSelected = selected;
             }

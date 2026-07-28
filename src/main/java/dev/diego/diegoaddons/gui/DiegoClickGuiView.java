@@ -146,20 +146,20 @@ public class DiegoClickGuiView extends GuiView {
         }
 
         panel.clearChildren();
-        panel.backgroundColor(t.surface()).cornerRadius(16f)
-                .borderWidth(BORDER).borderColor(t.border())
+        panel.backgroundColor(GuiColors.of(t.surface())).cornerRadius(16f)
+                .borderWidth(BORDER).borderColor(GuiColors.of(t.border()))
                 // Without this the rail's square corners paint over the panel's rounded ones and
                 // spill past its bottom edge.
                 .clipChildren(true);
         panel.add(header());
 
         railPane = column(RAIL_W, 6f).height(BODY_H).padding(RAIL_PAD)
-                .backgroundColor(t.surfaceAlt());
+                .backgroundColor(GuiColors.of(t.surfaceAlt()));
         contentPane = column(CONTENT_W, 12f).height(BODY_H).padding(CONTENT_PAD);
 
         ContainerComponent body = row(PANEL_W, 0f).height(BODY_H).alignItems(GuiAlignment.STRETCH);
         body.add(railPane);
-        body.add(new ContainerComponent().size(1f, BODY_H).backgroundColor(t.border()));
+        body.add(new ContainerComponent().size(1f, BODY_H).backgroundColor(GuiColors.of(t.border())));
         body.add(contentPane);
         panel.add(body);
 
@@ -190,9 +190,9 @@ public class DiegoClickGuiView extends GuiView {
                     refreshList();
                 });
         search.size(240f, 32f).padding(8f, 12f).cornerRadius(9f).flexShrink(0f)
-                .backgroundColor(t.surfaceAlt())
-                .borderWidth(1f).borderColor(t.border())
-                .color(t.text());
+                .backgroundColor(GuiColors.of(t.surfaceAlt()))
+                .borderWidth(1f).borderColor(GuiColors.of(t.border()))
+                .color(GuiColors.of(t.text()));
         title.add(search);
         contentPane.add(title);
 
@@ -261,7 +261,7 @@ public class DiegoClickGuiView extends GuiView {
         }
 
         railPane.add(new ContainerComponent().width(RAIL_INNER).flexGrow(1f).flexShrink(1f));
-        railPane.add(new ContainerComponent().size(RAIL_INNER, 1f).backgroundColor(t.border()));
+        railPane.add(new ContainerComponent().size(RAIL_INNER, 1f).backgroundColor(GuiColors.of(t.border())));
 
         ContainerComponent footer = row(RAIL_INNER, 8f).height(26f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN);
@@ -353,7 +353,7 @@ public class DiegoClickGuiView extends GuiView {
     private ContainerComponent card(Module m) {
         ButtonComponent shell = clickable(t.surfaceAlt(), () -> expand(m));
         asColumn(shell, CARD_W, CARD_GAP).padding(CARD_PAD_Y, CARD_PAD_X).cornerRadius(12f)
-                .borderWidth(1f).borderColor(t.border())
+                .borderWidth(1f).borderColor(GuiColors.of(t.border()))
                 .flexShrink(0f);
 
         float textW = CARD_INNER - TOGGLE_W - 14f;
@@ -402,8 +402,8 @@ public class DiegoClickGuiView extends GuiView {
         }
         Module m = card.module;
         int background = open ? t.elevated() : t.surfaceAlt();
-        card.shell.backgroundColor(background).gradient(flat(background))
-                .borderColor(open ? t.accent() : t.border());
+        card.shell.backgroundColor(GuiColors.of(background)).gradient(flat(background))
+                .borderColor(GuiColors.of(open ? t.accent() : t.border()));
 
         ContainerComponent box = card.settings;
         box.clearChildren();
@@ -415,7 +415,7 @@ public class DiegoClickGuiView extends GuiView {
         }
 
         float total = SETTINGS_PAD_TOP + 1f;   // own padding, then the divider
-        box.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(t.border()));
+        box.add(new ContainerComponent().size(CARD_INNER, 1f).backgroundColor(GuiColors.of(t.border())));
         List<Setting> rows = card.module.settings();
         if (rows.isEmpty()) {
             ContainerComponent empty = row(CARD_INNER, 0f);
@@ -483,7 +483,7 @@ public class DiegoClickGuiView extends GuiView {
                         value.text(ns.display());   // in place: a rebuild would drop the drag
                     })
                     .size(CARD_INNER, SLIDER_H)
-                    .trackColor(t.surface()).fillColor(t.accent()).thumbColor(t.accentText()));
+                    .trackColor(GuiColors.of(t.surface())).fillColor(GuiColors.of(t.accent())).thumbColor(GuiColors.of(t.accentText())));
             float height = SLIDER_LABEL_H + SLIDER_GAP + SLIDER_H;
             col.height(height);
             return new Row(col, height);
@@ -513,7 +513,7 @@ public class DiegoClickGuiView extends GuiView {
         ButtonComponent b = clickable(t.surface(), action);
         asRow(b, CARD_INNER, 10f).height(ROW_H).padding(0f, 12f).cornerRadius(8f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN)
-                .borderWidth(1f).borderColor(t.border());
+                .borderWidth(1f).borderColor(GuiColors.of(t.border()));
         b.add(GuiText.label(name, t.text(), 14f).flexGrow(1f));
         b.add(GuiText.label(value, t.textMuted(), 13f).textAlignment(GuiTextAlignment.RIGHT));
         wrap.add(b);
@@ -566,7 +566,7 @@ public class DiegoClickGuiView extends GuiView {
 
     private ToggleSwitchComponent toggle(boolean value, java.util.function.Consumer<Boolean> onChange) {
         ToggleSwitchComponent sw = new ToggleSwitchComponent().value(value)
-                .trackOnColor(t.accent()).trackOffColor(t.border())
+                .trackOnColor(GuiColors.of(t.accent())).trackOffColor(GuiColors.of(t.border()))
                 .knobRadius(7f)
                 .onChange(onChange);
         sw.size(TOGGLE_W, TOGGLE_H).flexShrink(0f);
@@ -582,19 +582,19 @@ public class DiegoClickGuiView extends GuiView {
         b.clearChildren();
         b.onPress(action);
         b.autoSize().padding(0f)
-                .backgroundColor(background)
+                .backgroundColor(GuiColors.of(background))
                 .gradient(flat(background))
                 .borderWidth(0f)
                 .shadow(null)
                 .glow(null);
-        b.hovered(c -> c.backgroundColor(t.elevated()).gradient(flat(t.elevated())));
-        b.pressed(c -> c.backgroundColor(t.elevated()).gradient(flat(t.elevated())));
+        b.hovered(c -> c.backgroundColor(GuiColors.of(t.elevated())).gradient(flat(t.elevated())));
+        b.pressed(c -> c.backgroundColor(GuiColors.of(t.elevated())).gradient(flat(t.elevated())));
         return b;
     }
 
     /** A flat single-colour gradient, so the stock button gradient never shows through. */
     private static GuiGradient flat(int argb) {
-        return new GuiGradient().startColor(argb).endColor(argb).angleDegrees(180f);
+        return new GuiGradient().startColor(GuiColors.of(argb)).endColor(GuiColors.of(argb)).angleDegrees(180f);
     }
 
     private ButtonComponent pill(String label, Runnable action) {
@@ -617,7 +617,7 @@ public class DiegoClickGuiView extends GuiView {
     private ContainerComponent chip(String label, int color) {
         ContainerComponent c = row(0f, 0f).autoSize().justifyContent(GuiAlignment.CENTER)
                 .padding(3f, 8f).cornerRadius(5f).flexShrink(0f)
-                .backgroundColor(t.elevated()).borderWidth(1f).borderColor(t.border());
+                .backgroundColor(GuiColors.of(t.elevated())).borderWidth(1f).borderColor(GuiColors.of(t.border()));
         c.add(GuiText.label(label, color, 11f));
         return c;
     }

@@ -3,6 +3,7 @@ package dev.diego.diegoaddons.hud;
 import com.render.api.gui.ContainerComponent;
 import com.render.api.gui.ImageComponent;
 import com.render.api.gui.TextComponent;
+import dev.diego.diegoaddons.gui.GuiColors;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
@@ -131,7 +132,7 @@ public class MusicElement extends HudElement {
             // while the lookup is still out. Two siblings both took up room in the row.
             coverBox = new ContainerComponent();
             coverBox.size(contentH, contentH).cornerRadius(3f)
-                    .backgroundColor(Theme.withAlpha(t.textFaint(), 0.25f));
+                    .backgroundColor(GuiColors.of(Theme.withAlpha(t.textFaint(), 0.25f)));
             cover = new ImageComponent();
             cover.size(contentH, contentH).cornerRadius(3f).visible(false);
             coverBox.add(cover);
@@ -147,9 +148,9 @@ public class MusicElement extends HudElement {
         if (wantBar) {
             ContainerComponent track = row(textWidth, 0f);
             track.height(BAR_H).cornerRadius(BAR_H / 2f)
-                    .backgroundColor(Theme.withAlpha(t.textFaint(), 0.35f));
+                    .backgroundColor(GuiColors.of(Theme.withAlpha(t.textFaint(), 0.35f)));
             barFill = new ContainerComponent();
-            barFill.size(0f, BAR_H).cornerRadius(BAR_H / 2f).backgroundColor(color);
+            barFill.size(0f, BAR_H).cornerRadius(BAR_H / 2f).backgroundColor(GuiColors.of(color));
             track.add(barFill);
             column.add(track);
         }

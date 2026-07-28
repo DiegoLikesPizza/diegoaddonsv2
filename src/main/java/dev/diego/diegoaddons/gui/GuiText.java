@@ -46,7 +46,7 @@ public final class GuiText {
     }
 
     public static TextComponent label(String s, int color, float scale, GuiFont face) {
-        return new TextComponent().text(s).color(color).font(face).textScalePixels(scale)
+        return new TextComponent().text(s).color(GuiColors.of(color)).font(face).textScalePixels(scale)
                 .width(width(s, scale));
     }
 
@@ -55,14 +55,14 @@ public final class GuiText {
      * category icons or the close cross, so through {@link #label} they come out as tofu boxes.
      */
     public static TextComponent glyph(String s, int color, float scale) {
-        return new TextComponent().text(s).color(color).font(GuiFont.minecraftDefault())
+        return new TextComponent().text(s).color(GuiColors.of(color)).font(GuiFont.minecraftDefault())
                 .textScalePixels(scale)
                 .width(Minecraft.getInstance().font.width(s) * (scale / 8f) + 4f);
     }
 
     /** A label that wraps inside {@code width} - descriptions and other running text. */
     public static TextComponent wrapped(String s, int color, float scale, float width) {
-        return new TextComponent().text(s).color(color).font(BODY).textScalePixels(scale)
+        return new TextComponent().text(s).color(GuiColors.of(color)).font(BODY).textScalePixels(scale)
                 .width(width);
     }
 

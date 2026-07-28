@@ -8,6 +8,7 @@ import com.render.api.gui.layout.GuiDisplay;
 import com.render.api.gui.layout.GuiFlexDirection;
 import com.render.api.gui.layout.GuiLength;
 import dev.diego.diegoaddons.gui.Fonts;
+import dev.diego.diegoaddons.gui.GuiColors;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.module.HudModule;
@@ -94,10 +95,10 @@ public abstract class HudElement {
     /** The themed chip background every element sits on. Re-applied when the theme changes. */
     protected void applyBackground(ContainerComponent box, float radius) {
         Theme t = Themes.current();
-        box.backgroundColor((0xCC << 24) | (t.surface() & 0x00FFFFFF))
+        box.backgroundColor(GuiColors.of((0xCC << 24) | (t.surface() & 0x00FFFFFF)))
                 .cornerRadius(radius)
                 .borderWidth(1f)
-                .borderColor(Theme.withAlpha(t.border(), 0.9f));
+                .borderColor(GuiColors.of(Theme.withAlpha(t.border(), 0.9f)));
     }
 
     /** True once per theme change, so an element knows to recolour itself. */
@@ -149,7 +150,7 @@ public abstract class HudElement {
     /** An absolutely-placed coloured box, for the map elements. */
     protected static ContainerComponent block(float x, float y, float w, float h, int color) {
         ContainerComponent box = new ContainerComponent();
-        box.size(w, h).backgroundColor(color)
+        box.size(w, h).backgroundColor(GuiColors.of(color))
                 .position(com.render.api.gui.layout.GuiPositionType.ABSOLUTE).x(x).y(y);
         return box;
     }
@@ -157,12 +158,12 @@ public abstract class HudElement {
     // --- text ---------------------------------------------------------------------------------------
 
     protected static TextComponent text(String s, int color, float scale) {
-        return new TextComponent().text(s).color(color).font(MEDIUM).textScalePixels(scale)
+        return new TextComponent().text(s).color(GuiColors.of(color)).font(MEDIUM).textScalePixels(scale)
                 .width(width(s, scale));
     }
 
     protected static TextComponent small(String s, int color, float scale) {
-        return new TextComponent().text(s).color(color).font(SMALL).textScalePixels(scale)
+        return new TextComponent().text(s).color(GuiColors.of(color)).font(SMALL).textScalePixels(scale)
                 .width(width(s, scale));
     }
 
@@ -170,7 +171,7 @@ public abstract class HudElement {
     protected static TextComponent glyph(String s, int color, float scale) {
         Minecraft mc = Minecraft.getInstance();
         float w = mc != null && mc.font != null ? mc.font.width(s) * (scale / 8f) + 4f : scale;
-        return new TextComponent().text(s).color(color).font(GuiFont.minecraftDefault())
+        return new TextComponent().text(s).color(GuiColors.of(color)).font(GuiFont.minecraftDefault())
                 .textScalePixels(scale).width(w);
     }
 

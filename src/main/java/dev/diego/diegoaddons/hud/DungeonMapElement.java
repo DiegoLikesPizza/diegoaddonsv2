@@ -3,6 +3,7 @@ package dev.diego.diegoaddons.hud;
 import com.render.api.gui.ContainerComponent;
 import com.render.api.gui.TextComponent;
 import com.render.api.gui.layout.GuiPositionType;
+import dev.diego.diegoaddons.gui.GuiColors;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.module.modules.DungeonMapModule;
@@ -61,7 +62,7 @@ public class DungeonMapElement extends HudElement {
         }
         for (int i = 0; i < statLabels.size() && i < stats.size(); i++) {
             DungeonMapModule.StatLine line = stats.get(i);
-            statLabels.get(i).text(line.label() + ": " + line.value()).color(line.color());
+            statLabels.get(i).text(line.label() + ": " + line.value()).color(GuiColors.of(line.color()));
         }
         refreshPlayers(mc);
         return true;
@@ -244,14 +245,14 @@ public class DungeonMapElement extends HudElement {
                 marker(used);
                 dots.get(used).size(size, size).cornerRadius(size / 2f)
                         .x(ex - size / 2f).y(ez - size / 2f)
-                        .backgroundColor(color).visible(true);
+                        .backgroundColor(GuiColors.of(color)).visible(true);
 
                 double yaw = Math.toRadians(p.getYRot());
                 float tx = (float) (ex - Math.sin(yaw) * 5f);
                 float tz = (float) (ez + Math.cos(yaw) * 5f);
                 ticks.get(used).x(Math.min(ex, tx)).y(Math.min(ez, tz))
                         .size(Math.max(1f, Math.abs(tx - ex)), Math.max(1f, Math.abs(tz - ez)))
-                        .backgroundColor(color).visible(true);
+                        .backgroundColor(GuiColors.of(color)).visible(true);
                 used++;
             }
         }

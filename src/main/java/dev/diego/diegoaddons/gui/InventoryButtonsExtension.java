@@ -135,9 +135,9 @@ public final class InventoryButtonsExtension implements ScreenExtension<Abstract
                     .alignItems(GuiAlignment.CENTER)
                     .justifyContent(GuiAlignment.CENTER)
                     .cornerRadius(4f)
-                    .backgroundColor(t.surfaceAlt())
+                    .backgroundColor(GuiColors.of(t.surfaceAlt()))
                     .borderWidth(1f)
-                    .borderColor(Theme.withAlpha(t.border(), 0.9f));
+                    .borderColor(GuiColors.of(Theme.withAlpha(t.border(), 0.9f)));
 
             // The icon fills the button but for a 1px rim, so a gigantic button gets a genuinely
             // larger item rather than a stretched 16px sprite.
