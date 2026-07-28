@@ -205,6 +205,11 @@ public final class WaterSolver {
         if (extended == null) {
             return;   // rotation not known yet, or the slots could not be read
         }
+        // The probes are relative to the room the player is standing in, so a reading is only
+        // meaningful once that room is the water board. Logged rather than said in chat: it is one
+        // line per attempt and only interesting when the solver is late.
+        DiegoAddonsV2Client.LOGGER.info("[DiegoAddons] Water Board probe: room={} extended=[{}] {}",
+                DungeonRooms.currentRoomName(), extended, slotReadout(mc));
         // Three extended slots is what every recorded solution assumes; anything else means the
         // puzzle has already been started and the board no longer matches what was recorded.
         if (extended.isEmpty()) {

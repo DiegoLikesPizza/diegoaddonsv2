@@ -106,6 +106,10 @@ public final class IceFillSolver {
         }
         List<List<List<int[]>>> patterns = shortRoute ? hard : easy;
         PATHS.clear();
+        // Which floors found a pattern at all. A floor that matches none is drawn as nothing, and a
+        // floor that matches the wrong one draws a route over blocks you must not walk on - the two
+        // look the same from the outside, so they are told apart here.
+        boolean[] matched = new boolean[identifiers.size()];
 
         for (int floor = 0; floor < identifiers.size(); floor++) {
             List<List<int[]>> candidates = identifiers.get(floor);
@@ -132,8 +136,18 @@ public final class IceFillSolver {
                     if (!path.isEmpty()) {
                         PATHS.add(path);
                     }
+                    DiegoAddonsV2Client.LOGGER.info(
+                            "[DiegoAddons] Ice Fill floor {} matched pattern {} of {} ({} points)",
+                            floor + 1, i + 1, candidates.size(), path.size());
+                    matched[floor] = true;
                     break;
                 }
+            }
+        }
+        for (int floor = 0; floor < matched.length; floor++) {
+            if (!matched[floor]) {
+                DiegoAddonsV2Client.LOGGER.info(
+                        "[DiegoAddons] Ice Fill floor {} matched no pattern", floor + 1);
             }
         }
         // Only consider the room solved once a path was built; otherwise the caller retries.

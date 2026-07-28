@@ -2,7 +2,6 @@ package dev.diego.diegoaddons.util;
 
 import dev.diego.diegoaddons.module.modules.SecretChimeModule;
 import net.minecraft.client.Minecraft;
-import net.minecraft.sounds.SoundEvents;
 
 /**
  * Watches the dungeon secret count and chimes when it goes up.
@@ -12,6 +11,9 @@ import net.minecraft.sounds.SoundEvents;
  * a count - so on a floor where the tab shows the percentage first it was watching a number that
  * moves in steps of several secrets, and mostly never chimed at all.
  *
+ * <p>It is checked every tick rather than a few times a second: the count itself only moves when
+ * the tab list updates, so anything on top of that is delay for its own sake.
+ *
  * <p>Only increases chime. The count resets to zero on entering a dungeon, and jumping from a high
  * number back to zero is a new run rather than progress.
  */
@@ -20,14 +22,12 @@ public final class SecretChime {
     private static final int INTERVAL = 5;
 
     private static int lastCount = -1;
-    private static int tick;
 
     private SecretChime() {
     }
 
     public static void reset() {
         lastCount = -1;
-        tick = 0;
     }
 
     public static void tick(Minecraft mc) {
@@ -35,18 +35,13 @@ public final class SecretChime {
         if (mod == null || !mod.isEnabled() || mc.player == null) {
             return;
         }
-        if (++tick < INTERVAL) {
-            return;
-        }
-        tick = 0;
-
         int count = DungeonState.inDungeons() ? DungeonState.secretsFound() : -1;
         if (count < 0) {
             lastCount = -1;   // left the dungeon; start fresh next time
             return;
         }
         if (lastCount >= 0 && count > lastCount) {
-            mc.player.playSound(SoundEvents.NOTE_BLOCK_PLING.value(), 1.0f, 2.0f);
+            mc.player.playSound(mod.chosenSound(), 1.0f, mod.pitch());
         }
         lastCount = count;
     }

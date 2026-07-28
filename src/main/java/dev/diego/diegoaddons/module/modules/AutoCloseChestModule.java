@@ -62,7 +62,11 @@ public class AutoCloseChestModule extends Module {
         }
         if (++emptyTicks >= EMPTY_TICKS) {
             forget();
-            mc.player.closeContainer();
+            // The screen's own close, which is what pressing escape runs. Calling
+            // player.closeContainer() instead sent the packet and swapped the menu back to the
+            // player's - but left the chest sitting on screen, which from the outside looks exactly
+            // like a feature that does nothing.
+            cs.onClose();
         }
     }
 
