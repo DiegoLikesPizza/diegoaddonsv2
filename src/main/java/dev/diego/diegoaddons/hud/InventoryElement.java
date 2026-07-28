@@ -86,6 +86,7 @@ public class InventoryElement extends HudElement {
     private final List<ItemStack> shown = new ArrayList<>();
     private Slot petSlot;
     private ContainerComponent petCard;
+    private ContainerComponent petIconRow;
     private ContainerComponent petNameRow;
     private ContainerComponent petLevelRow;
     private TextComponent petName;
@@ -131,18 +132,20 @@ public class InventoryElement extends HudElement {
             root.backgroundColor(0x00000000).borderWidth(0f);
         }
 
-        if (inv.showArmor()) {
-            root.add(slotColumn(armor, 4));
-        }
-        if (inv.showPlayerModel()) {
-            root.add(playerModel());
-        }
-        if (inv.showEquipment()) {
-            root.add(slotColumn(equipment, 4));
-        }
-        root.add(storage());
-        if (inv.showPet()) {
-            root.add(petCard());
+        // Left to right in whatever order the module was arranged in.
+        for (String section : inv.sectionOrder()) {
+            if (!inv.sectionShown(section)) {
+                continue;
+            }
+            switch (section) {
+                case "armor" -> root.add(slotColumn(armor, 4));
+                case "player" -> root.add(playerModel());
+                case "equipment" -> root.add(slotColumn(equipment, 4));
+                case "storage" -> root.add(storage());
+                case "pet" -> root.add(petCard());
+                default -> {
+                }
+            }
         }
     }
 
@@ -157,14 +160,15 @@ public class InventoryElement extends HudElement {
     }
 
     private ContainerComponent storage() {
-        float rowW = COLS * CELL + (COLS - 1) * SLOT_GAP;
+        float cell = storageCell();
+        float rowW = COLS * cell + (COLS - 1) * SLOT_GAP;
         ContainerComponent wrap = column(rowW, HOTBAR_GAP);
 
         ContainerComponent rows = column(rowW, SLOT_GAP);
         for (int r = 0; r < ROWS; r++) {
             ContainerComponent line = row(rowW, SLOT_GAP);
             for (int c = 0; c < COLS; c++) {
-                Slot slot = slot();
+                Slot slot = slot(cell);
                 grid.add(slot);
                 line.add(slot.box());
             }
@@ -175,13 +179,33 @@ public class InventoryElement extends HudElement {
         if (inv.showHotbar()) {
             ContainerComponent line = row(rowW, SLOT_GAP);
             for (int c = 0; c < COLS; c++) {
-                Slot slot = slot();
+                Slot slot = slot(cell);
                 hotbar.add(slot);
                 line.add(slot.box());
             }
             wrap.add(line);
         }
         return wrap;
+    }
+
+    /** Rows the storage grid stacks: the three stash rows, plus the hotbar when it is on. */
+    private int storageRows() {
+        return ROWS + (inv.showHotbar() ? 1 : 0);
+    }
+
+    private float storageGaps() {
+        return (ROWS - 1) * SLOT_GAP + (inv.showHotbar() ? HOTBAR_GAP : 0f);
+    }
+
+    /**
+     * The slot size that makes the grid exactly as tall as the tallest section beside it - three
+     * rows of storage against four of armour left the grid a head short, with the element's
+     * background padding out the difference. Slots only ever grow, never shrink below {@link #CELL},
+     * and since RenderLib rasterises an item at its box size they come out genuinely bigger rather
+     * than stretched.
+     */
+    private float storageCell() {
+        return Math.max(CELL, (contentHeight() - storageGaps()) / storageRows());
     }
 
     /**
@@ -225,7 +249,12 @@ public class InventoryElement extends HudElement {
         petCard = column(petWidth, 2f);
         petCard.alignItems(GuiAlignment.CENTER);
         petSlot = slot(PET_ITEM);
-        petCard.add(petSlot.box());
+        // The icon sits in a row of the card's full width so it stays over the middle of the name,
+        // whatever the name does to that width.
+        petIconRow = row(petWidth, 0f);
+        petIconRow.height(PET_ITEM).justifyContent(GuiAlignment.CENTER);
+        petIconRow.add(petSlot.box());
+        petCard.add(petIconRow);
         petName = text("", Themes.current().text(), PET_NAME_PX)
                 .textAlignment(GuiTextAlignment.CENTER).lineHeight(LINE_HEIGHT).width(petWidth);
         petLevel = small("", Themes.current().textMuted(), PET_LINE)
@@ -246,6 +275,7 @@ public class InventoryElement extends HudElement {
         }
         petWidth = wanted;
         petCard.width(wanted);
+        petIconRow.width(wanted);
         petNameRow.width(wanted);
         petLevelRow.width(wanted);
         petName.width(wanted);

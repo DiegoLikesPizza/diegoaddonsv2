@@ -26,6 +26,12 @@ public class ModuleConfig {
     /** Feature-specific numeric settings, keyed by the setting key. */
     public Map<String, Double> numbers = new HashMap<>();
 
+    /**
+     * Feature-specific text settings, keyed by the setting key - for the things a toggle or a number
+     * cannot say, such as the order the inventory HUD lays its sections out in.
+     */
+    public Map<String, String> texts = new HashMap<>();
+
     public ModuleConfig() {
     }
 

@@ -1,56 +1,30 @@
 package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.gui.Fonts;
-import dev.diego.diegoaddons.gui.Theme;
-import dev.diego.diegoaddons.gui.UiRender;
+import dev.diego.diegoaddons.gui.InventoryLayoutScreen;
+import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.HudModule;
 import dev.diego.diegoaddons.util.SkyblockHud;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemStack;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A HUD element that mirrors the player's inventory on screen as a grid of item slots, so you can
  * see your inventory without opening it.
  *
- * <p>The element is built from optional <b>sections</b>, always laid out left to right in this
- * order: <b>armour, player model, equipment, inventory, pet</b>. Every section declares its natural
- * size and is then <b>scaled to fill the element's full height</b> (see {@link #fill(int)}), so no
- * section is left as a short stub next to a taller one - whichever section is naturally tallest sets
- * the height and the rest grow to match.
+ * <p>The element is built from optional <b>sections</b> - armour, player model, equipment, the
+ * storage grid and the pet card - laid out left to right in whatever order you arrange them in
+ * ({@link InventoryLayoutScreen}, from this feature's settings). Whichever section is tallest sets
+ * the height and the storage grid grows its slots to match, so the element has no half-empty column.
  *
- * <p>It is a custom-drawn {@link HudModule} (overrides the footprint and drawing instead of using
- * the default text chip) and works with the HUD editor's drag + scroll-to-scale.
+ * <p>The drawing lives in {@link dev.diego.diegoaddons.hud.InventoryElement}, which builds it as a
+ * RenderLib component tree; this class is only the settings and what they mean.
  */
 public class InventoryHudModule extends HudModule {
-    private static final int COLS = 9;
-    private static final int ROWS = 3;
-    private static final int SLOT = 18;       // cell stride
-    private static final int CELL = 16;       // drawn cell / item size
-    private static final int PAD = 5;
-    private static final int GAP = 6;         // gap between main storage and the hotbar row
-    private static final int SECTION_GAP = 6; // gap between sections
-    private static final int MODEL_W = 44;
-    private static final int COL_H = (4 - 1) * SLOT + CELL;   // 4 stacked slots (armour / equipment)
-    private static final int GRID_W = (COLS - 1) * SLOT + CELL;
-
-    // Pet card: item on top, then the name row and the level row.
-    private static final int PET_LINE_H = Fonts.SMALL_H;
-    private static final int PET_GAP = 3;
-    private static final int PET_H = CELL + PET_GAP + PET_LINE_H * 2 + 1;
-    private static final int PET_MIN_W = 54;
-
-    private static final EquipmentSlot[] ARMOR = {
-            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
-    };
-
     private final BooleanSetting background = new BooleanSetting(this, "background", "Background", true);
     private final BooleanSetting slotBoxes = new BooleanSetting(this, "slots", "Slot boxes", true);
     private final BooleanSetting hotbar = new BooleanSetting(this, "hotbar", "Show hotbar", false);
@@ -59,6 +33,8 @@ public class InventoryHudModule extends HudModule {
     private final BooleanSetting equipment = new BooleanSetting(this, "equipment", "Equipment (SkyBlock)", false);
     private final BooleanSetting pet = new BooleanSetting(this, "pet", "Pet (SkyBlock)", false);
     private final BooleanSetting debugScan = new BooleanSetting(this, "debug", "Debug scan (log)", false);
+    private final ActionSetting layout =
+            new ActionSetting(this, "layout", "Section order", "Arrange", this::openLayoutEditor);
 
     public InventoryHudModule() {
         super("inventory", "Inventory HUD", "Shows your inventory as a grid of item slots.", false);
@@ -69,6 +45,7 @@ public class InventoryHudModule extends HudModule {
         settings.add(playerModel);
         settings.add(equipment);
         settings.add(pet);
+        settings.add(layout);
         settings.add(debugScan);
     }
 
@@ -101,44 +78,10 @@ public class InventoryHudModule extends HudModule {
         return null; // custom-drawn; see drawLocal
     }
 
-    // --- Natural (unscaled) section sizes -------------------------------------------------------
-
-    private int gridH() {
-        return (ROWS - 1) * SLOT + CELL + (hotbar.get() ? GAP + CELL : 0);
-    }
-
-    private int petW(Font font) {
-        SkyblockHud.PetInfo info = SkyblockHud.petInfo();
-        if (info == null) {
-            return PET_MIN_W;
-        }
-        int w = Math.max(Fonts.width(font, info.name(), Fonts.SMALL), Fonts.width(font, levelLine(info), Fonts.SMALL));
-        return Math.max(PET_MIN_W, w);
-    }
-
+    /** The pet's level line, as shown under its icon. */
     private static String levelLine(SkyblockHud.PetInfo info) {
         String lvl = info.level() >= 0 ? "Lvl " + info.level() : "Lvl ?";
         return info.xp() == null ? lvl : lvl + "  " + info.xp();
-    }
-
-    /**
-     * Height of the element's content: the tallest enabled section. Every other section is scaled up
-     * to this, so the element has no half-empty columns.
-     */
-    private int contentH() {
-        int h = gridH();
-        if (armor.get() || equipment.get()) {
-            h = Math.max(h, COL_H);
-        }
-        if (pet.get()) {
-            h = Math.max(h, PET_H);
-        }
-        return h;
-    }
-
-    /** The factor that makes a section of natural height {@code naturalH} fill the element. */
-    private float fill(int naturalH) {
-        return naturalH > 0 ? contentH() / (float) naturalH : 1f;
     }
 
     // --- read by the RenderLib element -----------------------------------------------------------
@@ -177,52 +120,80 @@ public class InventoryHudModule extends HudModule {
     }
 
     /**
-     * Which sections are on, as a string - the element rebuilds its tree when this changes and
-     * leaves it alone otherwise.
+     * Which sections are on and in what order, as a string - the element rebuilds its tree when this
+     * changes and leaves it alone otherwise.
      */
     public String sectionSignature() {
         return "" + background.get() + slotBoxes.get() + hotbar.get() + armor.get()
-                + playerModel.get() + equipment.get() + pet.get();
+                + playerModel.get() + equipment.get() + pet.get() + String.join(",", sectionOrder());
+    }
+
+    // --- section order ----------------------------------------------------------------------------
+
+    /** The sections, in the order they are laid out in unless you rearrange them. */
+    public static final List<String> SECTIONS =
+            List.of("armor", "player", "equipment", "storage", "pet");
+
+    /** What a section is called in the arranging screen. */
+    public static String sectionName(String section) {
+        return switch (section) {
+            case "armor" -> "Armor";
+            case "player" -> "Player model";
+            case "equipment" -> "Equipment";
+            case "storage" -> "Inventory";
+            case "pet" -> "Pet";
+            default -> section;
+        };
+    }
+
+    /** Whether a section is currently drawn; the storage grid is the one that is always there. */
+    public boolean sectionShown(String section) {
+        return switch (section) {
+            case "armor" -> armor.get();
+            case "player" -> playerModel.get();
+            case "equipment" -> equipment.get();
+            case "pet" -> pet.get();
+            default -> true;
+        };
+    }
+
+    /**
+     * The left-to-right order of the sections. Read back defensively: anything unknown is dropped and
+     * anything missing is appended, so a hand-edited or older config still gives a full layout.
+     */
+    public List<String> sectionOrder() {
+        List<String> out = new ArrayList<>();
+        String saved = ConfigManager.moduleConfig(id).texts.get(ORDER_KEY);
+        if (saved != null) {
+            for (String part : saved.split(",")) {
+                String s = part.trim();
+                if (SECTIONS.contains(s) && !out.contains(s)) {
+                    out.add(s);
+                }
+            }
+        }
+        for (String s : SECTIONS) {
+            if (!out.contains(s)) {
+                out.add(s);
+            }
+        }
+        return out;
+    }
+
+    public void setSectionOrder(List<String> order) {
+        ConfigManager.moduleConfig(id).texts.put(ORDER_KEY, String.join(",", order));
+        ConfigManager.save();
+    }
+
+    private static final String ORDER_KEY = "sectionOrder";
+
+    private void openLayoutEditor() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.setScreen(new InventoryLayoutScreen(mc.screen, this));
     }
 
     @Override
     public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
         return new dev.diego.diegoaddons.hud.InventoryElement(this, root);
-    }
-
-
-
-
-    /** The pet section: item centred on top, then the rarity-coloured name and the level row. */
-    private void drawPet(GuiGraphicsExtractor g, Font font, Theme t, boolean smooth, int x) {
-        float s = fill(PET_H);
-        int cardW = petW(font);
-        g.pose().pushMatrix();
-        g.pose().translate(x, PAD);
-        g.pose().scale(s);
-
-        SkyblockHud.PetInfo info = SkyblockHud.petInfo();
-        slot(g, font, t, smooth, SkyblockHud.pet(), (cardW - CELL) / 2, 0, false);
-        if (info == null) {
-            UiRender.text(g, font, "No pet", Fonts.SMALL, 0, CELL + PET_GAP, t.textFaint());
-        } else {
-            UiRender.text(g, font, info.name(), Fonts.SMALL, 0, CELL + PET_GAP, info.colour());
-            UiRender.text(g, font, levelLine(info), Fonts.SMALL, 0, CELL + PET_GAP + PET_LINE_H + 1, t.textMuted());
-        }
-        g.pose().popMatrix();
-    }
-
-    private void slot(GuiGraphicsExtractor g, Font font, Theme t, boolean smooth,
-                      ItemStack stack, int x, int y, boolean selected) {
-        if (slotBoxes.get()) {
-            UiRender.fillRounded(g, x, y, CELL, CELL, 3, Theme.withAlpha(t.textFaint(), 0.16f), smooth);
-        }
-        if (selected) {
-            UiRender.strokeRounded(g, x - 1, y - 1, CELL + 2, CELL + 2, 4, t.accent(), smooth);
-        }
-        if (stack != null && !stack.isEmpty()) {
-            g.item(stack, x, y);
-            g.itemDecorations(font, stack, x, y);
-        }
     }
 }
