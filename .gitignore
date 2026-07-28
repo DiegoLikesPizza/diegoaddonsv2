@@ -35,3 +35,6 @@ feature-reference/
 
 # Scratch/experiment area.
 scratchpad/
+
+# Agent worktrees - checkouts of this same repo, never part of it.
+.claude/worktrees/
