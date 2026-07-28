@@ -49,16 +49,76 @@ public final class CustomScoreboard {
         entries.sort(Comparator.comparingInt(PlayerScoreEntry::value).reversed());
 
         List<Component> lines = new ArrayList<>();
+        if (!mod.topText().isBlank()) {
+            lines.add(Component.literal(mod.topText().replace('&', '§')));
+        }
         for (PlayerScoreEntry e : entries) {
             if (lines.size() >= MAX_LINES) {
                 break;
             }
             PlayerTeam team = sb.getPlayersTeam(e.owner());
-            lines.add(team != null
+            Component line = team != null
                     ? Component.empty().append(team.getPlayerPrefix()).append(team.getPlayerSuffix())
-                    : e.ownerName());
+                    : e.ownerName();
+            if (dropped(mod, LegacyText.strip(line.getString()))) {
+                continue;
+            }
+            lines.add(line);
         }
-        draw(g, mc, mod, obj.getDisplayName(), lines);
+        if (mod.showBank()) {
+            String bank = bankLine(mc);
+            if (bank != null) {
+                lines.add(Component.literal("§6Bank: §f" + bank));
+            }
+        }
+        if (!mod.bottomText().isBlank()) {
+            lines.add(Component.literal(mod.bottomText().replace('&', '§')));
+        }
+        Component title = mod.customTitle().isBlank()
+                ? obj.getDisplayName()
+                : Component.literal(mod.customTitle().replace('&', '§'));
+        draw(g, mc, mod, title, lines);
+    }
+
+    /**
+     * Whether a sidebar line is one of the ones you asked not to see.
+     *
+     * <p>SkyBlock's sidebar ends with a server id and the network's own address, which are three of
+     * fifteen lines saying nothing about what you are doing. They are matched by shape rather than
+     * by position, since the sidebar's length changes with where you are.
+     */
+    private static boolean dropped(CustomScoreboardModule mod, String plain) {
+        String s = plain.trim();
+        if (s.isEmpty()) {
+            return false;
+        }
+        String lower = s.toLowerCase(java.util.Locale.ROOT);
+        if (mod.hideUrl() && (lower.contains("hypixel.net") || lower.contains("www."))) {
+            return true;
+        }
+        // A server id is the trailing token of the date line ("11/12/24 m123AB") or a line of its
+        // own: a letter, then digits and letters, no spaces.
+        if (mod.hideServerId() && SERVER_ID.matcher(s).matches()) {
+            return true;
+        }
+        return mod.hideDate() && DATE.matcher(s).find();
+    }
+
+    /** "m123AB" / "M12-3" - the instance name Hypixel prints at the bottom. */
+    private static final java.util.regex.Pattern SERVER_ID =
+            java.util.regex.Pattern.compile("^[a-zA-Z]{1,3}[0-9]{1,4}[a-zA-Z0-9-]*$");
+    private static final java.util.regex.Pattern DATE =
+            java.util.regex.Pattern.compile("\\d{2}/\\d{2}/\\d{2}");
+
+    /** The bank balance from the tab list, or null when it is not shown there. */
+    private static String bankLine(Minecraft mc) {
+        for (String line : SkyblockLocation.tabLines(mc)) {
+            String plain = LegacyText.strip(line).trim();
+            if (plain.startsWith("Bank:")) {
+                return plain.substring("Bank:".length()).trim();
+            }
+        }
+        return null;
     }
 
     private static void draw(GuiGraphicsExtractor g, Minecraft mc, CustomScoreboardModule mod,

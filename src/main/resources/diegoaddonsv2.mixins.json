@@ -15,6 +15,7 @@
     "ClientboundPingPacketMixin",
     "CustomHeadLayerMixin",
     "EffectsInInventoryMixin",
+    "EntityInvisibilityMixin",
     "EtherwarpSoundMixin",
     "FontMixin",
     "ForceNametagMixin",

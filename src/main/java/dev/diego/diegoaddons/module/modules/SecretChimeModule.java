@@ -1,13 +1,13 @@
 package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.module.Category;
-import dev.diego.diegoaddons.module.CycleSetting;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.NumberSetting;
+import dev.diego.diegoaddons.module.StringSetting;
 import dev.diego.diegoaddons.util.SecretChime;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
 
 /**
  * Plays a short note whenever a dungeon secret is found, so you can tell without watching the tab
@@ -19,8 +19,10 @@ import net.minecraft.sounds.SoundEvents;
 public class SecretChimeModule extends Module {
     public static SecretChimeModule INSTANCE;
 
-    private final CycleSetting sound = new CycleSetting(this, "sound", "Sound", 0,
-            "Pling", "Bell", "Chime", "Harp", "Xylophone", "Orb", "Anvil");
+    private static final String DEFAULT_SOUND = "minecraft:block.note_block.pling";
+
+    private final StringSetting sound = new StringSetting(this, "sound", "Sound", DEFAULT_SOUND,
+            SecretChimeModule::openBrowser);
     private final NumberSetting pitch =
             new NumberSetting(this, "pitch", "Pitch", 2.0, 0.5, 2.0, 0.1);
 
@@ -32,17 +34,25 @@ public class SecretChimeModule extends Module {
         INSTANCE = this;
     }
 
-    /** The sound picked in the settings. */
+    /**
+     * The chosen sound, as an event the client can play.
+     *
+     * <p>Built from the id rather than looked up in the registry, so a sound a resource pack adds
+     * works exactly as well as one the game ships - the client plays what it is asked for by name.
+     */
     public SoundEvent chosenSound() {
-        return switch (sound.get()) {
-            case 1 -> SoundEvents.NOTE_BLOCK_BELL.value();
-            case 2 -> SoundEvents.NOTE_BLOCK_CHIME.value();
-            case 3 -> SoundEvents.NOTE_BLOCK_HARP.value();
-            case 4 -> SoundEvents.NOTE_BLOCK_XYLOPHONE.value();
-            case 5 -> SoundEvents.EXPERIENCE_ORB_PICKUP;
-            case 6 -> SoundEvents.ANVIL_LAND;
-            default -> SoundEvents.NOTE_BLOCK_PLING.value();
-        };
+        Identifier id = Identifier.tryParse(sound.get());
+        return SoundEvent.createVariableRangeEvent(id == null
+                ? Identifier.parse(DEFAULT_SOUND) : id);
+    }
+
+    private static void openBrowser() {
+        SecretChimeModule mod = INSTANCE;
+        if (mod == null) {
+            return;
+        }
+        Minecraft.getInstance().execute(() ->
+                new dev.diego.diegoaddons.gui.SoundBrowserView(mod.sound.get(), mod.sound::set).open());
     }
 
     public float pitch() {

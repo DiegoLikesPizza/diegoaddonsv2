@@ -28,6 +28,7 @@ import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.ModuleManager;
 import dev.diego.diegoaddons.module.NumberSetting;
 import dev.diego.diegoaddons.module.Setting;
+import dev.diego.diegoaddons.module.StringSetting;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -501,6 +502,11 @@ public class DiegoClickGuiView extends GuiView {
                 ks.clear();
                 fill(cards.get(ks.owner.id), true);
             });
+        }
+        if (s instanceof StringSetting str) {
+            // The value is usually long (a sound id is a whole namespace), so it gets the row to
+            // itself and the chooser is what a click opens.
+            return valueRow(str.name, str.get(), str::choose);
         }
         if (s instanceof ColorSetting col) {
             return colorRow(col);

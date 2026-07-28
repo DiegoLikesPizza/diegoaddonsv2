@@ -16,14 +16,6 @@ import java.util.Locale;
  * this sends commands on your behalf.
  */
 public final class AutoGfs {
-    /** One refillable item: what to look for in an item's name, and its SkyBlock sack id. */
-    public record Item(String match, String id) {
-    }
-
-    public static final Item PEARLS = new Item("ender pearl", "ENDER_PEARL");
-    public static final Item SUPERBOOM = new Item("superboom", "SUPERBOOM_TNT");
-    public static final Item LEAPS = new Item("spirit leap", "SPIRIT_LEAP");
-
     /** Minimum gap between two refills, so a low stack cannot spam commands. */
     private static final long COOLDOWN_MS = 5000;
     private static final int CHECK_INTERVAL = 20;
@@ -57,13 +49,12 @@ public final class AutoGfs {
             return;
         }
 
-        int threshold = mod.threshold();
-        for (Item item : mod.enabledItems()) {
+        for (dev.diego.diegoaddons.config.GfsItem item : mod.enabledItems()) {
             int[] state = scan(mc, item.match());
             int have = state[0];
             int maxStack = state[1];
             // Zero means "not carried at all" rather than "ran out", so it is left alone.
-            if (have <= 0 || have >= threshold) {
+            if (have <= 0 || have >= item.threshold) {
                 continue;
             }
             // Top the stack back up to full rather than always pulling a whole stack - grabbing 16
@@ -73,7 +64,7 @@ public final class AutoGfs {
                 continue;
             }
             lastRefill = System.currentTimeMillis();
-            mc.player.connection.sendCommand("gfs " + item.id() + " " + deficit);
+            mc.player.connection.sendCommand("gfs " + item.sackId() + " " + deficit);
             return;   // one refill at a time; the next check picks up the rest
         }
     }

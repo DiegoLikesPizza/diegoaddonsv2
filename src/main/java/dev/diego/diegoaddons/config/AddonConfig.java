@@ -53,5 +53,11 @@ public class AddonConfig {
 
     /** User-recorded mining routes, and the one currently being drawn (see the Mining Routes module). */
     public List<MiningRoute> miningRoutes = new ArrayList<>();
+
+    /** The items Auto GFS keeps topped up, in the order they are checked. */
+    public List<GfsItem> gfsItems = new ArrayList<>();
+
+    /** Whether the three it used to have built in have been offered once. Emptying the list sticks. */
+    public boolean gfsSeeded = false;
     public String activeMiningRoute = "";
 }

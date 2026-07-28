@@ -44,11 +44,11 @@ build, a deploy and a run in game before the next starts.
 
 ## Batch 5 — the bigger features
 
-- [ ] **Custom Scoreboard** — customisation: hide the server id, hide the Hypixel URL, custom text
-      top and bottom, show bank balance, and the rest of that family
-- [ ] **Show Hidden Mobs** — reveal invisible dungeon mobs (shadow assassins, fels)
-- [ ] **Secret Chime** — a browser for the game's sounds to pick from
-- [ ] **Auto GFS** — custom items, sliders for all three defaults, likely its own GUI
+- [x] **Custom Scoreboard** — hide server id / URL / date, custom title, text top and bottom, bank
+      balance from the tab list
+- [x] **Show Hidden Mobs** — reveal invisible dungeon mobs (shadow assassins, fels)
+- [x] **Secret Chime** — any sound id in the game, from a searchable browser with preview
+- [x] **Auto GFS** — its own RenderLib screen; items by SkyBlock name, one threshold each
 
 ## Batch 6 — the last three screens on the old drawing
 
@@ -64,4 +64,4 @@ build, a deploy and a run in game before the next starts.
   client-initiated ping, so the only number available is the one the server hands out
   (`PlayerInfo.setLatency`). On Hypixel that is measured behind the proxy, which is why it reads
   1 ms. **Decided: the row is gone** - better no number than a confident wrong one.
-- **Auto GFS custom items** - whether "custom item" means any item id, or SkyBlock items by name.
+- ~~Auto GFS custom items~~ - decided: SkyBlock item names, with the sack id derived from the name.
