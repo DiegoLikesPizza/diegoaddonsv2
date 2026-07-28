@@ -7,6 +7,7 @@ import dev.diego.diegoaddons.gui.Fonts;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
+import dev.diego.diegoaddons.module.modules.AchievementsModule;
 import dev.diego.diegoaddons.module.modules.AnimationsModule;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
 import dev.diego.diegoaddons.module.modules.AnnounceKickModule;
@@ -161,6 +162,7 @@ public final class ModuleManager {
         register(new ChestSolverModule(), false);
         register(new MiningRoutesModule(), false);
         register(new CommandHotkeysModule(), false);
+        register(new AchievementsModule(), false);
         register(new SlayerBossHighlightModule(), false);
         register(new SlayerMinibossEspModule(), false);
         register(new VoidgloomSlayerModule(), false);
@@ -270,6 +272,8 @@ public final class ModuleManager {
                 dev.diego.diegoaddons.util.FishingAlerts.onMessage(plain);
                 PrinceMessageModule.onMessage(plain);
                 AutoRequeueModule.onMessage(plain);
+                // Both the profile-switch line and the achievement chat triggers.
+                dev.diego.diegoaddons.util.Achievements.onMessage(plain);
             }
         });
 
@@ -336,6 +340,7 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.EspDraw.clear();
             dev.diego.diegoaddons.util.EspWorld.clear();
             PartyCommands.reset();
+            dev.diego.diegoaddons.util.Achievements.reset();
         });
 
         DiegoAddonsV2Client.LOGGER.info("[DiegoAddons V2] {} modules registered", MODULES.size());

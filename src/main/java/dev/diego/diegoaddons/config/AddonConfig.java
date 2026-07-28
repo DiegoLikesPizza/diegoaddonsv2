@@ -54,6 +54,18 @@ public class AddonConfig {
     /** User-recorded mining routes, and the one currently being drawn (see the Mining Routes module). */
     public List<MiningRoute> miningRoutes = new ArrayList<>();
 
+    /** Achievements you wrote yourself (see the Custom Achievements module). */
+    public List<Achievement> achievements = new ArrayList<>();
+
+    /**
+     * Achievement id to the moment it unlocked, for this account as a whole. Held here rather than
+     * per profile: earning something is a fact about you, not about the profile you were on.
+     */
+    public Map<String, Long> achievementUnlocks = new LinkedHashMap<>();
+
+    /** Per-profile observations the achievement conditions are evaluated over, keyed by profile name. */
+    public Map<String, ProfileStats> profileStats = new LinkedHashMap<>();
+
     /** The items Auto GFS keeps topped up, in the order they are checked. */
     public List<GfsItem> gfsItems = new ArrayList<>();
 

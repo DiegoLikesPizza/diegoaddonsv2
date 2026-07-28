@@ -89,6 +89,8 @@ public final class DiegoCommands {
                         .executes(c -> openView(() -> new CommandHotkeysView())))
                 .then(ClientCommands.literal("blocked")
                         .executes(c -> openView(() -> new IgnoreListView())))
+                .then(ClientCommands.literal("achievements")
+                        .executes(c -> openView(dev.diego.diegoaddons.gui.AchievementsView::new)))
                 .then(ClientCommands.literal("block")
                         .then(ClientCommands.argument("player", StringArgumentType.word())
                                 .executes(c -> block(c.getSource(), StringArgumentType.getString(c, "player"), ""))
