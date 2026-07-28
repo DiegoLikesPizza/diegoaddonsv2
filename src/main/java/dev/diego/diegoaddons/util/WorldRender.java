@@ -78,9 +78,15 @@ public final class WorldRender {
             return;
         }
         for (Label l : labels) {
-            ctx.text(l.text(), l.pos(), LABEL_MATERIAL, l.scale());
+            // RenderLib wants a text size here, not a multiplier. Every caller passes 1.0f meaning
+            // "normal", which asked for one-pixel text - drawn, and far too small to see, which is
+            // indistinguishable from not drawn at all.
+            ctx.text(l.text(), l.pos(), LABEL_MATERIAL, LABEL_PX * l.scale());
         }
     }
+
+    /** What "scale 1" means in pixels. */
+    private static final float LABEL_PX = 12f;
 
     /** White, drawn through walls: a label you cannot see is not worth queuing. */
     private static final com.render.api.world.WorldMaterial LABEL_MATERIAL =

@@ -14,6 +14,7 @@ import dev.diego.diegoaddons.module.modules.AutoRequeueModule;
 import dev.diego.diegoaddons.module.modules.AutoSprintModule;
 import dev.diego.diegoaddons.module.modules.ForceNametagModule;
 import dev.diego.diegoaddons.module.modules.FullbrightModule;
+import dev.diego.diegoaddons.module.modules.HydrationReminderModule;
 import dev.diego.diegoaddons.module.modules.ItemRarityModule;
 import dev.diego.diegoaddons.module.modules.AutoGfsModule;
 import dev.diego.diegoaddons.module.modules.BetterIgnoreListModule;
@@ -133,6 +134,7 @@ public final class ModuleManager {
         register(new ShowHiddenMobsModule(), false);
         register(new BorderlessFullscreenModule(), false);
         register(new TitleScreenModule(), true);
+        register(new HydrationReminderModule(), false);
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);
@@ -183,6 +185,10 @@ public final class ModuleManager {
             }
             return net.minecraft.world.InteractionResult.PASS;
         });
+
+        // What a party is short of, at the bottom of the tooltip you are already reading.
+        net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register(
+                (stack, context, flag, lines) -> PartyFinder.appendTooltip(stack, lines));
 
         // Always-on dispatch hooks.
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
@@ -279,9 +285,6 @@ public final class ModuleManager {
                     // Inventory buttons are not drawn here any more - they are a RenderLib screen
                     // extension (see InventoryButtonsExtension), which owns their hit testing too.
                     dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
-                    // On top of the items: drawn with the background it was painted over by the
-                    // very listings it describes.
-                    PartyFinder.hover((AbstractContainerScreen<?>) scr, g, mx, my);
                     dev.diego.diegoaddons.util.SlotLocks.keys((AbstractContainerScreen<?>) scr, mx, my);
                     Toasts.render(g);
                 });

@@ -91,7 +91,7 @@ public class AutoGfsView extends DiegoView {
     }
 
     private ContainerComponent itemRow(GfsItem item, float inner) {
-        ContainerComponent card = column(inner, 6f).padding(10f, 12f).cornerRadius(10f)
+        ContainerComponent card = column(inner, 6f).flexShrink(0f).padding(10f, 12f).cornerRadius(10f)
                 .backgroundColor(GuiColors.of(t.surfaceAlt()))
                 .borderWidth(1f).borderColor(GuiColors.of(t.border()));
 

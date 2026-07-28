@@ -12,6 +12,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemLore;
 
@@ -91,63 +92,39 @@ public final class PartyFinder {
         }
     }
 
-    /** The hover panel, drawn after the items so they cannot paint over it. */
-    public static void hover(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
-                             int mouseX, int mouseY) {
-        PartyFinderModule mod = PartyFinderModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || !mod.showMissing() || !isPartyFinder(screen)) {
-            return;
-        }
-        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
-        drawMissing(screen, g, acc.diego$leftPos(), acc.diego$topPos(), mouseX, mouseY);
-    }
-
     /**
-     * Names the classes nobody in the hovered listing is playing, beside the cursor.
+     * Adds a "missing" line to a party listing's own tooltip.
      *
-     * <p>The highlight only answers "does this party want what I picked". This answers the question
-     * you actually have while reading the list - what is this party short of - without making you
-     * count five names in the tooltip yourself.
+     * <p>This was a panel drawn beside the cursor, which meant two boxes of text about the same
+     * party, in different styles, fighting for the same corner of the screen. The listing already
+     * has a tooltip you are reading; the answer belongs at the bottom of it.
      */
-    private static void drawMissing(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
-                                    int leftPos, int topPos, int mouseX, int mouseY) {
-        List<Slot> slots = screen.getMenu().slots;
-        int chestCount = Math.max(0, slots.size() - PLAYER_INV_SLOTS);
-        for (int i = 0; i < chestCount && i < slots.size(); i++) {
-            Slot s = slots.get(i);
-            int x = leftPos + s.x;
-            int y = topPos + s.y;
-            if (mouseX < x || mouseX >= x + SLOT || mouseY < y || mouseY >= y + SLOT) {
-                continue;
-            }
-            ItemStack stack = s.getItem();
-            if (stack.isEmpty()
-                    || !LISTING.matcher(LegacyText.strip(stack.getHoverName().getString()).trim()).matches()) {
-                return;
-            }
-            List<String> taken = memberClasses(stack);
-            if (taken.isEmpty()) {
-                return;   // unreadable listing; saying "missing everything" would be a lie
-            }
-            List<String> missing = new ArrayList<>();
-            for (int c = 0; c < CLASSES.length; c++) {
-                if (!taken.contains(CLASSES[c])) {
-                    missing.add(CLASS_NAMES[c]);
-                }
-            }
-            Theme t = Themes.current();
-            boolean sm = ConfigManager.get().smoothCorners;
-            Minecraft mc = Minecraft.getInstance();
-            String line = missing.isEmpty() ? "Full party" : "Missing: " + String.join(", ", missing);
-            int w = mc.font.width(line) + 12;
-            int px = Math.min(mouseX + 10, screen.width - w - 2);
-            int py = Math.max(2, mouseY - 18);
-            UiRender.fillRounded(g, px, py, w, 16, 5, (0xEE << 24) | (t.surface() & 0x00FFFFFF), sm);
-            UiRender.strokeRounded(g, px, py, w, 16, 5, t.border(), sm);
-            g.text(mc.font, net.minecraft.network.chat.Component.literal(line), px + 6, py + 4,
-                    missing.isEmpty() ? t.textMuted() : t.text(), false);
+    public static void appendTooltip(ItemStack stack, List<Component> lines) {
+        PartyFinderModule mod = PartyFinderModule.INSTANCE;
+        Minecraft mc = Minecraft.getInstance();
+        if (mod == null || !mod.isEnabled() || !mod.showMissing()
+                || !(mc.screen instanceof AbstractContainerScreen<?> screen)
+                || !isPartyFinder(screen)) {
             return;
         }
+        if (stack.isEmpty()
+                || !LISTING.matcher(LegacyText.strip(stack.getHoverName().getString()).trim()).matches()) {
+            return;
+        }
+        List<String> taken = memberClasses(stack);
+        if (taken.isEmpty()) {
+            return;   // unreadable listing; saying "missing everything" would be a lie
+        }
+        List<String> missing = new ArrayList<>();
+        for (int c = 0; c < CLASSES.length; c++) {
+            if (!taken.contains(CLASSES[c])) {
+                missing.add(CLASS_NAMES[c]);
+            }
+        }
+        lines.add(Component.literal(""));
+        lines.add(missing.isEmpty()
+                ? Component.literal("§7Full party")
+                : Component.literal("§eMissing: §f" + String.join(", ", missing)));
     }
 
     /** True when the listing has nobody playing any of the classes you selected. */

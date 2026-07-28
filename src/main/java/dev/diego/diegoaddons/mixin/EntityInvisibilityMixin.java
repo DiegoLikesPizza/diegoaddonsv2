@@ -4,7 +4,6 @@ import dev.diego.diegoaddons.module.modules.ShowHiddenMobsModule;
 import dev.diego.diegoaddons.util.DungeonState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,12 +28,12 @@ public class EntityInvisibilityMixin {
         }
         Entity self = (Entity) (Object) this;
         Minecraft mc = Minecraft.getInstance();
-        if (self == mc.player || !(self instanceof LivingEntity)) {
-            return;
-        }
-        // Every name plate in SkyBlock is an invisible armour stand. Revealing those reveals the
-        // scaffolding the whole server is built out of, which is not what "show hidden mobs" means.
-        if (self instanceof net.minecraft.world.entity.decoration.ArmorStand) {
+        // Only things that fight back. Excluding armour stands by name was not enough - SkyBlock
+        // builds its plates, its holograms and half its decoration out of invisible living entities,
+        // and "not an armour stand" still let all of those through. A mob or a player is what
+        // "hidden mob" means; everything else stays as the server drew it.
+        if (self == mc.player
+                || !(self instanceof net.minecraft.world.entity.Mob || self instanceof Player)) {
             return;
         }
         if (self instanceof Player && !mod.includePlayers()) {

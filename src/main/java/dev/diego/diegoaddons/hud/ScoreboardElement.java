@@ -83,9 +83,13 @@ public class ScoreboardElement extends HudElement {
         titleRow = textRow(titleLabel, width - PAD_X * 2f, TITLE_H);
         root.add(titleRow);
 
-        for (Component line : lines) {
-            TextComponent label = new TextComponent().text(line).font(MEDIUM)
+        for (int i = 0; i < lines.size(); i++) {
+            // The lines you wrote yourself are headings rather than readings, so they are centred
+            // like the title; the server's own lines stay left, where a column of numbers belongs.
+            boolean own = board.isCustomLine(i, lines.size());
+            TextComponent label = new TextComponent().text(lines.get(i)).font(MEDIUM)
                     .textScalePixels(LINE_PX).lineHeight(LINE_HEIGHT)
+                    .textAlignment(own ? GuiTextAlignment.CENTER : GuiTextAlignment.LEFT)
                     .color(GuiColors.of(Themes.current().text()))
                     .width(width - PAD_X * 2f);
             rows.add(label);

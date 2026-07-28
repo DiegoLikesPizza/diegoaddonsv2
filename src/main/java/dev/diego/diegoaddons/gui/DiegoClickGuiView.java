@@ -131,6 +131,7 @@ public class DiegoClickGuiView extends GuiView {
 
     @Override
     protected void build() {
+        open = this;
         panel = column(PANEL_W, 0f).height(PANEL_H)
                 .position(GuiPositionType.ABSOLUTE)
                 .x((DESIGN_W - PANEL_W) / 2f)
@@ -458,6 +459,20 @@ public class DiegoClickGuiView extends GuiView {
 
     /** A built settings row and the height it was built at. */
     private record Row(ContainerComponent box, float height) {
+    }
+
+    /** The open menu, so a setting edited on another screen can ask its card to redraw. */
+    private static DiegoClickGuiView open;
+
+    /**
+     * Redraws one module's card. A setting whose editor is a screen of its own - a colour, a sound,
+     * a line of text - saves after that screen has closed, and the row it came from is still showing
+     * what the value was when it was built.
+     */
+    public static void refreshCard(String moduleId) {
+        if (open != null) {
+            open.fill(open.cards.get(moduleId), true);
+        }
     }
 
     private Row setting(Setting s) {

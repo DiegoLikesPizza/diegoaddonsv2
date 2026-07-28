@@ -100,11 +100,11 @@ public class SoundBrowserView extends DiegoView {
 
     private ContainerComponent soundRow(String id) {
         float inner = PANEL_W - PAD * 4f;
-        ContainerComponent r = row(inner, 10f).height(ROW_H)
+        ContainerComponent r = row(inner, 10f).height(ROW_H).flexShrink(0f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN);
 
         ButtonComponent hear = clickable(t.surfaceAlt(), () -> play(id));
-        asRow(hear, inner - 110f, 0f).height(ROW_H).cornerRadius(8f).padding(0f, 12f)
+        asRow(hear, inner - 110f, 0f).height(ROW_H).flexShrink(0f).cornerRadius(8f).padding(0f, 12f)
                 .borderWidth(1f).borderColor(GuiColors.of(t.border()));
         hear.add(GuiText.label(id, id.equals(current) ? t.accent() : t.text(), 13f));
         r.add(hear);

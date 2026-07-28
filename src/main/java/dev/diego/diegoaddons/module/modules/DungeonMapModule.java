@@ -118,12 +118,15 @@ public class DungeonMapModule extends HudModule {
             clearSeams();
             return;
         }
+        // The map item is re-read every tick: it is a pixel lookup, and it is what carries a room
+        // being discovered or cleared. Tying it to the seam pass meant the map only noticed the
+        // room you had just walked into a second later.
+        DungeonMapData.update(mc);
         if (rescanIn > 0) {
             rescanIn--;
             return;
         }
         rescanIn = RESCAN_TICKS;
-        DungeonMapData.update(mc);   // map colours, for the clear-marks only
         rescanSeams(mc);             // roof probe -> which seams are doors / fills / open
     }
 

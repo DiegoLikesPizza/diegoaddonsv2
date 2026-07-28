@@ -32,6 +32,7 @@ public class StringSetting extends Setting {
             ConfigManager.moduleConfig(owner.id).texts.put(key, value.trim());
         }
         ConfigManager.save();
+        dev.diego.diegoaddons.gui.DiegoClickGuiView.refreshCard(owner.id);
     }
 
     /**

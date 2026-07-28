@@ -73,7 +73,7 @@ public class IgnoreListView extends DiegoView {
             return;
         }
         for (BlockedPlayer b : List.copyOf(all)) {
-            ContainerComponent r = row(inner - 24f, 10f).height(ROW_H).padding(0f, 12f)
+            ContainerComponent r = row(inner - 24f, 10f).height(ROW_H).flexShrink(0f).padding(0f, 12f)
                     .cornerRadius(10f).backgroundColor(GuiColors.of(t.surfaceAlt()))
                     .borderWidth(1f).borderColor(GuiColors.of(t.border()))
                     .justifyContent(GuiAlignment.SPACE_BETWEEN);

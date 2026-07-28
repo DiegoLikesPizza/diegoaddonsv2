@@ -36,25 +36,38 @@ public final class MiningAbilityOverlay {
     }
 
     private static void render(GuiCanvas canvas, net.minecraft.client.DeltaTracker delta) {
-        MiningAbilityModule module = MiningAbilityModule.INSTANCE;
-        if (module == null || !module.isEnabled()) {
-            return;
-        }
         Minecraft mc = Minecraft.getInstance();
         if (mc.options != null && mc.options.hideGui) {
+            return;
+        }
+        // The hydration reminder wants the same spot for the same reason, so it shares the pass
+        // rather than registering a second overlay that could draw over this one.
+        dev.diego.diegoaddons.module.modules.HydrationReminderModule water =
+                dev.diego.diegoaddons.module.modules.HydrationReminderModule.INSTANCE;
+        if (water != null && water.isEnabled() && water.message() != null) {
+            drawLines(canvas, List.of(water.message()), Themes.current().accent());
+            return;
+        }
+
+        MiningAbilityModule module = MiningAbilityModule.INSTANCE;
+        if (module == null || !module.isEnabled()) {
             return;
         }
         List<String> lines = module.hudLines(mc);
         if (lines.isEmpty()) {
             return;
         }
+        drawLines(canvas, lines, module.color());
+    }
+
+    /** Draws the lines big, centred, with a dark copy behind so they read over bright terrain. */
+    private static void drawLines(GuiCanvas canvas, List<String> lines, int argb) {
 
         int x = canvas.width() / 2;
         int y = Math.round(canvas.height() / 2f - ABOVE_CENTRE);
-        RenderColor color = RenderColor.argb(module.color());
+        RenderColor color = RenderColor.argb(argb);
         RenderColor shadow = RenderColor.argb(0xAA000000);
         for (String line : lines) {
-            // A dark copy behind the text keeps it readable over bright terrain.
             canvas.centeredText(line, x + 2, y + 2, shadow, HudElement.MEDIUM, TEXT_PX);
             canvas.centeredText(line, x, y, color, HudElement.MEDIUM, TEXT_PX);
             y += Math.round(TEXT_PX * 1.25f);

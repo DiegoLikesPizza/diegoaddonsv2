@@ -111,7 +111,7 @@ public class ChatSearchView extends DiegoView {
      * it discoverable without being told.
      */
     private ContainerComponent hitRow(GuiMessage message, String text, float inner) {
-        ContainerComponent r = row(inner, 8f).height(ROW_H);
+        ContainerComponent r = row(inner, 8f).height(ROW_H).flexShrink(0f);
 
         ButtonComponent jump = clickable(t.surfaceAlt(), () -> jumpTo(message));
         asRow(jump, inner - 96f, 0f).height(ROW_H).cornerRadius(8f).padding(0f, 12f)

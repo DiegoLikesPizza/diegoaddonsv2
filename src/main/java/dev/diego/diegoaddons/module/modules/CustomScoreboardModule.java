@@ -78,6 +78,14 @@ public class CustomScoreboardModule extends HudModule {
         return bottom.get();
     }
 
+    /** Whether the line at {@code index} of {@code total} is one of yours rather than the server's. */
+    public boolean isCustomLine(int index, int total) {
+        if (!topText().isBlank() && index == 0) {
+            return true;
+        }
+        return !bottomText().isBlank() && index == total - 1;
+    }
+
     @Override
     protected String label() {
         return "Scoreboard";
