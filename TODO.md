@@ -57,9 +57,21 @@ build, a deploy and a run in game before the next starts.
 - [x] **Replace Words** → RenderLib
 - [x] **Chat Search** → RenderLib
 - [x] **Custom Scoreboard** → a managed HUD element, so it can be placed like everything else
-- [ ] **Inventory Buttons editor** → still on the old drawing; it is a freeform placement editor,
-      which is a different job from a list
-- [ ] **Intro screen / DiegoScreen** → still on the old drawing
+- [ ] **Inventory Buttons editor** → wants a rework, not a port (Diego's call)
+
+### The right edge of the HUD
+
+RenderLib's placement screen is a fixed 1920x1080 canvas, letterboxed to fit the window; the live
+HUD is not letterboxed - its design space is `window / min(w/1920, h/1080)`, so on a window wider
+than 16:9 it runs *past* 1920 on the right. Two consequences: the last strip of the screen cannot be
+reached by dragging, and design x=0 is the far left in game but inset in the editor.
+
+Options for an element that has to touch an edge (the scoreboard):
+1. Live with it - on a 16:9 window there is no gap at all.
+2. An "anchor" mode: the element draws itself pinned to an edge as an immediate HUD overlay, with
+   its own offset, and leaves the placement screen behind. Always flush; not draggable.
+3. Ask RenderLib for either an anchor on `HudPlacement` or a full-window placement canvas.
+- [x] **Intro screen** → RenderLib, with live theme swatches
 
 ---
 

@@ -2,7 +2,7 @@ package dev.diego.diegoaddons;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.gui.IntroScreen;
+import dev.diego.diegoaddons.gui.IntroView;
 import dev.diego.diegoaddons.module.ModuleManager;
 import dev.diego.diegoaddons.util.SkinChanger;
 import net.fabricmc.api.ClientModInitializer;
@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Loads the per-instance config.</li>
  *   <li>Registers the "open menu" key mapping (default: backslash).</li>
  *   <li>Each client tick: opens {@link MainScreen} when the key is pressed in-game, and shows the
- *       one-time {@link IntroScreen} the first time the title screen appears in this instance.</li>
+ *       one-time {@link IntroView} the first time the title screen appears in this instance.</li>
  * </ul>
  */
 public class DiegoAddonsV2Client implements ClientModInitializer {
@@ -63,7 +63,7 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
             }
 
             if (!ConfigManager.get().introShown && client.screen instanceof TitleScreen) {
-                client.setScreen(new IntroScreen(client.screen));
+                new IntroView().open();
             }
         });
 
