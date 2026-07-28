@@ -1,6 +1,7 @@
 package dev.diego.diegoaddons.gui;
 
 import com.render.api.ScreenExtension;
+import com.render.api.ScreenBounds;
 import com.render.api.ScreenExtensionContext;
 import com.render.api.ScreenExtensionMode;
 import com.render.api.gui.ButtonComponent;
@@ -29,7 +30,12 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress;
  * drawing and owns the whole surface, which is what lets the row of buttons nobody presses simply
  * not exist rather than be hidden behind something.
  *
- * <p>The background is a gradient whose angle turns, one degree every few frames. A still gradient
+ * <p>The buttons keep Minecraft's own geometry - 200 by 20, four apart, starting a quarter of the
+ * way down, with the last two sharing a row. The menu you know in different colours is still a menu
+ * you can use without looking; a stack of great rounded slabs is a different program wearing the
+ * same name.
+ *
+ * <p>The background is a gradient whose angle turns, a third of a degree a tick. A still gradient
  * behind a menu reads as a screenshot of a menu; a slow turn reads as a place. It is a property of
  * the paint rather than an animation of its own, so the motion costs a number per tick and nothing
  * else - and it can be switched off, for people who would rather it held still.
@@ -57,13 +63,13 @@ public final class TitleScreenExtension implements ScreenExtension<TitleScreen> 
         return new View();
     }
 
-    /** The menu itself: the mark and title above, the buttons below, on the moving gradient. */
+    /** The menu itself: vanilla's layout, drawn in this mod's colours. */
     private static final class View extends ScreenExtensionView {
-        private static final float DESIGN_W = 1920f;
-        private static final float DESIGN_H = 1080f;
-        private static final float BUTTON_W = 520f;
-        private static final float BUTTON_H = 58f;
-        private static final float GAP = 12f;
+        /** Minecraft's own menu-button metrics. */
+        private static final float BUTTON_W = 200f;
+        private static final float BUTTON_H = 20f;
+        private static final float ROW = 24f;
+        private static final float HALF_W = 98f;
 
         private ContainerComponent backdrop;
         private float angle;
@@ -72,7 +78,7 @@ public final class TitleScreenExtension implements ScreenExtension<TitleScreen> 
         @Override
         protected void build(ScreenExtensionContext context) {
             root().display(GuiDisplay.BLOCK);
-            rebuild();
+            rebuild(context);
         }
 
         @Override
@@ -81,8 +87,8 @@ public final class TitleScreenExtension implements ScreenExtension<TitleScreen> 
             if (mod == null) {
                 return;
             }
-            if (!signature().equals(builtFor)) {
-                rebuild();
+            if (!signature(context).equals(builtFor)) {
+                rebuild(context);
                 return;
             }
             if (mod.animate() && backdrop != null) {
@@ -93,86 +99,90 @@ public final class TitleScreenExtension implements ScreenExtension<TitleScreen> 
             }
         }
 
-        /** What the menu depends on: the theme, and whether the Hypixel button is wanted. */
-        private String signature() {
+        /** What the menu depends on: the screen size, the theme, and which buttons are wanted. */
+        private String signature(ScreenExtensionContext context) {
             CustomTitleScreenModule mod = CustomTitleScreenModule.INSTANCE;
-            return Themes.current().name() + "|" + (mod != null && mod.showHypixel())
-                    + "|" + (mod != null ? mod.server() : "");
+            ScreenBounds b = context.hostBounds();
+            return b.width() + "x" + b.height() + "|" + Themes.current().name()
+                    + "|" + (mod != null && mod.showHypixel());
         }
 
-        private void rebuild() {
-            builtFor = signature();
+        private void rebuild(ScreenExtensionContext context) {
+            builtFor = signature(context);
             root().clearChildren();
             Theme t = Themes.current();
+            ScreenBounds bounds = context.hostBounds();
+            float width = bounds.width();
+            float height = bounds.height();
 
             backdrop = new ContainerComponent();
             backdrop.position(GuiPositionType.ABSOLUTE).x(0f).y(0f)
-                    .size(DESIGN_W, DESIGN_H)
+                    .size(width, height)
                     .backgroundColor(GuiColors.of(t.surface()))
                     .gradient(backdrop(angle));
             root().add(backdrop);
 
-            ContainerComponent middle = new ContainerComponent();
-            middle.position(GuiPositionType.ABSOLUTE).x(0f).y(0f).size(DESIGN_W, DESIGN_H)
-                    .display(GuiDisplay.FLEX)
-                    .flexDirection(GuiFlexDirection.COLUMN)
-                    .alignItems(GuiAlignment.CENTER)
-                    .justifyContent(GuiAlignment.CENTER)
-                    .rowGap(GuiLength.pixels(GAP))
-                    .gap(GAP);
-
-            middle.add(brand(t));
-            middle.add(spacer(BUTTON_W, 28f));
-
             CustomTitleScreenModule mod = CustomTitleScreenModule.INSTANCE;
             Minecraft mc = Minecraft.getInstance();
+            float left = width / 2f - BUTTON_W / 2f;
+            // Vanilla starts its buttons a quarter of the way down plus 48, and so does this.
+            float y = height / 4f + 48f;
 
-            middle.add(button("Singleplayer", t.surface(), t.text(),
+            root().add(brand(t, width, height / 4f - 34f));
+
+            root().add(button("Singleplayer", left, y, BUTTON_W, t.surface(), t.text(),
                     () -> mc.setScreen(new SelectWorldScreen(mc.screen))));
-            middle.add(button("Multiplayer", t.surface(), t.text(),
+            y += ROW;
+            root().add(button("Multiplayer", left, y, BUTTON_W, t.surface(), t.text(),
                     () -> mc.setScreen(new JoinMultiplayerScreen(mc.screen))));
             if (mod != null && mod.showHypixel()) {
-                middle.add(button("Join Hypixel", t.accent(), t.accentText(),
+                y += ROW;
+                root().add(button("Join Hypixel", left, y, BUTTON_W, t.accent(), t.accentText(),
                         () -> connect(mc, mod.server())));
             }
-            middle.add(spacer(BUTTON_W, 10f));
-            middle.add(button("DiegoAddons", t.surfaceAlt(), t.text(),
+            y += ROW;
+            root().add(button("DiegoAddons", left, y, BUTTON_W, t.surfaceAlt(), t.text(),
                     () -> new DiegoClickGuiView().open()));
-            middle.add(button("Settings", t.surface(), t.text(),
-                    () -> mc.setScreen(new OptionsScreen(mc.screen, mc.options, false))));
-            middle.add(button("Quit Game", t.surface(), t.textMuted(), mc::stop));
 
-            root().add(middle);
+            // Options and Quit share the last row, the way they do in vanilla.
+            y += ROW;
+            root().add(button("Settings", left, y, HALF_W, t.surface(), t.text(),
+                    () -> mc.setScreen(new OptionsScreen(mc.screen, mc.options, false))));
+            root().add(button("Quit Game", left + BUTTON_W - HALF_W, y, HALF_W,
+                    t.surface(), t.textMuted(), mc::stop));
         }
 
-        /** The mark and the name, sitting above the buttons. */
-        private ContainerComponent brand(Theme t) {
+        /** The mark and the name, where vanilla puts its logo. */
+        private ContainerComponent brand(Theme t, float width, float top) {
             ContainerComponent col = new ContainerComponent();
-            col.display(GuiDisplay.FLEX).flexDirection(GuiFlexDirection.COLUMN)
-                    .alignItems(GuiAlignment.CENTER).rowGap(GuiLength.pixels(10f)).gap(10f);
+            col.position(GuiPositionType.ABSOLUTE).x(0f).y(top).width(width)
+                    .display(GuiDisplay.FLEX).flexDirection(GuiFlexDirection.COLUMN)
+                    .alignItems(GuiAlignment.CENTER).rowGap(GuiLength.pixels(4f)).gap(4f);
 
             ContainerComponent mark = new ContainerComponent();
-            mark.size(88f, 88f).cornerRadius(24f)
+            mark.size(34f, 34f).cornerRadius(9f)
                     .display(GuiDisplay.FLEX).flexDirection(GuiFlexDirection.ROW)
                     .alignItems(GuiAlignment.CENTER).justifyContent(GuiAlignment.CENTER)
                     .backgroundColor(GuiColors.of(t.accent()))
                     .gradient(new GuiGradient()
                             .startColor(GuiColors.of(t.accent()))
                             .endColor(GuiColors.of(t.accentTo())));
-            mark.add(GuiText.label("D", t.accentText(), 44f));
+            mark.add(GuiText.label("D", t.accentText(), 18f));
             col.add(mark);
-            col.add(GuiText.label("DiegoAddons", t.text(), 34f));
-            col.add(GuiText.label("VERSION 2", t.accent(), 12f));
+            col.add(GuiText.label("DiegoAddons", t.text(), 16f));
+            col.add(GuiText.label("VERSION 2", t.accent(), 7f));
             return col;
         }
 
-        /** One menu button, the width of all the others. */
-        private ButtonComponent button(String label, int background, int textColor, Runnable action) {
+        /** One menu button, placed where vanilla would place it. */
+        private ButtonComponent button(String label, float x, float y, float w,
+                                       int background, int textColor, Runnable action) {
             Theme t = Themes.current();
             ButtonComponent b = new ButtonComponent();
             b.clearChildren();
             b.onPress(action);
-            b.size(BUTTON_W, BUTTON_H).padding(0f).cornerRadius(14f)
+            b.position(GuiPositionType.ABSOLUTE).x(x).y(y)
+                    .size(w, BUTTON_H).padding(0f).cornerRadius(4f)
                     .display(GuiDisplay.FLEX).flexDirection(GuiFlexDirection.ROW)
                     .alignItems(GuiAlignment.CENTER).justifyContent(GuiAlignment.CENTER)
                     .backgroundColor(GuiColors.of(background))
@@ -181,7 +191,7 @@ public final class TitleScreenExtension implements ScreenExtension<TitleScreen> 
                     .shadow(null).glow(null);
             b.hovered(c -> c.backgroundColor(GuiColors.of(t.elevated())).gradient(flat(t.elevated())));
             b.pressed(c -> c.backgroundColor(GuiColors.of(t.elevated())).gradient(flat(t.elevated())));
-            b.add(GuiText.label(label, textColor, 18f));
+            b.add(GuiText.label(label, textColor, 10f));
             return b;
         }
 
@@ -205,12 +215,6 @@ public final class TitleScreenExtension implements ScreenExtension<TitleScreen> 
 
         private static GuiGradient flat(int argb) {
             return new GuiGradient().startColor(GuiColors.of(argb)).endColor(GuiColors.of(argb));
-        }
-
-        private static ContainerComponent spacer(float width, float height) {
-            ContainerComponent c = new ContainerComponent();
-            c.size(width, height);
-            return c;
         }
     }
 }

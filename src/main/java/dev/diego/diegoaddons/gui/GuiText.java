@@ -20,9 +20,9 @@ import net.minecraft.resources.Identifier;
  * which is why a row that needs a fixed height puts the text in a box instead.
  */
 public final class GuiText {
-    public static final GuiFont BODY = font("ui");
-    public static final GuiFont MEDIUM = font("ui_medium");
-    public static final GuiFont TITLE = font("ui_title");
+    public static final GuiFont BODY = ttf("poppins_regular", 400);
+    public static final GuiFont MEDIUM = ttf("poppins_medium", 500);
+    public static final GuiFont TITLE = ttf("poppins_bold", 700);
 
     /** Natural pixel size of the bundled faces, as Minecraft rasterises them. */
     private static final float NATURAL_PX = 10f;
@@ -47,8 +47,22 @@ public final class GuiText {
     private GuiText() {
     }
 
-    private static GuiFont font(String path) {
-        return GuiFont.of(Identifier.fromNamespaceAndPath("diegoaddonsv2", path));
+    /**
+     * The typeface, handed to RenderLib as a font file rather than as a Minecraft font provider.
+     *
+     * <p>This is the whole difference between text that looks designed and text that looks like a
+     * Minecraft mod. {@code GuiFont.of} names a provider from the resource pack, and Minecraft bakes
+     * those into a glyph atlas at one fixed size - ours at 15px - so everything larger is that atlas
+     * scaled up. At 36px a headline is a 15px bitmap stretched two and a half times, which is
+     * exactly as soft as it sounds.
+     *
+     * <p>{@code GuiFont.ttf} hands RenderLib the file and lets it rasterise at the size actually
+     * being drawn, at device resolution, with real kerning and hinting. Same font, same weights -
+     * drawn properly.
+     */
+    private static GuiFont ttf(String file, int weight) {
+        return GuiFont.ttf(Identifier.fromNamespaceAndPath("diegoaddonsv2", "font/" + file + ".ttf"))
+                .weight(weight);
     }
 
     /** A label that never wraps. */
