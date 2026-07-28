@@ -66,6 +66,21 @@ public class AddonConfig {
     /** Per-profile observations the achievement conditions are evaluated over, keyed by profile name. */
     public Map<String, ProfileStats> profileStats = new LinkedHashMap<>();
 
+    /** Running tallies behind the counted achievements ("20,000 F7 runs"), keyed by counter name. */
+    public Map<String, Integer> achievementCounters = new LinkedHashMap<>();
+
+    /**
+     * Chat patterns you have corrected on a built-in achievement, keyed by its id.
+     *
+     * <p>The shipped patterns are read off Hypixel's chat and Hypixel changes its wording, so being
+     * able to fix one without waiting for a mod update matters more than the patterns being right
+     * first time. An override always wins over the built-in.
+     */
+    public Map<String, String> achievementPatterns = new LinkedHashMap<>();
+
+    /** Built-in achievements switched off, by id. Yours carry their own {@code enabled} flag. */
+    public java.util.Set<String> achievementsOff = new java.util.HashSet<>();
+
     /** The items Auto GFS keeps topped up, in the order they are checked. */
     public List<GfsItem> gfsItems = new ArrayList<>();
 

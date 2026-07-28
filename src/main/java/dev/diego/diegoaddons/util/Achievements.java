@@ -8,8 +8,13 @@ import dev.diego.diegoaddons.module.modules.AchievementsModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -28,16 +33,73 @@ public final class Achievements {
     /** Evaluating every tick would be twenty times a second to answer a question about hours. */
     private static final int EVALUATE_EVERY = 20;
 
+    /** Evaluations between config writes - a minute, so playtime survives a crash without churn. */
+    private static final int SAVE_EVERY = 60;
+
     private static long lastTick = 0;
     private static int sinceEvaluate = 0;
+    private static int sinceSave = 0;
 
     private Achievements() {
     }
 
     // --- storage ------------------------------------------------------------------------------------
 
+    /** The ones you wrote. */
     public static List<Achievement> all() {
         return ConfigManager.get().achievements;
+    }
+
+    /** Everything: the shipped list first, then yours. Rebuilt cheaply - both lists are in memory. */
+    public static List<Achievement> everything() {
+        List<Achievement> out = new ArrayList<>(AchievementCatalogue.all());
+        out.addAll(all());
+        return out;
+    }
+
+    /**
+     * Whether an achievement is being watched at all. Built-ins carry no state of their own, so
+     * theirs is held as a set of ids that are off; yours carry a flag.
+     */
+    public static boolean isOn(Achievement a) {
+        return a.builtin ? !ConfigManager.get().achievementsOff.contains(a.id) : a.enabled;
+    }
+
+    public static void setOn(Achievement a, boolean on) {
+        if (a.builtin) {
+            if (on) {
+                ConfigManager.get().achievementsOff.remove(a.id);
+            } else {
+                ConfigManager.get().achievementsOff.add(a.id);
+            }
+        } else {
+            a.enabled = on;
+        }
+        ConfigManager.save();
+    }
+
+    /** The trigger in force: your correction if you made one, otherwise the shipped guess. */
+    public static String pattern(Achievement a) {
+        String override = ConfigManager.get().achievementPatterns.get(a.id);
+        return override != null ? override : a.chat;
+    }
+
+    public static void setPattern(Achievement a, String chat) {
+        if (a.builtin) {
+            if (chat.equals(a.chat)) {
+                ConfigManager.get().achievementPatterns.remove(a.id);
+            } else {
+                ConfigManager.get().achievementPatterns.put(a.id, chat);
+            }
+        } else {
+            a.chat = chat;
+        }
+        ConfigManager.save();
+    }
+
+    public static int counter(String key) {
+        Integer n = ConfigManager.get().achievementCounters.get(key);
+        return n == null ? 0 : n;
     }
 
     public static boolean isUnlocked(Achievement a) {
@@ -105,32 +167,76 @@ public final class Achievements {
         if (++sinceEvaluate >= EVALUATE_EVERY) {
             sinceEvaluate = 0;
             evaluate();
-            ConfigManager.save();   // the record moved; write it with the same beat
+            // Writing the record is separated from judging it: judging is cheap and wants to be
+            // prompt, whereas this rewrites the whole config file and only guards against losing a
+            // minute of playtime to a crash. Unlocks save themselves the moment they happen.
+            if (++sinceSave >= SAVE_EVERY) {
+                sinceSave = 0;
+                ConfigManager.save();
+            }
         }
     }
 
-    /** Chat triggers. An achievement with conditions as well has to satisfy those too. */
+    /**
+     * Chat triggers, in two passes.
+     *
+     * <p>Tallies are advanced first and only once each, because several achievements share a counter
+     * - a Floor VII clear advances the 10-run, 100-run and 20,000-run entries, and it would be one
+     * clear counted three times if each bumped the count itself. Only then is anything unlocked.
+     */
     public static void onMessage(String plain) {
         SkyblockProfile.onMessage(plain);
         if (AchievementsModule.INSTANCE == null || !AchievementsModule.INSTANCE.isEnabled()) {
             return;
         }
-        for (Achievement a : List.copyOf(all())) {
-            if (!a.enabled || a.chat.isBlank() || isUnlocked(a)) {
+        List<Achievement> everything = everything();
+
+        Set<String> bumped = new HashSet<>();
+        for (Achievement a : everything) {
+            if (a.counter.isBlank() || bumped.contains(a.counter) || !isOn(a)) {
                 continue;
             }
-            if (matches(a.chat, plain) && conditionsMet(a)) {
+            if (triggered(a, plain)) {
+                bumped.add(a.counter);
+                ConfigManager.get().achievementCounters.merge(a.counter, 1, Integer::sum);
+            }
+        }
+
+        for (Achievement a : everything) {
+            if (!isOn(a) || isUnlocked(a)) {
+                continue;
+            }
+            if (!a.counter.isBlank()) {
+                // Counted: the tally decides, so a threshold already passed unlocks on any bump.
+                if (bumped.contains(a.counter) && counter(a.counter) >= a.threshold
+                        && conditionsMet(a)) {
+                    unlock(a);
+                }
+            } else if (!pattern(a).isBlank() && triggered(a, plain) && conditionsMet(a)) {
                 unlock(a);
             }
         }
+        // Tallies are deliberately not written here. Some of them count kills, and a config write
+        // per kill is a stutter; the tick loop persists them within the minute, and an unlock -
+        // the part that would actually hurt to lose - saves itself immediately.
+    }
+
+    /** Whether this line fires this achievement: the pattern matches and the exclusion does not. */
+    private static boolean triggered(Achievement a, String line) {
+        String chat = pattern(a);
+        if (chat.isBlank() || !matches(chat, line)) {
+            return false;
+        }
+        return a.excludes.isBlank()
+                || !line.toLowerCase(Locale.ROOT).contains(a.excludes.toLowerCase(Locale.ROOT));
     }
 
     // --- evaluation ---------------------------------------------------------------------------------
 
     /** Condition-only achievements: the ones that are true rather than the ones that happen. */
     private static void evaluate() {
-        for (Achievement a : List.copyOf(all())) {
-            if (!a.enabled || !a.chat.isBlank() || a.conditions.isEmpty() || isUnlocked(a)) {
+        for (Achievement a : everything()) {
+            if (!isOn(a) || !pattern(a).isBlank() || a.conditions.isEmpty() || isUnlocked(a)) {
                 continue;
             }
             if (conditionsMet(a)) {
@@ -187,15 +293,28 @@ public final class Achievements {
      * plus in "+1" - should mean itself rather than quietly turning the pattern into something else.
      */
     public static boolean matches(String pattern, String line) {
-        StringBuilder regex = new StringBuilder();
-        for (String part : pattern.trim().split("\\*", -1)) {
-            if (regex.length() > 0) {
-                regex.append(".*");
+        return compiled(pattern).matcher(line.trim()).matches();
+    }
+
+    /**
+     * Patterns compiled once and kept.
+     *
+     * <p>There are several hundred triggers and a busy lobby is a lot of chat; compiling every
+     * pattern against every line would be the one part of this feature anybody could feel.
+     */
+    private static final Map<String, Pattern> COMPILED = new HashMap<>();
+
+    private static Pattern compiled(String pattern) {
+        return COMPILED.computeIfAbsent(pattern, p -> {
+            StringBuilder regex = new StringBuilder();
+            for (String part : p.trim().split("\\*", -1)) {
+                if (regex.length() > 0) {
+                    regex.append(".*");
+                }
+                regex.append(Pattern.quote(part));
             }
-            regex.append(Pattern.quote(part));
-        }
-        return Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE)
-                .matcher(line.trim()).matches();
+            return Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE);
+        });
     }
 
     // --- unlocking ----------------------------------------------------------------------------------

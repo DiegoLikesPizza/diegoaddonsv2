@@ -26,8 +26,39 @@ public class Achievement {
      */
     public String chat = "";
 
+    /**
+     * A phrase that must <em>not</em> appear in the line for it to count.
+     *
+     * <p>Wildcards alone cannot say "no": the natural pattern for a Floor VII clear also matches a
+     * Master Mode VII clear, because the master line contains the normal one word for word. Rather
+     * than let people write regex to get around that, one exclusion covers the case that actually
+     * comes up.
+     */
+    public String excludes = "";
+
+    /**
+     * The tally this counts towards, or empty if it unlocks the first time it happens.
+     *
+     * <p>Achievements sharing a counter share the count, which is the point: "10 runs" and "20,000
+     * runs" are the same tally read at two heights, not two things to keep track of.
+     */
+    public String counter = "";
+
+    /** How high the counter has to reach. Ignored when there is no counter. */
+    public int threshold = 1;
+
+    /** Grouping in the list, e.g. "Dungeons". Purely for finding things among hundreds. */
+    public String category = "Custom";
+
     public List<Condition> conditions = new ArrayList<>();
     public boolean enabled = true;
+
+    /**
+     * Set on the ones the mod ships rather than the ones you wrote. Not persisted: built-ins are
+     * rebuilt from code every launch, so they can be corrected and added to without rewriting
+     * anybody's config. Only what you change about them is stored.
+     */
+    public transient boolean builtin;
 
     public Achievement() {
     }
@@ -40,6 +71,11 @@ public class Achievement {
     /** An achievement with neither a trigger nor a condition can never unlock; the GUI says so. */
     public boolean isComplete() {
         return !chat.isBlank() || !conditions.isEmpty();
+    }
+
+    /** Whether this is a tally rather than a one-off. */
+    public boolean counted() {
+        return !counter.isBlank() && threshold > 1;
     }
 
     /**

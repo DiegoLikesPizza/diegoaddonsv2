@@ -48,35 +48,54 @@ public class AchievementEditView extends DiegoView {
         ContainerComponent body = column(width, 10f).height(height).padding(PAD);
         float inner = width - PAD * 2f;
 
-        body.add(field(a.name, "Name", inner, s -> {
-            a.name = s;
-            ConfigManager.save();
-        }));
-        body.add(field(a.description, "Description (optional)", inner, s -> {
-            a.description = s;
-            ConfigManager.save();
-        }));
+        if (a.builtin) {
+            // A shipped achievement is not yours to rename - but its trigger is a guess about
+            // Hypixel's wording, and that is exactly the part worth being able to correct.
+            body.add(textBox(GuiText.label(a.name, t.text(), 18f), inner, 26f));
+            body.add(textBox(GuiText.label(
+                    a.description.isBlank() ? a.category : a.category + "  ·  " + a.description,
+                    t.textMuted(), 12f), inner, 20f));
+        } else {
+            body.add(field(a.name, "Name", inner, s -> {
+                a.name = s;
+                ConfigManager.save();
+            }));
+            body.add(field(a.description, "Description (optional)", inner, s -> {
+                a.description = s;
+                ConfigManager.save();
+            }));
+        }
 
         body.add(textBox(GuiText.label(
                 "Chat trigger - a line that unlocks it. * matches anything. Leave empty for none.",
                 t.textFaint(), 12f), inner, 18f));
-        body.add(field(a.chat, "You found a * Essence", inner, s -> {
-            a.chat = s;
-            ConfigManager.save();
-        }));
+        body.add(field(Achievements.pattern(a), "You found a * Essence", inner,
+                s -> Achievements.setPattern(a, s)));
+        if (a.builtin && !a.excludes.isBlank()) {
+            body.add(textBox(GuiText.label("Ignored when the line contains: " + a.excludes,
+                    t.textFaint(), 11f), inner, 16f));
+        }
+        if (a.counted()) {
+            body.add(textBox(GuiText.label(
+                    "Counted: " + Achievements.counter(a.counter) + " of " + a.threshold
+                            + " so far, shared with the other tiers of this one.",
+                    t.textFaint(), 11f), inner, 16f));
+        }
 
         ContainerComponent head = row(inner, 12f).height(28f)
                 .justifyContent(GuiAlignment.SPACE_BETWEEN);
         head.add(textBox(GuiText.label("Conditions - all must hold, counted over every profile",
                 t.textMuted(), 12f), 0f, 28f).flexGrow(1f));
-        ButtonComponent addCond = clickable(t.accent(), () -> {
-            a.conditions.add(new Achievement.Condition("level", ">=", 200));
-            ConfigManager.save();
-            rebuildView();
-        });
-        asRow(addCond, 150f, 0f).height(28f).cornerRadius(8f).justifyContent(GuiAlignment.CENTER);
-        addCond.add(GuiText.label("Add condition", t.accentText(), 13f));
-        head.add(addCond);
+        if (!a.builtin) {
+            ButtonComponent addCond = clickable(t.accent(), () -> {
+                a.conditions.add(new Achievement.Condition("level", ">=", 200));
+                ConfigManager.save();
+                rebuildView();
+            });
+            asRow(addCond, 150f, 0f).height(28f).cornerRadius(8f).justifyContent(GuiAlignment.CENTER);
+            addCond.add(GuiText.label("Add condition", t.accentText(), 13f));
+            head.add(addCond);
+        }
         body.add(head);
 
         list = new ScrollContainerComponent();
@@ -101,15 +120,14 @@ public class AchievementEditView extends DiegoView {
         back.add(GuiText.label("All achievements", t.text(), 13f));
         bar.add(back);
 
-        ButtonComponent pause = clickable(a.enabled ? t.surface() : t.elevated(), () -> {
-            a.enabled = !a.enabled;
-            ConfigManager.save();
+        boolean on = Achievements.isOn(a);
+        ButtonComponent pause = clickable(on ? t.surface() : t.elevated(), () -> {
+            Achievements.setOn(a, !on);
             rebuildView();
         });
         asRow(pause, 100f, 0f).height(34f).cornerRadius(9f).justifyContent(GuiAlignment.CENTER)
                 .borderWidth(1f).borderColor(GuiColors.of(t.border()));
-        pause.add(GuiText.label(a.enabled ? "Active" : "Paused",
-                a.enabled ? t.text() : t.textFaint(), 13f));
+        pause.add(GuiText.label(on ? "Active" : "Paused", on ? t.text() : t.textFaint(), 13f));
         bar.add(pause);
 
         boolean done = Achievements.isUnlocked(a);
@@ -163,15 +181,17 @@ public class AchievementEditView extends DiegoView {
             }));
             r.add(textBox(GuiText.label(progress(c), t.textMuted(), 12f), 96f, ROW_H));
 
-            ButtonComponent remove = clickable(t.surface(), () -> {
-                a.conditions.remove(c);
-                ConfigManager.save();
-                rebuildView();
-            });
-            asRow(remove, 78f, 0f).height(28f).cornerRadius(8f).justifyContent(GuiAlignment.CENTER)
-                    .borderWidth(1f).borderColor(GuiColors.of(t.border()));
-            remove.add(GuiText.label("Remove", t.textMuted(), 12f));
-            r.add(remove);
+            if (!a.builtin) {
+                ButtonComponent remove = clickable(t.surface(), () -> {
+                    a.conditions.remove(c);
+                    ConfigManager.save();
+                    rebuildView();
+                });
+                asRow(remove, 78f, 0f).height(28f).cornerRadius(8f).justifyContent(GuiAlignment.CENTER)
+                        .borderWidth(1f).borderColor(GuiColors.of(t.border()));
+                remove.add(GuiText.label("Remove", t.textMuted(), 12f));
+                r.add(remove);
+            }
             list.add(r);
         }
     }
