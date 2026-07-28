@@ -34,8 +34,14 @@ public final class EspDraw {
     private record Arrow(Vec3 target, int argb) {
     }
 
+    /** A world box to be drawn as a flat rectangle around wherever it lands on screen. */
+    private record Square(AABB box, int argb) {
+    }
+
     private static final List<Arrow> BUILDING = new ArrayList<>();
     private static volatile List<Arrow> RENDER = new ArrayList<>();
+    private static final List<Square> BUILDING_SQUARES = new ArrayList<>();
+    private static volatile List<Square> RENDER_SQUARES = new ArrayList<>();
 
     private EspDraw() {
     }
@@ -73,19 +79,33 @@ public final class EspDraw {
         }
     }
 
+    /**
+     * Queues a box to be drawn as a 2D rectangle around its outline on screen - the flat sort of ESP,
+     * where what you see is a box on the glass rather than a cage in the world.
+     */
+    public static void square2d(AABB box, int argb) {
+        synchronized (BUILDING) {
+            BUILDING_SQUARES.add(new Square(box, argb));
+        }
+    }
+
     /** Promotes this tick's arrows to the set drawn each frame. Call right after {@code WorldRender.flip()}. */
     public static void flip() {
         synchronized (BUILDING) {
             RENDER = new ArrayList<>(BUILDING);
             BUILDING.clear();
+            RENDER_SQUARES = new ArrayList<>(BUILDING_SQUARES);
+            BUILDING_SQUARES.clear();
         }
     }
 
     public static void clear() {
         synchronized (BUILDING) {
             BUILDING.clear();
+            BUILDING_SQUARES.clear();
         }
         RENDER = new ArrayList<>();
+        RENDER_SQUARES = new ArrayList<>();
     }
 
     /**
@@ -95,7 +115,12 @@ public final class EspDraw {
      */
     public static void renderHud(GuiGraphicsExtractor g, Minecraft mc) {
         List<Arrow> arrows = RENDER;
-        if (arrows.isEmpty() || mc.player == null || mc.options.hideGui || mc.gameRenderer == null) {
+        List<Square> squares = RENDER_SQUARES;
+        if (mc.player == null || mc.options.hideGui || mc.gameRenderer == null) {
+            return;
+        }
+        squares(g, mc, squares);
+        if (arrows.isEmpty()) {
             return;
         }
         int w = mc.getWindow().getGuiScaledWidth();
@@ -133,6 +158,82 @@ public final class EspDraw {
             double ey = cy + Math.sin(ang) * ry;
             drawArrow(g, ex, ey, ang, a.argb());
         }
+    }
+
+    /**
+     * Draws each queued box as the rectangle it covers on screen.
+     *
+     * <p>All eight corners are projected and the rectangle is their extent, so a mob standing at an
+     * angle is still framed by what it actually occupies rather than by its width from one side. A
+     * corner behind the camera has no sensible place on screen, so a box with any corner behind is
+     * dropped rather than smeared across it.
+     */
+    private static void squares(GuiGraphicsExtractor g, Minecraft mc, List<Square> squares) {
+        if (squares.isEmpty()) {
+            return;
+        }
+        int w = mc.getWindow().getGuiScaledWidth();
+        int h = mc.getWindow().getGuiScaledHeight();
+        Vec3 cam = mc.gameRenderer.getMainCamera().position();
+        double camYaw = Math.toRadians(mc.player.getYRot());
+        double camPitch = Math.toRadians(mc.player.getXRot());
+        double halfV = Math.toRadians(fov(mc)) / 2.0;
+        double halfH = Math.atan(Math.tan(halfV) * (h == 0 ? 1.0 : (double) w / h));
+
+        for (Square s : squares) {
+            AABB b = s.box();
+            double minX = Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            boolean visible = true;
+            for (int i = 0; i < 8 && visible; i++) {
+                Vec3 corner = new Vec3(
+                        (i & 1) == 0 ? b.minX : b.maxX,
+                        (i & 2) == 0 ? b.minY : b.maxY,
+                        (i & 4) == 0 ? b.minZ : b.maxZ);
+                double[] p = project(corner, cam, camYaw, camPitch, halfH, halfV, w, h);
+                if (p == null) {
+                    visible = false;
+                    break;
+                }
+                minX = Math.min(minX, p[0]);
+                maxX = Math.max(maxX, p[0]);
+                minY = Math.min(minY, p[1]);
+                maxY = Math.max(maxY, p[1]);
+            }
+            if (!visible || maxX < 0 || maxY < 0 || minX > w || minY > h) {
+                continue;
+            }
+            rect(g, (int) minX, (int) minY, (int) maxX, (int) maxY, s.argb());
+        }
+    }
+
+    /** A world point in GUI pixels, or null when it is behind the camera. */
+    private static double[] project(Vec3 point, Vec3 cam, double camYaw, double camPitch,
+                                    double halfH, double halfV, int w, int h) {
+        Vec3 d = point.subtract(cam);
+        double horiz = Math.sqrt(d.x * d.x + d.z * d.z);
+        double relYaw = wrap(Math.atan2(-d.x, d.z) - camYaw);
+        double relPitch = Math.atan2(-d.y, horiz) - camPitch;
+        if (Math.abs(relYaw) > Math.PI / 2.2 || Math.abs(relPitch) > Math.PI / 2.2) {
+            return null;   // beside or behind the camera: the tangent below stops meaning anything
+        }
+        double x = w / 2.0 + Math.tan(relYaw) / Math.tan(halfH) * (w / 2.0);
+        double y = h / 2.0 + Math.tan(relPitch) / Math.tan(halfV) * (h / 2.0);
+        return new double[]{x, y};
+    }
+
+    /** A one-pixel rectangle outline, with a dark line behind it so it reads against anything. */
+    private static void rect(GuiGraphicsExtractor g, int x1, int y1, int x2, int y2, int argb) {
+        g.fill(x1 - 1, y1 - 1, x2 + 1, y1, OUTLINE);
+        g.fill(x1 - 1, y2, x2 + 1, y2 + 1, OUTLINE);
+        g.fill(x1 - 1, y1, x1, y2, OUTLINE);
+        g.fill(x2, y1, x2 + 1, y2, OUTLINE);
+        g.fill(x1, y1, x2, y1 + 1, argb);
+        g.fill(x1, y2 - 1, x2, y2, argb);
+        g.fill(x1, y1, x1 + 1, y2, argb);
+        g.fill(x2 - 1, y1, x2, y2, argb);
     }
 
     /** A filled arrowhead centred at (x,y), tip pointing along {@code ang}; black outline behind. */

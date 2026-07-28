@@ -59,13 +59,13 @@ public final class EntityEsp {
         for (Entity e : mc.level.getEntities(mc.player, area)) {
             // Bats are real entities, not name plates, so they are matched by type.
             if (doBat && e instanceof Bat) {
-                WorldRender.thickBox(e.getBoundingBox().inflate(0.1), bats.color(), EDGE, true);
+                EspRender.draw(e.getBoundingBox().inflate(0.1), bats);
                 continue;
             }
             // Real players, hiding the NPCs that share the player model.
             if (doPlayer && e instanceof Player p && p != mc.player) {
                 if (isRealPlayer(mc, p)) {
-                    WorldRender.thickBox(p.getBoundingBox().inflate(0.05), players.color(), EDGE, true);
+                    EspRender.draw(p.getBoundingBox().inflate(0.05), players);
                 }
                 continue;
             }
@@ -75,17 +75,17 @@ public final class EntityEsp {
             String name = LegacyText.strip(stand.getCustomName().getString());
 
             if (doStarred && name.contains(STAR) && !starred.hideDead(name)) {
-                box(stand, starred.color());
+                box(stand, starred);
             } else if (doMiniboss && miniboss.matches(name)) {
                 // Boxed from its body below, so it keeps its box once it turns invisible and the
                 // plate goes with it. Only if the body cannot be resolved do we fall back to the plate.
                 if (!remember(mc, stand)) {
-                    box(stand, miniboss.color());
+                    box(stand, miniboss);
                 }
             } else if (doCustom) {
                 String match = CustomEsp.match(name);
                 if (match != null) {
-                    box(stand, custom.color());
+                    box(stand, custom);
                 }
             }
         }
@@ -103,14 +103,13 @@ public final class EntityEsp {
      * want to see it. The body entity itself stays loaded throughout, so once a plate has identified
      * it we keep drawing from the body and stop only when the entity actually leaves the world.
      */
-    private static final java.util.Map<Integer, Integer> tracked = new java.util.HashMap<>();
+    private static final java.util.Set<Integer> tracked = new java.util.HashSet<>();
 
     /** Re-boxes every remembered miniboss from its body, dropping any that have left the world. */
     private static void drawTracked(Minecraft mc) {
-        var it = tracked.entrySet().iterator();
+        var it = tracked.iterator();
         while (it.hasNext()) {
-            var entry = it.next();
-            Entity body = mc.level.getEntity(entry.getKey());
+            Entity body = mc.level.getEntity(it.next());
             if (body == null || !body.isAlive()) {
                 it.remove();
                 continue;
@@ -119,7 +118,7 @@ public final class EntityEsp {
                 it.remove();   // out of range: forget it rather than hold a stale box
                 continue;
             }
-            WorldRender.thickBox(body.getBoundingBox().inflate(0.05), entry.getValue(), EDGE, true);
+            EspRender.draw(body.getBoundingBox().inflate(0.05), DungeonMinibossEspModule.INSTANCE);
         }
     }
 
@@ -149,7 +148,7 @@ public final class EntityEsp {
         if (body == null) {
             return false;
         }
-        tracked.put(body.getId(), DungeonMinibossEspModule.INSTANCE.color());
+        tracked.add(body.getId());
         return true;
     }
 
@@ -165,10 +164,10 @@ public final class EntityEsp {
     }
 
     /** The plate floats above its mob, so the box is placed on the body below it. */
-    private static void box(ArmorStand stand, int color) {
+    private static void box(ArmorStand stand, dev.diego.diegoaddons.module.EspModule module) {
         AABB box = new AABB(
                 stand.getX() - 0.45, stand.getY() - 2.1, stand.getZ() - 0.45,
                 stand.getX() + 0.45, stand.getY() - 0.3, stand.getZ() + 0.45);
-        WorldRender.thickBox(box, color, EDGE, true);
+        EspRender.draw(box, module);
     }
 }

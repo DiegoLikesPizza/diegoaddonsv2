@@ -92,7 +92,7 @@ public final class SlayerMinibossEsp {
             }
             if (best != null) {
                 taken.add(best);
-                EspDraw.highlight(best.getBoundingBox().inflate(0.05), COLOR, EDGE);
+                EspRender.draw(best.getBoundingBox().inflate(0.05), mod);
             }
         }
     }

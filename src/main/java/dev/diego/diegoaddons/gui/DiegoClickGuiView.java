@@ -21,6 +21,7 @@ import dev.diego.diegoaddons.DiegoAddonsV2Client;
 import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
+import dev.diego.diegoaddons.module.ColorSetting;
 import dev.diego.diegoaddons.module.CycleSetting;
 import dev.diego.diegoaddons.module.KeybindSetting;
 import dev.diego.diegoaddons.module.Module;
@@ -501,10 +502,102 @@ public class DiegoClickGuiView extends GuiView {
                 fill(cards.get(ks.owner.id), true);
             });
         }
+        if (s instanceof ColorSetting col) {
+            return colorRow(col);
+        }
         if (s instanceof ActionSetting as) {
             return valueRow(as.name, as.action, as::run);
         }
         return new Row(row(CARD_INNER, 0f).height(ROW_H), ROW_H);
+    }
+
+    /**
+     * A colour: the mode on top, then the channels for however many colours that mode uses.
+     *
+     * <p>Rainbow has nothing to pick - it is the whole wheel, moving - so it shows no channels at
+     * all. Gradient shows two sets, since two ends is what a gradient is. The swatch beside the mode
+     * is the live answer to "what will this actually draw", which for a gradient is both ends and
+     * for a rainbow is wherever the wheel is at that moment.
+     */
+    private Row colorRow(ColorSetting col) {
+        ContainerComponent wrap = column(CARD_INNER, SLIDER_GAP).flexShrink(0f);
+        float height = 0f;
+
+        ContainerComponent top = row(CARD_INNER, 10f).height(ROW_H)
+                .justifyContent(GuiAlignment.SPACE_BETWEEN);
+        top.add(GuiText.label(col.name, t.text(), 14f).flexGrow(1f));
+        ContainerComponent swatchA = swatch(col.argbAt(0f));
+        top.add(swatchA);
+        if (col.mode() == ColorSetting.GRADIENT) {
+            top.add(swatch(col.argbAt(1f)));
+        }
+        ButtonComponent mode = clickable(t.surface(), () -> {
+            col.cycleMode();
+            fill(cards.get(col.owner.id), true);   // the channel rows below depend on the mode
+        });
+        asRow(mode, 96f, 0f).height(ROW_H).cornerRadius(8f).padding(0f, 12f)
+                .justifyContent(GuiAlignment.CENTER)
+                .borderWidth(1f).borderColor(GuiColors.of(t.border()));
+        mode.add(GuiText.label(ColorSetting.MODES[col.mode()], t.textMuted(), 13f));
+        top.add(mode);
+        wrap.add(top);
+        height += ROW_H;
+
+        if (col.mode() != ColorSetting.RAINBOW) {
+            height += channels(wrap, col, true, swatchA);
+        }
+        if (col.mode() == ColorSetting.GRADIENT) {
+            height += channels(wrap, col, false, null);
+        }
+        wrap.height(height);
+        return new Row(wrap, height);
+    }
+
+    /** The three channel sliders of one colour; returns the height they took. */
+    private float channels(ContainerComponent into, ColorSetting col, boolean first,
+                           ContainerComponent live) {
+        float height = 0f;
+        String[] names = {"Red", "Green", "Blue"};
+        int[] shifts = {16, 8, 0};
+        for (int i = 0; i < names.length; i++) {
+            int shift = shifts[i];
+            int argb = first ? col.colorA() : col.colorB();
+            ContainerComponent labelRow = row(CARD_INNER, 10f).height(SLIDER_LABEL_H)
+                    .justifyContent(GuiAlignment.SPACE_BETWEEN);
+            labelRow.add(GuiText.label((first ? "" : "To ") + names[i], t.textMuted(), 12f).flexGrow(1f));
+            into.add(labelRow);
+            into.add(new SliderComponent()
+                    .min(0).max(255).step(1).value((argb >> shift) & 0xFF)
+                    .valueLabelPosition(SliderValueLabelPosition.OFF)
+                    .onChange(v -> {
+                        int current = first ? col.colorA() : col.colorB();
+                        int level = (int) Math.round(v.doubleValue());
+                        int next = (current & ~(0xFF << shift)) | (level << shift) | 0xFF000000;
+                        if (first) {
+                            col.setColorA(next);
+                            if (live != null) {
+                                live.backgroundColor(GuiColors.of(next));   // no rebuild mid-drag
+                            }
+                        } else {
+                            col.setColorB(next);
+                        }
+                    })
+                    .size(CARD_INNER, SLIDER_H)
+                    .trackColor(GuiColors.of(t.surface()))
+                    .fillColor(GuiColors.of(t.accent()))
+                    .thumbColor(GuiColors.of(t.accentText())));
+            height += SLIDER_LABEL_H + SLIDER_GAP + SLIDER_H;
+        }
+        return height;
+    }
+
+    /** A small block of colour, so a number is also a thing you can look at. */
+    private ContainerComponent swatch(int argb) {
+        ContainerComponent box = new ContainerComponent();
+        box.size(22f, 14f).cornerRadius(4f)
+                .backgroundColor(GuiColors.of(argb))
+                .borderWidth(1f).borderColor(GuiColors.of(t.border()));
+        return box;
     }
 
     /** A full-width "name … value" row that runs an action when clicked. */

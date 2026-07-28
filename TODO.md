@@ -25,10 +25,13 @@ build, a deploy and a run in game before the next starts.
 
 ## Batch 3 — ESP and item drawing (shared groundwork first)
 
-- [ ] **Setting groundwork** — a colour setting (single / gradient / rainbow) and its ClickGUI row;
-      everything below depends on it
-- [ ] **All ESP modules** — style: outline, box, 2D square · colour: single, gradient, rainbow
-- [ ] **Item Rarity** — display: outline, filled, circle
+- [x] **Setting groundwork** — `ColorSetting` (single / gradient / rainbow) with a mode pill, live
+      swatches and RGB channel sliders in the ClickGUI
+- [x] **All ESP modules** — a shared `EspModule` base carries style + colour; Starred Mob, Bat,
+      Dungeon Miniboss, Player, Custom, Slayer Boss and Slayer Miniboss are on it
+- [ ] **Door & Key ESP / Voidgloom beacon + nukekebi** — left on their semantic colours (a wither
+      door is black, a blood key is red); they should get the style setting without the colour one
+- [x] **Item Rarity** — display: outline, filled, circle
 
 ## Batch 4 — chat, party and small additions
 

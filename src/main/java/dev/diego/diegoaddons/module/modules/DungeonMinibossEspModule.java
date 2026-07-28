@@ -1,7 +1,7 @@
 package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.module.Category;
-import dev.diego.diegoaddons.module.Module;
+import dev.diego.diegoaddons.module.EspModule;
 
 /**
  * Boxes dungeon minibosses - Shadow Assassin, Lost Adventurer, Frozen Adventurer and Angry
@@ -9,7 +9,7 @@ import dev.diego.diegoaddons.module.Module;
  * in a distinct colour from ordinary starred mobs. Handled in the shared
  * {@link dev.diego.diegoaddons.util.EntityEsp} pass; gated to dungeons.
  */
-public class DungeonMinibossEspModule extends Module {
+public class DungeonMinibossEspModule extends EspModule {
     public static DungeonMinibossEspModule INSTANCE;
 
     /** The recognised dungeon miniboss plate names, matched by {@code contains}. */
@@ -20,13 +20,11 @@ public class DungeonMinibossEspModule extends Module {
 
     public DungeonMinibossEspModule() {
         super("dungeonminibossesp", Category.DUNGEONS, "Miniboss ESP",
-                "Box Shadow Assassins, Lost/Frozen Adventurers and Angry Archeologists.");
+                "Box Shadow Assassins, Lost/Frozen Adventurers and Angry Archeologists.",
+                0xFFFF3060);
         INSTANCE = this;
     }
 
-    public int color() {
-        return 0xFFFF3060;   // pink-red
-    }
 
     /** Whether a name plate is one of the dungeon minibosses. */
     public boolean matches(String plate) {

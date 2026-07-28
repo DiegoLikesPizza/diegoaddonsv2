@@ -46,10 +46,7 @@ public final class ItemRarity {
             if (color == 0) {
                 continue;
             }
-            int x = left + slot.x;
-            int y = top + slot.y;
-            int bg = (color & 0x00FFFFFF) | (0x66 << 24);
-            g.fill(x - 1, y - 1, x + 17, y + 17, bg);
+            paint(g, left + slot.x, top + slot.y, color, mod.display());
         }
     }
 
@@ -76,12 +73,42 @@ public final class ItemRarity {
             if (color == 0) {
                 continue;
             }
-            int x = hotbarX + 3 + i * 20;
-            int c = (color & 0x00FFFFFF) | 0xFF000000;
-            g.fill(x - 1, y - 1, x + 17, y, c);        // top
-            g.fill(x - 1, y + 16, x + 17, y + 17, c);  // bottom
-            g.fill(x - 1, y, x, y + 16, c);            // left
-            g.fill(x + 16, y, x + 17, y + 16, c);      // right
+            paint(g, hotbarX + 3 + i * 20, y, color, mod.display());
+        }
+    }
+
+    /**
+     * Puts a rarity colour on one 16x16 slot, in whichever of the three ways is chosen.
+     *
+     * <p>Filled sits behind the item at low alpha; outline frames it at full; the circle is a disc
+     * behind it, drawn as rows of a filled circle since a rounded shape has to be built out of the
+     * rectangles {@code fill} gives us.
+     */
+    private static void paint(GuiGraphicsExtractor g, int x, int y, int color, int display) {
+        switch (display) {
+            case ItemRarityModule.OUTLINE -> {
+                int c = (color & 0x00FFFFFF) | 0xFF000000;
+                g.fill(x - 1, y - 1, x + 17, y, c);
+                g.fill(x - 1, y + 16, x + 17, y + 17, c);
+                g.fill(x - 1, y, x, y + 16, c);
+                g.fill(x + 16, y, x + 17, y + 16, c);
+            }
+            case ItemRarityModule.CIRCLE -> {
+                int c = (color & 0x00FFFFFF) | (0x88 << 24);
+                double r = 9.0;
+                double cx = x + 8.0;
+                double cy = y + 8.0;
+                for (int row = -9; row < 9; row++) {
+                    double dy = row + 0.5;
+                    double half = r * r - dy * dy;
+                    if (half <= 0) {
+                        continue;
+                    }
+                    int w = (int) Math.round(Math.sqrt(half));
+                    g.fill((int) (cx - w), (int) (cy + dy - 0.5), (int) (cx + w), (int) (cy + dy + 0.5), c);
+                }
+            }
+            default -> g.fill(x - 1, y - 1, x + 17, y + 17, (color & 0x00FFFFFF) | (0x66 << 24));
         }
     }
 

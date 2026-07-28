@@ -2,7 +2,7 @@ package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
-import dev.diego.diegoaddons.module.Module;
+import dev.diego.diegoaddons.module.EspModule;
 import dev.diego.diegoaddons.util.EspDraw;
 import dev.diego.diegoaddons.util.SlayerState;
 import net.minecraft.client.Minecraft;
@@ -16,7 +16,7 @@ import net.minecraft.world.phys.Vec3;
  * lobby full of other players' bosses. Optional extras: a tracer from the crosshair to it and a 2D
  * edge arrow while it is off-screen, both handy the moment the boss teleports out of view.
  */
-public class SlayerBossHighlightModule extends Module {
+public class SlayerBossHighlightModule extends EspModule {
     public static SlayerBossHighlightModule INSTANCE;
 
     private static final double EDGE = 0.06;
@@ -30,7 +30,8 @@ public class SlayerBossHighlightModule extends Module {
 
     public SlayerBossHighlightModule() {
         super("slayerbosshighlight", Category.SLAYER, "Boss Highlight",
-                "Box your own slayer boss, coloured by tier, with an optional tracer and off-screen arrow.");
+                "Box your own slayer boss, coloured by tier, with an optional tracer and off-screen arrow.",
+                0xFFFF5555);
         settings.add(tierColor);
         settings.add(tracer);
         settings.add(arrow);
@@ -46,11 +47,12 @@ public class SlayerBossHighlightModule extends Module {
         if (boss == null) {
             return;
         }
-        int color = tierColor.get() ? tierColor(SlayerState.tier()) : 0xFFFF5555;
+        // The tier colours say something the user's own colour cannot, so they win when asked for.
+        int color = tierColor.get() ? tierColor(SlayerState.tier()) : espColor().argb();
         AABB box = boss.getBoundingBox().inflate(0.05);
         Vec3 center = box.getCenter();
 
-        EspDraw.highlight(box, color, EDGE);
+        dev.diego.diegoaddons.util.EspRender.draw(box, this, color);
         if (tracer.get()) {
             EspDraw.tracer(center, color);
         }
