@@ -1,7 +1,7 @@
 package dev.diego.diegoaddons.module.modules;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import dev.diego.diegoaddons.gui.ChatSearchScreen;
+import dev.diego.diegoaddons.gui.ChatSearchView;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
@@ -46,6 +46,7 @@ public class ChatModule extends Module {
             new BooleanSetting(this, "caseSensitive", "Search is case sensitive", false);
 
     private boolean wasDown;
+    private ChatSearchView open;
 
     public ChatModule() {
         super("chat", Category.MISC, "Chat",
@@ -97,8 +98,9 @@ public class ChatModule extends Module {
         wasDown = down;
 
         // Don't reopen on top of the search itself, and don't steal the combo from other mods' menus.
-        if (pressed && !(mc.screen instanceof ChatSearchScreen) && mc.player != null) {
-            mc.setScreen(new ChatSearchScreen(mc.screen));
+        if (pressed && mc.player != null && (open == null || !open.isOpen())) {
+            open = new ChatSearchView();
+            open.open();
         }
     }
 }

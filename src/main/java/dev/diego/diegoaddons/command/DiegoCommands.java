@@ -3,11 +3,11 @@ package dev.diego.diegoaddons.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import dev.diego.diegoaddons.gui.BlockedPlayersScreen;
+import dev.diego.diegoaddons.gui.IgnoreListView;
 import dev.diego.diegoaddons.gui.DiegoClickGuiView;
-import dev.diego.diegoaddons.gui.CommandHotkeysScreen;
+import dev.diego.diegoaddons.gui.CommandHotkeysView;
 import dev.diego.diegoaddons.gui.InventoryButtonsScreen;
-import dev.diego.diegoaddons.gui.ReplaceWordsScreen;
+import dev.diego.diegoaddons.gui.ReplaceWordsView;
 import dev.diego.diegoaddons.config.MiningRoute;
 import dev.diego.diegoaddons.util.CustomEsp;
 import dev.diego.diegoaddons.util.IgnoreList;
@@ -84,11 +84,11 @@ public final class DiegoCommands {
                 .then(ClientCommands.literal("invbuttons")
                         .executes(c -> open(() -> new InventoryButtonsScreen(null))))
                 .then(ClientCommands.literal("words")
-                        .executes(c -> open(() -> new ReplaceWordsScreen(null))))
+                        .executes(c -> openView(() -> new ReplaceWordsView())))
                 .then(ClientCommands.literal("hotkeys")
-                        .executes(c -> open(() -> new CommandHotkeysScreen(null))))
+                        .executes(c -> openView(() -> new CommandHotkeysView())))
                 .then(ClientCommands.literal("blocked")
-                        .executes(c -> open(() -> new BlockedPlayersScreen(null))))
+                        .executes(c -> openView(() -> new IgnoreListView())))
                 .then(ClientCommands.literal("block")
                         .then(ClientCommands.argument("player", StringArgumentType.word())
                                 .executes(c -> block(c.getSource(), StringArgumentType.getString(c, "player"), ""))
@@ -273,6 +273,12 @@ public final class DiegoCommands {
      * Opens a screen once the command has finished running. Setting it directly would fight with the
      * chat screen closing itself immediately afterwards, which would drop us back to the game.
      */
+    /** Opens one of the RenderLib views, which own their own screen. */
+    private static int openView(Supplier<dev.diego.diegoaddons.gui.DiegoView> view) {
+        Minecraft.getInstance().execute(() -> view.get().open());
+        return 1;
+    }
+
     private static int open(Supplier<Screen> screen) {
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> mc.setScreen(screen.get()));

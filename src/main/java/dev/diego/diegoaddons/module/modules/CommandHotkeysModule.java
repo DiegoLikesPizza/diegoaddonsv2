@@ -1,6 +1,6 @@
 package dev.diego.diegoaddons.module.modules;
 
-import dev.diego.diegoaddons.gui.CommandHotkeysScreen;
+import dev.diego.diegoaddons.gui.CommandHotkeysView;
 import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
@@ -29,7 +29,7 @@ public class CommandHotkeysModule extends Module {
 
     private static void open() {
         Minecraft mc = Minecraft.getInstance();
-        mc.setScreen(new CommandHotkeysScreen(mc.screen));
+        new CommandHotkeysView().open();
     }
 
     @Override

@@ -50,11 +50,16 @@ build, a deploy and a run in game before the next starts.
 - [x] **Secret Chime** — any sound id in the game, from a searchable browser with preview
 - [x] **Auto GFS** — its own RenderLib screen; items by SkyBlock name, one threshold each
 
-## Batch 6 — the last three screens on the old drawing
+## Batch 6 — the screens on the old drawing
 
-- [ ] **Custom Ignore List** → RenderLib
-- [ ] **Command Hotkeys** → RenderLib
-- [ ] **Replace Words** → RenderLib
+- [x] **Custom Ignore List** → RenderLib
+- [x] **Command Hotkeys** → RenderLib
+- [x] **Replace Words** → RenderLib
+- [x] **Chat Search** → RenderLib
+- [x] **Custom Scoreboard** → a managed HUD element, so it can be placed like everything else
+- [ ] **Inventory Buttons editor** → still on the old drawing; it is a freeform placement editor,
+      which is a different job from a list
+- [ ] **Intro screen / DiegoScreen** → still on the old drawing
 
 ---
 

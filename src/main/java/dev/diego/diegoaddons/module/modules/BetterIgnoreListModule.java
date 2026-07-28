@@ -1,6 +1,6 @@
 package dev.diego.diegoaddons.module.modules;
 
-import dev.diego.diegoaddons.gui.BlockedPlayersScreen;
+import dev.diego.diegoaddons.gui.IgnoreListView;
 import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
@@ -34,7 +34,7 @@ public class BetterIgnoreListModule extends Module {
 
     private static void open() {
         Minecraft mc = Minecraft.getInstance();
-        mc.setScreen(new BlockedPlayersScreen(mc.screen));
+        new IgnoreListView().open();
     }
 
     public boolean autoKick() {

@@ -1,6 +1,6 @@
 package dev.diego.diegoaddons.module.modules;
 
-import dev.diego.diegoaddons.gui.ReplaceWordsScreen;
+import dev.diego.diegoaddons.gui.ReplaceWordsView;
 import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
@@ -36,7 +36,7 @@ public class ReplaceWordsModule extends Module {
 
     private static void open() {
         Minecraft mc = Minecraft.getInstance();
-        mc.setScreen(new ReplaceWordsScreen(mc.screen));
+        new ReplaceWordsView().open();
     }
 
     public boolean inChat() {

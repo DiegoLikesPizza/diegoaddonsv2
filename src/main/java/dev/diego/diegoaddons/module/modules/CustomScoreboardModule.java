@@ -2,7 +2,7 @@ package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
-import dev.diego.diegoaddons.module.Module;
+import dev.diego.diegoaddons.module.HudModule;
 import dev.diego.diegoaddons.module.StringSetting;
 
 /**
@@ -10,7 +10,7 @@ import dev.diego.diegoaddons.module.StringSetting;
  * sidebar is cancelled by {@code ScoreboardSidebarMixin}; the drawing lives in
  * {@link dev.diego.diegoaddons.util.CustomScoreboard}.
  */
-public class CustomScoreboardModule extends Module {
+public class CustomScoreboardModule extends HudModule {
     public static CustomScoreboardModule INSTANCE;
 
     private final BooleanSetting background =
@@ -32,7 +32,8 @@ public class CustomScoreboardModule extends Module {
 
     public CustomScoreboardModule() {
         super("customscoreboard", Category.RENDER, "Custom Scoreboard",
-                "Re-style the sidebar: themed panel, no red numbers, and only the lines you want.");
+                "Re-style the sidebar: themed panel, no red numbers, and only the lines you want.",
+                false);
         settings.add(background);
         settings.add(hideServerId);
         settings.add(hideUrl);
@@ -75,5 +76,21 @@ public class CustomScoreboardModule extends Module {
 
     public String bottomText() {
         return bottom.get();
+    }
+
+    @Override
+    protected String label() {
+        return "Scoreboard";
+    }
+
+    @Override
+    protected String value(net.minecraft.client.Minecraft mc) {
+        return null;   // drawn by its own element, not as a text chip
+    }
+
+    @Override
+    public dev.diego.diegoaddons.hud.HudElement createElement(
+            com.render.api.gui.ContainerComponent root) {
+        return new dev.diego.diegoaddons.hud.ScoreboardElement(this, root);
     }
 }

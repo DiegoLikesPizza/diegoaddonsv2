@@ -1,12 +1,7 @@
 package dev.diego.diegoaddons.util;
 
-import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.gui.Theme;
-import dev.diego.diegoaddons.gui.Themes;
-import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.modules.CustomScoreboardModule;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.scores.DisplaySlot;
 import net.minecraft.world.scores.Objective;
@@ -19,10 +14,13 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Re-draws the SkyBlock sidebar with the addon's own panel styling. The vanilla sidebar is cancelled
- * by {@code ScoreboardSidebarMixin}; this draws a replacement from the same scoreboard data, but as a
- * rounded themed panel and <b>without the red score numbers</b> - only each line's visible text (the
- * team prefix+suffix), which is where SkyBlock puts everything worth reading.
+ * Reads the SkyBlock sidebar and hands back what should be shown in its place. The vanilla sidebar
+ * is cancelled by {@code ScoreboardSidebarMixin} and
+ * {@link dev.diego.diegoaddons.hud.ScoreboardElement} draws the replacement - as a HUD element like
+ * every other, which is what lets it be moved and scaled.
+ *
+ * <p>The red score numbers are dropped: only each line's visible text (the team prefix+suffix),
+ * which is where SkyBlock puts everything worth reading.
  */
 public final class CustomScoreboard {
     private static final int MAX_LINES = 15;
@@ -30,18 +28,39 @@ public final class CustomScoreboard {
     private CustomScoreboard() {
     }
 
-    /** Draws the replacement sidebar in the HUD layer. No-op unless the module is on. */
-    public static void render(GuiGraphicsExtractor g, Minecraft mc) {
+    /**
+     * The sidebar's title, or null when there is nothing to draw.
+     *
+     * <p>Split out from the drawing so the HUD element can ask for the content and lay it out with
+     * everything else. This used to draw itself into the HUD pass at a fixed spot on the right,
+     * which is the one HUD element you could not move.
+     */
+    public static Component title(Minecraft mc) {
         CustomScoreboardModule mod = CustomScoreboardModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || mc.player == null || mc.player.connection == null
-                || mc.options.hideGui) {
-            return;
+        Objective obj = objective(mc);
+        if (mod == null || obj == null) {
+            return null;
+        }
+        return mod.customTitle().isBlank()
+                ? obj.getDisplayName()
+                : Component.literal(mod.customTitle().replace('&', '§'));
+    }
+
+    private static Objective objective(Minecraft mc) {
+        if (mc.player == null || mc.player.connection == null) {
+            return null;
+        }
+        return mc.player.connection.scoreboard().getDisplayObjective(DisplaySlot.SIDEBAR);
+    }
+
+    /** The sidebar's lines, filtered and decorated the way the settings ask for. */
+    public static List<Component> lines(Minecraft mc) {
+        CustomScoreboardModule mod = CustomScoreboardModule.INSTANCE;
+        Objective obj = objective(mc);
+        if (mod == null || obj == null) {
+            return List.of();
         }
         Scoreboard sb = mc.player.connection.scoreboard();
-        Objective obj = sb.getDisplayObjective(DisplaySlot.SIDEBAR);
-        if (obj == null) {
-            return;
-        }
 
         // Highest score at the top, like vanilla; the red number itself is dropped.
         List<PlayerScoreEntry> entries = new ArrayList<>(sb.listPlayerScores(obj));
@@ -74,10 +93,7 @@ public final class CustomScoreboard {
         if (!mod.bottomText().isBlank()) {
             lines.add(Component.literal(mod.bottomText().replace('&', '§')));
         }
-        Component title = mod.customTitle().isBlank()
-                ? obj.getDisplayName()
-                : Component.literal(mod.customTitle().replace('&', '§'));
-        draw(g, mc, mod, title, lines);
+        return lines;
     }
 
     /**
@@ -119,38 +135,5 @@ public final class CustomScoreboard {
             }
         }
         return null;
-    }
-
-    private static void draw(GuiGraphicsExtractor g, Minecraft mc, CustomScoreboardModule mod,
-                             Component title, List<Component> lines) {
-        var font = mc.font;
-        Theme t = Themes.current();
-        boolean smooth = ConfigManager.get().smoothCorners;
-        int pad = 5;
-        int lineH = font.lineHeight + 1;
-
-        int inner = font.width(title);
-        for (Component line : lines) {
-            inner = Math.max(inner, font.width(line));
-        }
-        int w = inner + pad * 2;
-        int h = pad * 2 + lineH + 2 + lines.size() * lineH;
-
-        int sw = mc.getWindow().getGuiScaledWidth();
-        int sh = mc.getWindow().getGuiScaledHeight();
-        int x = sw - w - 4;
-        int y = Math.max(2, (sh - h) / 2);
-
-        if (mod.background()) {
-            int bg = (0xCC << 24) | (t.surface() & 0x00FFFFFF);
-            UiRender.panel(g, x, y, w, h, 6, bg, Theme.withAlpha(t.border(), 0.9f), smooth);
-        }
-        int ty = y + pad;
-        g.text(font, title, x + (w - font.width(title)) / 2, ty, t.accent(), true);
-        ty += lineH + 2;
-        for (Component line : lines) {
-            g.text(font, line, x + pad, ty, t.text(), true);
-            ty += lineH;
-        }
     }
 }

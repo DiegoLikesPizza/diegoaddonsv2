@@ -403,13 +403,11 @@ public final class ModuleManager {
         boolean smooth = ConfigManager.get().smoothCorners;
         Font font = mc.font;
         dev.diego.diegoaddons.util.ItemRarity.renderHotbar(g, mc);
-        dev.diego.diegoaddons.util.CustomScoreboard.render(g, mc);
         dev.diego.diegoaddons.util.AbilityCooldown.renderHotbar(g, mc);
         dev.diego.diegoaddons.util.EspDraw.renderHud(g, mc);
         // Toasts, except on the screens that draw them themselves - those sit above the HUD (and
         // dim it), so drawing here too would show a faded ghost behind the crisp one.
-        if (!(mc.screen instanceof dev.diego.diegoaddons.gui.ChatSearchScreen)
-                && !(mc.screen instanceof AbstractContainerScreen<?>)) {
+        if (!(mc.screen instanceof AbstractContainerScreen<?>)) {
             Toasts.render(g);
         }
     }
