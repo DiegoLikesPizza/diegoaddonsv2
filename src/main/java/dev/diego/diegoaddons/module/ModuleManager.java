@@ -17,6 +17,7 @@ import dev.diego.diegoaddons.module.modules.FullbrightModule;
 import dev.diego.diegoaddons.module.modules.ItemRarityModule;
 import dev.diego.diegoaddons.module.modules.AutoGfsModule;
 import dev.diego.diegoaddons.module.modules.BetterIgnoreListModule;
+import dev.diego.diegoaddons.module.modules.BorderlessFullscreenModule;
 import dev.diego.diegoaddons.module.modules.ChatModule;
 import dev.diego.diegoaddons.module.modules.ClockModule;
 import dev.diego.diegoaddons.module.modules.CommandHotkeysModule;
@@ -53,7 +54,6 @@ import dev.diego.diegoaddons.module.modules.DungeonMinibossEspModule;
 import dev.diego.diegoaddons.module.modules.FishingRareAlertModule;
 import dev.diego.diegoaddons.module.modules.LeapOverlayModule;
 import dev.diego.diegoaddons.module.modules.CustomScoreboardModule;
-import dev.diego.diegoaddons.module.modules.CustomTitleScreenModule;
 import dev.diego.diegoaddons.module.modules.PlayerEspModule;
 import dev.diego.diegoaddons.module.modules.ShowHiddenMobsModule;
 import dev.diego.diegoaddons.module.modules.SlotLockModule;
@@ -130,8 +130,7 @@ public final class ModuleManager {
         register(new InventoryButtonsModule(), false);
         register(new ChatModule(), false);
         register(new ShowHiddenMobsModule(), false);
-        // On by default: it was asked for as the menu, not as an option to go looking for.
-        register(new CustomTitleScreenModule(), true);
+        register(new BorderlessFullscreenModule(), false);
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);

@@ -46,8 +46,6 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
         // Same story for the party finder's class picker, which decides per screen whether the menu
         // in front of it is the party finder.
         com.render.api.RenderLibScreen.register(new dev.diego.diegoaddons.gui.PartyFinderExtension());
-        // The title screen, replaced outright while its module is on.
-        com.render.api.RenderLibScreen.register(new dev.diego.diegoaddons.gui.TitleScreenExtension());
         dev.diego.diegoaddons.util.WorldRender.init();
         dev.diego.diegoaddons.command.DiegoCommands.register();
 
