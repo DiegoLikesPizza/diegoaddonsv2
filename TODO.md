@@ -48,6 +48,13 @@ Every option is currently `SpecBuilder.notPersisted()`; `ConfigManager` still ow
       lost, so do it with someone watching, not before bed.
 
 ### 3. Smaller open items
+- [ ] **Shade behind the title-screen wordmark** (configlib `:menu`) — a slider for a dark scrim
+      behind the mod name and subtitle on the custom main menu, so the text stays readable over a
+      bright wallpaper. Distinct from the existing `MenuSettings.dim()`, which dims the whole
+      background: this is a local gradient or rounded panel behind the text only, so a wallpaper can
+      stay bright while the name is still legible. Goes in `MenuSettings` next to `dim`/`glow` as a
+      percent, a row in `MenuCustomizeScreen`, and drawn in `MainMenuScreen` around the wordmark at
+      `MainMenuScreen.java:186` and the subtitle just below it.
 - [ ] **Door & Key ESP / Voidgloom beacon + nukekebi** — left on their semantic colours (a wither
       door is black, a blood key is red). They should get the style setting without the colour one.
 - [ ] **Inventory Buttons** — removed in 2.2.2 rather than ported. Wants a rework, not a port.
