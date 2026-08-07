@@ -1,84 +1,102 @@
 # DiegoAddons V2 — work list
 
-`[ ]` open · `[~]` in progress · `[x]` done. Batches are the order we work in; each one ends with a
-build, a deploy and a run in game before the next starts.
+`[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
+"DiegoAddonsV2 Test" instance, and a run in game before the next starts.
+
+**Current version: 2.4.0.** RenderLib is gone; the mod runs on
+[diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
+`includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
 ---
 
-## Batch 1 — bugs that are just wrong
+## Open — in the order worth doing
 
-- [x] **CustomF5** — camera clip does nothing
-- [x] **Fullbright** — does nothing
-- [x] **Performance HUD** — renamed; the ping row is gone (see the note below)
-- [x] **Music Display** — drop the "Centered" toggle (does nothing on the custom layout)
-- [x] **Puzzle Solvers** — Blaze guessing options removed ("show whole order" already existed)
-- [x] **Armor Hider** — stops hiding armour on mobs that use a player model
+### 1. The seven custom HUD elements
+All ten HUD elements register and are placeable, but only Clock, Performance and Mining Ability look
+right. The rest fall back to configlib's `labelValue` prefab and draw as plain text:
 
-## Batch 2 — bugs that need real work
+- [ ] **Dungeon Map** — room grid, checkmarks, player heads
+- [ ] **Crystal Hollows Map** — coloured region blocks
+- [ ] **Inventory HUD** — slot grid with item models
+- [ ] **Custom Scoreboard** — multi-line sidebar
+- [ ] **Player HUD** — armour / model / equipment columns
+- [ ] **Pet HUD** — icon plus level
+- [ ] **Music Display** — cover art plus track
 
-- [x] **Dungeon Map** — stray lines across rooms that span several tiles
-- [x] **Etherwarp Helper** — zoom gone; the sound replaces the teleport's own; the highlight is a
-      setting of its own
-- [x] **Slot Locking** — a locked hotbar slot cannot be dropped with the drop key while the
-      inventory is closed either
-- [x] **Pet Display** — the pet icon is centred by padding now, not by asking the layout
+**Head start:** `DungeonMapModule` and `CrystalHollowsMapModule` still contain their complete
+pre-RenderLib immediate-mode drawing (`drawSeams`, `drawRooms`, `drawLabels`, `drawPlayers`,
+`drawStats`). Nothing calls it. Reviving those two is composition into a
+`HudWidget.of(w, h, renderer)`, not a rewrite. The other five had their drawing entirely inside the
+deleted element classes and need real work — `HudTemplates` has `bar()`, `stats()`, `icon()` and
+`image()`, which may cover the pet and the scoreboard.
 
-## Batch 3 — ESP and item drawing (shared groundwork first)
+**Mining Ability** is a behaviour change, not just a look: it was drawn large in the centre of the
+screen by `MiningAbilityOverlay`, not as a placeable chip. It wants a plain HUD render callback
+rather than a `HudWidget` in the editor.
 
-- [x] **Setting groundwork** — `ColorSetting` (single / gradient / rainbow) with a mode pill, live
-      swatches and RGB channel sliders in the ClickGUI
-- [x] **All ESP modules** — a shared `EspModule` base carries style + colour; Starred Mob, Bat,
-      Dungeon Miniboss, Player, Custom, Slayer Boss and Slayer Miniboss are on it
+This is also what keeps `gui/UiRender`, `gui/Fonts`, `gui/Theme` and `gui/Themes` alive — plus
+`Toasts` and `ModuleManager.renderHud` (item rarity, ability cooldown, ESP HUD).
+
+### 2. Persistence — configlib should own the config
+Every option is currently `SpecBuilder.notPersisted()`; `ConfigManager` still owns
+`config/diegoaddonsv2.json` and configlib writes only HUD positions and menu settings to
+`config/diegoaddonsv2-configlib.json`.
+
+- [ ] Move module settings onto configlib's store and retire `ConfigManager`
+- [ ] **Migrate, do not reset.** The two files have incompatible schemas and share a mod id — this
+      is why the handle is pointed at a separate path today. Get this wrong and a real config is
+      lost, so do it with someone watching, not before bed.
+
+### 3. Smaller open items
 - [ ] **Door & Key ESP / Voidgloom beacon + nukekebi** — left on their semantic colours (a wither
-      door is black, a blood key is red); they should get the style setting without the colour one
-- [x] **Item Rarity** — display: outline, filled, circle
-
-## Batch 4 — chat, party and small additions
-
-- [x] **Chat** — one module: unlimited history · compact chat · compact window (s) · Ctrl+F search ·
-      Ctrl+click copy · case-sensitive search
-- [x] **Party Commands** — !8ball, !cf/!coinflip, !roll/!dice, !rps, !pick, behind one option
-- [x] **Party Finder** — missing classes on hover; the class picks left in the in-menu strip only
-- [x] **Force Nametag** — option to show your own nametag in F5
-- [x] **Hide Effects** — also hide the effect icons in the top-right corner
-
-## Batch 5 — the bigger features
-
-- [x] **Custom Scoreboard** — hide server id / URL / date, custom title, text top and bottom, bank
-      balance from the tab list
-- [x] **Show Hidden Mobs** — reveal invisible dungeon mobs (shadow assassins, fels)
-- [x] **Secret Chime** — any sound id in the game, from a searchable browser with preview
-- [x] **Auto GFS** — its own RenderLib screen; items by SkyBlock name, one threshold each
-
-## Batch 6 — the screens on the old drawing
-
-- [x] **Custom Ignore List** → RenderLib
-- [x] **Command Hotkeys** → RenderLib
-- [x] **Replace Words** → RenderLib
-- [x] **Chat Search** → RenderLib
-- [x] **Custom Scoreboard** → a managed HUD element, so it can be placed like everything else
-- [ ] **Inventory Buttons editor** → wants a rework, not a port (Diego's call)
-
-### The right edge of the HUD
-
-RenderLib's placement screen is a fixed 1920x1080 canvas, letterboxed to fit the window; the live
-HUD is not letterboxed - its design space is `window / min(w/1920, h/1080)`, so on a window wider
-than 16:9 it runs *past* 1920 on the right. Two consequences: the last strip of the screen cannot be
-reached by dragging, and design x=0 is the far left in game but inset in the editor.
-
-Options for an element that has to touch an edge (the scoreboard):
-1. Live with it - on a 16:9 window there is no gap at all.
-2. An "anchor" mode: the element draws itself pinned to an edge as an immediate HUD overlay, with
-   its own offset, and leaves the placement screen behind. Always flush; not draggable.
-3. Ask RenderLib for either an anchor on `HudPlacement` or a full-window placement canvas.
-- [x] **Intro screen** → RenderLib, with live theme swatches
+      door is black, a blood key is red). They should get the style setting without the colour one.
+- [ ] **Inventory Buttons** — removed in 2.2.2 rather than ported. Wants a rework, not a port.
+- [ ] **configlib has no GitHub remote** — committed locally only. Needs a repo name and visibility
+      before it can be pushed.
+- [ ] **`IMPLEMENTATION_PLAN.md` is stale** — written for the RenderLib era. Rewrite or delete.
 
 ---
 
-### Open questions
+## Needs eyes on it — built and deployed, never actually seen
 
-- **Ping**: the client has no way to time a round trip of its own - the play protocol has no
-  client-initiated ping, so the only number available is the one the server hands out
-  (`PlayerInfo.setLatency`). On Hypixel that is measured behind the proxy, which is why it reads
-  1 ms. **Decided: the row is gone** - better no number than a confident wrong one.
-- ~~Auto GFS custom items~~ - decided: SkyBlock item names, with the sack id derived from the name.
+Everything below compiles, boots and registers, but was written without being able to click it.
+Worth a pass before trusting any of it:
+
+- [ ] Settings menu: seven categories, 56 module cards, switches **on** the cards
+- [ ] Sliders drag; dropdowns stay open; text boxes and keybind capture keep focus
+- [ ] Colour picker: the hex field accepts a pasted value
+- [ ] List editors (blocked players, words, hotkeys, GFS, routes) — add / reorder / delete
+- [ ] Player HUD "Section order" screen
+- [ ] Sound picker for Secret Chime
+- [ ] HUD editor: ten draggable elements, and a position that survives a restart
+- [ ] Chat search (Ctrl+F) — jump and copy
+- [ ] Intro screen on a fresh instance
+- [ ] Custom title screen, the Join Hypixel button on both title screens, and the DiegoAddons button
+- [ ] Chat: scroll no longer jumps, separators no longer compacted
+
+---
+
+## Done
+
+- **RenderLib removed entirely** (2.1.0) — no source reference, no dependency, no bundled jar
+- **Screen extensions** → Fabric `ScreenEvents` + real `AbstractWidget`s
+- **World rendering / ESP** → `LevelRenderEvents`, vertex work shared in `WorldGeometry`
+- **Settings menu** → configlib, from a spec walked off `ModuleManager`
+- **HUD** → configlib, ten elements on the `labelValue` prefab
+- **Five list editors** → one configlib `ListOption` screen
+- **Section order** → configlib `OrderOption`; **sound** → configlib `PickerOption`
+- **Chat search** and **intro** → rebuilt on configlib's drawing layer
+- **Custom title screen** → configlib `:menu`, behind the Title Screen module
+- **Achievements** removed in full (2.0.30); **Inventory Buttons** removed (2.2.2)
+- **Chat fixes** — compacting no longer eats scroll position or Hypixel separator rules
+
+### Resolved along the way
+
+- **The right edge of the HUD.** RenderLib's placement screen was a fixed 1920×1080 canvas while the
+  live HUD was not, so the last strip of a wide window could not be reached by dragging. configlib's
+  `HudPos` is a screen fraction plus an `Anchor`, so an element pinned to an edge stays pinned at any
+  window shape. No longer a problem.
+- **Ping.** The client cannot time a round trip of its own — the play protocol has no
+  client-initiated ping, and the only number available is the one the server hands out
+  (`PlayerInfo.setLatency`), measured behind Hypixel's proxy. The row is gone: better no number than
+  a confident wrong one.
