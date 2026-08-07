@@ -7,7 +7,6 @@ import dev.diego.diegoaddons.gui.Fonts;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
-import dev.diego.diegoaddons.module.modules.AchievementsModule;
 import dev.diego.diegoaddons.module.modules.AnimationsModule;
 import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
 import dev.diego.diegoaddons.module.modules.AnnounceKickModule;
@@ -38,7 +37,6 @@ import dev.diego.diegoaddons.module.modules.MiningRoutesModule;
 import dev.diego.diegoaddons.module.modules.PrinceMessageModule;
 import dev.diego.diegoaddons.module.modules.StructureFinderModule;
 import dev.diego.diegoaddons.module.modules.HideEffectsModule;
-import dev.diego.diegoaddons.module.modules.InventoryButtonsModule;
 import dev.diego.diegoaddons.module.modules.InventoryHudModule;
 import dev.diego.diegoaddons.module.modules.MiningAbilityModule;
 import dev.diego.diegoaddons.module.modules.MusicDisplayModule;
@@ -65,7 +63,6 @@ import dev.diego.diegoaddons.module.modules.TitleScreenModule;
 import dev.diego.diegoaddons.module.modules.SlayerBossHighlightModule;
 import dev.diego.diegoaddons.module.modules.SlayerMinibossEspModule;
 import dev.diego.diegoaddons.module.modules.VoidgloomSlayerModule;
-import dev.diego.diegoaddons.util.InventoryButtons;
 import dev.diego.diegoaddons.util.IgnoreList;
 import dev.diego.diegoaddons.util.LegacyText;
 import dev.diego.diegoaddons.util.OldMasterStars;
@@ -132,7 +129,6 @@ public final class ModuleManager {
         register(new InventoryHudModule(), false);
         register(new MusicDisplayModule(), false);
         register(new OldMasterStarsModule(), false);
-        register(new InventoryButtonsModule(), false);
         register(new ChatModule(), false);
         register(new ShowHiddenMobsModule(), false);
         register(new BorderlessFullscreenModule(), false);
@@ -162,7 +158,6 @@ public final class ModuleManager {
         register(new ChestSolverModule(), false);
         register(new MiningRoutesModule(), false);
         register(new CommandHotkeysModule(), false);
-        register(new AchievementsModule(), false);
         register(new SlayerBossHighlightModule(), false);
         register(new SlayerMinibossEspModule(), false);
         register(new VoidgloomSlayerModule(), false);
@@ -275,8 +270,6 @@ public final class ModuleManager {
                 dev.diego.diegoaddons.util.FishingAlerts.onMessage(plain);
                 PrinceMessageModule.onMessage(plain);
                 AutoRequeueModule.onMessage(plain);
-                // Both the profile-switch line and the achievement chat triggers.
-                dev.diego.diegoaddons.util.Achievements.onMessage(plain);
             }
         });
 
@@ -293,14 +286,14 @@ public final class ModuleManager {
                     PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
-                    // Inventory buttons are not drawn here any more - they are a RenderLib screen
+                    // Inventory buttons are not drawn here any more - they are a screen
                     // extension (see InventoryButtonsExtension), which owns their hit testing too.
                     dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
                     dev.diego.diegoaddons.util.SlotLocks.keys((AbstractContainerScreen<?>) scr, mx, my);
                     Toasts.render(g);
                 });
                 // Deny the click to the menu when it lands on a locked slot. Our own buttons are
-                // absent here on purpose: they are RenderLib components now, and a RenderLib button
+                // absent here on purpose: they are real widgets now, and a widget
                 // consumes its own press, so the click never reaches the menu and needs no veto.
                 ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) ->
                         !dev.diego.diegoaddons.util.SlotLocks.locksClick(
@@ -343,7 +336,6 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.EspDraw.clear();
             dev.diego.diegoaddons.util.EspWorld.clear();
             PartyCommands.reset();
-            dev.diego.diegoaddons.util.Achievements.reset();
         });
 
         DiegoAddonsV2Client.LOGGER.info("[DiegoAddons V2] {} modules registered", MODULES.size());

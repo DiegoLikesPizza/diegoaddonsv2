@@ -1,7 +1,5 @@
 package dev.diego.diegoaddons.module.modules;
 
-import dev.diego.diegoaddons.gui.IgnoreListView;
-import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
@@ -20,21 +18,15 @@ public class BetterIgnoreListModule extends Module {
             new BooleanSetting(this, "autoKick", "Auto-kick from party", true);
     private final BooleanSetting announceReason =
             new BooleanSetting(this, "announce", "Announce reason", false);
-    private final ActionSetting list =
-            new ActionSetting(this, "list", "Blocked players", "Open", BetterIgnoreListModule::open);
 
     public BetterIgnoreListModule() {
         super("betterignorelist", Category.MISC, "Better Ignore List",
                 "Block players with a reason, and kick them from your party.");
         settings.add(autoKick);
         settings.add(announceReason);
-        settings.add(list);
+        // The list itself is a row on this card now, declared in ListSpecs - a button
+        // that opens a screen showing the same thing would be a second door to one room.
         INSTANCE = this;
-    }
-
-    private static void open() {
-        Minecraft mc = Minecraft.getInstance();
-        new IgnoreListView().open();
     }
 
     public boolean autoKick() {

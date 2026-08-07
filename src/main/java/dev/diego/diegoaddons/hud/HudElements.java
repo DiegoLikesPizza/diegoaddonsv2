@@ -1,11 +1,8 @@
 package dev.diego.diegoaddons.hud;
 
-import com.render.api.HudLayoutElement;
-import com.render.api.HudPlacement;
-import com.render.api.ManagedHudLayout;
-import com.render.api.RenderLibHud;
-import com.render.api.RenderRegistration;
-import dev.diego.diegoaddons.config.ConfigManager;
+import dev.diego.configlib.ConfigHandle;
+import dev.diego.configlib.hud.HudPos;
+import dev.diego.configlib.hud.HudTemplates;
 import dev.diego.diegoaddons.module.HudModule;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.ModuleManager;
@@ -15,154 +12,69 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Owns the mod's {@link ManagedHudLayout}. RenderLib holds each element's position, scale and
- * opacity, persists them, and supplies the placement screen the mod's HUD editor used to.
+ * The HUD, drawn by configlib.
  *
- * <p>RenderLib freezes an element list at registration, so the layout is rebuilt and re-registered
- * whenever the set of <em>enabled</em> HUD modules changes. That is deliberate: only elements you
- * actually have switched on appear in the placement screen, instead of a row of empty ghosts for
- * everything the mod could draw.
+ * <p>Every {@link HudModule} already answers "what should this show right now" through
+ * {@link HudModule#hudLine}, and always did - that half survived the move off RenderLib untouched.
+ * What changed is who draws it: instead of each element building a component tree, a module is
+ * handed to one of configlib's prefabs and the library owns placement, scale, the editor and the
+ * saving of where things sit.
+ *
+ * <p>Positions live here rather than in {@code ModuleConfig}. The old {@code hudX}/{@code hudY} were
+ * whole GUI pixels from a fixed corner; a {@link HudPos} is a fraction of the screen plus an anchor,
+ * which is what keeps an element in the same visual place when the window is resized. Translating
+ * between the two would preserve nothing worth preserving, so the new placements are simply new -
+ * configlib persists them in its own file.
  */
 public final class HudElements {
-    private static final org.slf4j.Logger LOGGER =
-            org.slf4j.LoggerFactory.getLogger("DiegoAddonsV2");
-    private static final String MOD_ID = "diegoaddonsv2";
 
-    private static final float DEFAULT_X = 8f;
-    private static final float DEFAULT_TOP = 8f;
-    private static final float DEFAULT_GAP = 4f;
-
-    private record Entry(HudModule module, HudLayoutElement element, HudElement content) {
-    }
-
-    private static ManagedHudLayout layout;
-    private static RenderRegistration registration;
-    private static final Map<String, Entry> ENTRIES = new LinkedHashMap<>();
-    /**
-     * Element trees, kept across re-registrations. Toggling one HUD module rebuilds the layout - the
-     * list RenderLib holds is frozen at registration - but there is no reason for that to throw away
-     * the component trees of every other element, so they are reused.
-     */
-    private static final Map<String, HudElement> CONTENT = new LinkedHashMap<>();
-    private static final Map<String, HudLayoutElement> SHELLS = new LinkedHashMap<>();
-    private static String registeredFor = "";
+    /** One live placement per module id. The editor mutates these in place. */
+    private static final Map<String, HudPos> POSITIONS = new LinkedHashMap<>();
 
     private HudElements() {
     }
 
-    /** Refresh every element. Call once per client tick. */
-    public static void tick(Minecraft mc) {
-        String enabled = enabledSignature();
-        if (!enabled.equals(registeredFor)) {
-            register(enabled);
-        }
-        boolean hidden = mc.options != null && mc.options.hideGui;
-        for (Entry e : ENTRIES.values()) {
-            e.element().visible(!hidden && e.content().update(mc));
-        }
+    /**
+     * The placement for a module, created on first ask.
+     *
+     * <p>Elements start stacked down the top-left rather than on top of each other, so switching
+     * several on and opening the editor gives a column to drag apart rather than one chip with the
+     * rest hidden underneath it.
+     */
+    public static HudPos position(String moduleId) {
+        return POSITIONS.computeIfAbsent(moduleId,
+                id -> HudPos.of(0.01, 0.01 + POSITIONS.size() * 0.03));
     }
 
-    /** Rebuilds the layout so it holds exactly the enabled HUD modules, and registers it. */
-    private static void register(String enabled) {
-        if (registration != null) {
-            registration.unregister();
-            registration = null;
-        }
-        ENTRIES.clear();
-        layout = new ManagedHudLayout(MOD_ID);
+    /** Declares every HUD module to the spec. Called while the spec is being built. */
+    public static void declare(dev.diego.configlib.core.SpecBuilder b, HudModule m) {
+        b.hud(m.id + ".hud", m.name, "Where this sits on screen", () -> position(m.id), true);
+    }
 
-        float cursor = DEFAULT_TOP;
-        for (Module m : ModuleManager.all()) {
-            if (!(m instanceof HudModule hud) || !hud.isEnabled() || !hud.managedHud()) {
+    /**
+     * Attaches the drawing half, once the handle exists.
+     *
+     * <p>{@code labelValue} rather than a plain line because the module already keeps the caption
+     * and the value apart, and the prefab aligns them the way every other element on the HUD is
+     * aligned - which a single pre-joined string cannot do.
+     */
+    public static void attach(ConfigHandle<?> handle) {
+        for (Module module : ModuleManager.all()) {
+            if (!(module instanceof HudModule m)) {
                 continue;
             }
-            HudLayoutElement element = SHELLS.get(hud.id);
-            HudElement content = CONTENT.get(hud.id);
-            if (element == null || content == null) {
-                element = new HudLayoutElement(hud.id, placement(hud, cursor));
-                content = hud.createElement(element.root());
-                SHELLS.put(hud.id, element);
-                CONTENT.put(hud.id, content);
-            }
-            cursor += estimatedHeight(hud) + DEFAULT_GAP;
-            element.visible(false);
-            layout.addElement(element);
-            ENTRIES.put(hud.id, new Entry(hud, element, content));
-        }
-
-        registration = RenderLibHud.register(layout);
-        registeredFor = enabled;
-    }
-
-    /**
-     * Where an element sits until RenderLib has a stored placement of its own. A position chosen in
-     * the mod's old HUD editor is carried across; anything never placed stacks down the left edge,
-     * stepped by its own height so a tall readout does not bury the next one.
-     */
-    private static HudPlacement placement(HudModule hud, float stackTop) {
-        var cfg = ConfigManager.moduleConfig(hud.id);
-        float scale = HudPlacement.clampScale(cfg.hudScale > 0f ? cfg.hudScale : 1f);
-        if (cfg.hudX >= 0 && cfg.hudY >= 0) {
-            return new HudPlacement(cfg.hudX, cfg.hudY, scale);
-        }
-        return new HudPlacement(DEFAULT_X, stackTop, scale);
-    }
-
-    private static float estimatedHeight(HudModule hud) {
-        int rows = 1;
-        try {
-            rows = Math.max(1, hud.editorLines(Minecraft.getInstance()).size());
-        } catch (RuntimeException ignored) {
-            // No live data this early; one row is a safe guess.
-        }
-        return rows * HudElement.ROW_H + HudElement.PAD_Y * 2f;
-    }
-
-    /** Which HUD modules are on, as a string - the layout is re-registered when this changes. */
-    private static String enabledSignature() {
-        StringBuilder sb = new StringBuilder();
-        for (Module m : ModuleManager.all()) {
-            if (m instanceof HudModule hud && hud.managedHud() && hud.isEnabled()) {
-                sb.append(hud.id).append(',');
-            }
-        }
-        return sb.toString();
-    }
-
-    /**
-     * Puts every element back where it started: RenderLib's stored placements are deleted and the
-     * layout is registered again, so each element falls back to its default position and scale.
-     */
-    public static void resetPositions() {
-        for (Module m : ModuleManager.all()) {
-            if (m instanceof HudModule hud && hud.managedHud()) {
-                var cfg = ConfigManager.moduleConfig(hud.id);
-                cfg.hudX = -1;
-                cfg.hudY = -1;
-            }
-        }
-        ConfigManager.save();
-        try {
-            java.nio.file.Path file = net.minecraft.client.Minecraft.getInstance().gameDirectory
-                    .toPath().resolve("config").resolve("render-lib").resolve("hud-layouts")
-                    .resolve(MOD_ID + ".json");
-            java.nio.file.Files.deleteIfExists(file);
-        } catch (java.io.IOException | RuntimeException e) {
-            // RenderLib owns that file and offers no API to clear it, so this is the only way in.
-            // If it ever moves or gets cached in memory, reset would silently stop working - so say
-            // so rather than leave you wondering why your elements came back.
-            LOGGER.warn("[DiegoAddons V2] Could not clear the stored HUD placements", e);
-        }
-        SHELLS.clear();       // defaults are recomputed, so the shells have to be rebuilt
-        CONTENT.clear();
-        registeredFor = "";   // forces a fresh registration on the next tick
-    }
-
-    /** Opens RenderLib's placement screen - the replacement for the mod's own HUD editor. */
-    public static void openPlacementScreen() {
-        if (layout != null) {
-            layout.openPlacementScreen();
+            handle.hud(m.id + ".hud", HudTemplates.labelValue()
+                    .label(m.showLabel() ? m.hudLabel() : "")
+                    .value(() -> {
+                        Minecraft mc = Minecraft.getInstance();
+                        String v = m.hudValue(mc);
+                        return v == null ? "" : v;
+                    }));
         }
     }
 
+    /** Whether a module currently has anything to show, for the element's own visibility. */
+    public static boolean hasContent(HudModule m) {
+        return m.isEnabled() && m.hudLine(Minecraft.getInstance()) != null;
+    }
 }

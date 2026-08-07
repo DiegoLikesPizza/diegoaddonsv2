@@ -10,8 +10,8 @@ import net.minecraft.world.phys.AABB;
  * one call and they all end up looking the same.
  *
  * <p>A gradient runs <b>up</b> whatever is drawn, and it is one gradient rather than a stack of
- * slices pretending to be one: see {@link EspWorld}, which hands the fade to RenderLib as a property
- * of the paint.
+ * slices pretending to be one: see {@link EspWorld}, which carries the fade on the vertex colours so
+ * the GPU interpolates it.
  */
 public final class EspRender {
     private static final double EDGE = 0.05;
@@ -38,7 +38,7 @@ public final class EspRender {
      * Draws around an entity, which is what lets the model itself be outlined.
      *
      * <p>Without an entity the model style has nothing to outline, so it falls back to the box - a
-     * name plate hovering over a mob identifies the mob, not an entity we can hand to RenderLib.
+     * name plate hovering over a mob identifies the mob, not an entity we can outline.
      */
     public static void draw(Entity entity, AABB box, EspModule module) {
         drawImpl(entity, box, module, module.espColor().argb());

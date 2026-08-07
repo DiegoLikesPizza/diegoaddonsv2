@@ -33,9 +33,6 @@ public class AddonConfig {
     public String[] savedEquipment = new String[4];
     public String savedPet;
 
-    /** User-defined buttons drawn beside container GUIs (see the Inventory Buttons module). */
-    public List<InventoryButton> inventoryButtons = new ArrayList<>();
-
     /** Players you have blocked, with the reason (see the Better Ignore List module). */
     public List<BlockedPlayer> blockedPlayers = new ArrayList<>();
 
@@ -53,33 +50,6 @@ public class AddonConfig {
 
     /** User-recorded mining routes, and the one currently being drawn (see the Mining Routes module). */
     public List<MiningRoute> miningRoutes = new ArrayList<>();
-
-    /** Achievements you wrote yourself (see the Custom Achievements module). */
-    public List<Achievement> achievements = new ArrayList<>();
-
-    /**
-     * Achievement id to the moment it unlocked, for this account as a whole. Held here rather than
-     * per profile: earning something is a fact about you, not about the profile you were on.
-     */
-    public Map<String, Long> achievementUnlocks = new LinkedHashMap<>();
-
-    /** Per-profile observations the achievement conditions are evaluated over, keyed by profile name. */
-    public Map<String, ProfileStats> profileStats = new LinkedHashMap<>();
-
-    /** Running tallies behind the counted achievements ("20,000 F7 runs"), keyed by counter name. */
-    public Map<String, Integer> achievementCounters = new LinkedHashMap<>();
-
-    /**
-     * Chat patterns you have corrected on a built-in achievement, keyed by its id.
-     *
-     * <p>The shipped patterns are read off Hypixel's chat and Hypixel changes its wording, so being
-     * able to fix one without waiting for a mod update matters more than the patterns being right
-     * first time. An override always wins over the built-in.
-     */
-    public Map<String, String> achievementPatterns = new LinkedHashMap<>();
-
-    /** Built-in achievements switched off, by id. Yours carry their own {@code enabled} flag. */
-    public java.util.Set<String> achievementsOff = new java.util.HashSet<>();
 
     /** The items Auto GFS keeps topped up, in the order they are checked. */
     public List<GfsItem> gfsItems = new ArrayList<>();

@@ -2,7 +2,6 @@ package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.config.GfsItem;
-import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.util.AutoGfs;
@@ -21,19 +20,15 @@ import java.util.List;
 public class AutoGfsModule extends Module {
     public static AutoGfsModule INSTANCE;
 
-    private final ActionSetting edit =
-            new ActionSetting(this, "items", "Items", "Edit", AutoGfsModule::openEditor);
 
     public AutoGfsModule() {
         super("autogfs", Category.MISC, "Auto GFS",
                 "Keep SkyBlock items topped up from your sacks.");
-        settings.add(edit);
+        // The list itself is a row on this card now, declared in ListSpecs - a button that
+        // opens a screen showing the same thing would be a second door to one room.
         INSTANCE = this;
     }
 
-    private static void openEditor() {
-        Minecraft.getInstance().execute(() -> new dev.diego.diegoaddons.gui.AutoGfsView().open());
-    }
 
     /**
      * The items currently switched on, in the order they are checked.

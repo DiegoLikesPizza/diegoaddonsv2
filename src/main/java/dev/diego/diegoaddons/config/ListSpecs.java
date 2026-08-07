@@ -1,0 +1,101 @@
+package dev.diego.diegoaddons.config;
+
+import dev.diego.configlib.core.SpecBuilder;
+
+/**
+ * The mod's editable lists, declared to configlib.
+ *
+ * <p>Each of these had its own screen once - blocked players, word replacements, command shortcuts,
+ * the Auto GFS list - and each screen did the same four things as the last: add a row, fill it in,
+ * move it, delete it. They are now one screen in the library, described five times instead of built
+ * five times.
+ *
+ * <p>Only text fields, which is what the shared editor handles. Where an item carries something else
+ * - a hotkey's key code, a GFS threshold, a route's recorded points - that part is still set the way
+ * it always was, by the command or the module that captures it. Those are noted per list below.
+ */
+public final class ListSpecs {
+
+    private ListSpecs() {
+    }
+
+    /** Every sound id the client knows, sorted so the picker reads predictably. */
+    private static java.util.List<String> allSounds() {
+        return net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.keySet().stream()
+                .map(net.minecraft.resources.Identifier::toString)
+                .sorted()
+                .toList();
+    }
+
+    /** "minecraft:block.note_block.pling" reads better as "block.note block.pling". */
+    private static String prettySound(String id) {
+        String s = id.startsWith("minecraft:") ? id.substring("minecraft:".length()) : id;
+        return s.replace('_', ' ');
+    }
+
+    /** "equipment" reads as "Equipment"; the keys are storage names, not labels. */
+    private static String prettyKey(String key) {
+        if (key == null || key.isEmpty()) {
+            return "";
+        }
+        return Character.toUpperCase(key.charAt(0)) + key.substring(1);
+    }
+
+    /** Adds every list to the spec, each under the module it belongs to. */
+    public static void declare(SpecBuilder b, String moduleId) {
+        switch (moduleId) {
+            case "betterignorelist" -> b.list("blocked", "Blocked players",
+                    "People whose chat is hidden", () -> ConfigManager.get().blockedPlayers,
+                    BlockedPlayer::new, f -> f.itemName("player")
+                            .field("Name", p -> p.name, (p, v) -> p.name = v, "Player name")
+                            .field("Reason", p -> p.reason, (p, v) -> p.reason = v, "Optional"));
+
+            case "replacewords" -> b.list("words", "Word replacements",
+                    "Swapped in your own outgoing chat", () -> ConfigManager.get().wordReplacements,
+                    WordReplacement::new, f -> f.itemName("replacement")
+                            .field("Find", w -> w.from, (w, v) -> w.from = v, "Text to replace")
+                            .field("Replace with", w -> w.to, (w, v) -> w.to = v, "Replacement"));
+
+            // The key itself is captured by pressing it in-game, so only the command is text.
+            case "commandhotkeys" -> b.list("hotkeys", "Command hotkeys",
+                    "Commands bound to a key", () -> ConfigManager.get().commandHotkeys,
+                    CommandHotkey::new, f -> f.itemName("hotkey")
+                            .field("Command", h -> h.command, (h, v) -> h.command = v, "/warp hub"));
+
+            // Threshold stays where it was; a number field is not something the shared editor does.
+            case "autogfs" -> b.list("gfs", "Auto GFS items",
+                    "Kept topped up from your sacks", () -> ConfigManager.get().gfsItems,
+                    GfsItem::new, f -> f.itemName("item")
+                            .field("Name", i -> i.name, (i, v) -> i.name = v, "Cobblestone")
+                            .field("Item id", i -> i.id, (i, v) -> i.id = v, "COBBLESTONE"));
+
+            // Points are recorded in the world with /da route add, never typed.
+            case "miningroutes" -> b.list("routes", "Mining routes",
+                    "Saved paths you can draw", () -> ConfigManager.get().miningRoutes,
+                    MiningRoute::new, f -> f.itemName("route")
+                            .field("Name", r -> r.name, (r, v) -> r.name = v, "Route name"));
+
+            // Not a list but the same idea: a fixed set the user arranges, which configlib's
+            // OrderOption owns the screen for.
+            case "playerhud" -> b.order("layout", "Section order",
+                    "The order the parts are drawn in",
+                    dev.diego.diegoaddons.module.modules.PlayerHudModule.SECTIONS,
+                    () -> dev.diego.diegoaddons.module.modules.PlayerHudModule.INSTANCE.sectionOrder(),
+                    o -> dev.diego.diegoaddons.module.modules.PlayerHudModule.INSTANCE.setSectionOrder(o),
+                    ListSpecs::prettyKey);
+
+            // Every sound the game knows is thousands of entries - a dropdown cannot carry that,
+            // so it is a searchable picker. Read lazily: the registry is not populated when the
+            // config is declared.
+            case "secretchime" -> b.picker("sound", "Sound", "Played when a secret is found",
+                    ListSpecs::allSounds,
+                    () -> dev.diego.diegoaddons.module.modules.SecretChimeModule.INSTANCE.soundId(),
+                    v -> dev.diego.diegoaddons.module.modules.SecretChimeModule.INSTANCE.setSoundId(v),
+                    ListSpecs::prettySound, "Pick a sound");
+
+            default -> {
+                // Most modules have no list; nothing to add.
+            }
+        }
+    }
+}

@@ -20,6 +20,17 @@ public class StringSetting extends Setting {
         this.chooser = chooser;
     }
 
+    /**
+     * Whether this setting picks from somewhere rather than being typed.
+     *
+     * <p>The two want different controls: a picker is a button that opens the thing it picks from,
+     * free text is a box you type in. Asking here lets the config layer choose correctly instead of
+     * treating every string the same.
+     */
+    public boolean hasChooser() {
+        return chooser != null;
+    }
+
     public String get() {
         String v = ConfigManager.moduleConfig(owner.id).texts.get(key);
         return v == null || v.isBlank() ? def : v;
@@ -32,7 +43,8 @@ public class StringSetting extends Setting {
             ConfigManager.moduleConfig(owner.id).texts.put(key, value.trim());
         }
         ConfigManager.save();
-        dev.diego.diegoaddons.gui.DiegoClickGuiView.refreshCard(owner.id);
+        // No menu refresh needed: configlib's rows read through this setting's own getter every
+        // frame, so a new value is on screen the moment it is written.
     }
 
     /**
@@ -44,7 +56,7 @@ public class StringSetting extends Setting {
             chooser.run();
             return;
         }
-        net.minecraft.client.Minecraft.getInstance().execute(() ->
-                new dev.diego.diegoaddons.gui.TextEntryView(name, get(), "Text", this::set).open());
+        // Nothing to open. A setting with no chooser is free text, and configlib draws it as a box
+        // in its own row - there is no screen to go to any more.
     }
 }

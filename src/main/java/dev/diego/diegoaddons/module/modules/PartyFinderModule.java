@@ -25,13 +25,13 @@ public class PartyFinderModule extends Module {
     public PartyFinderModule() {
         super("partyfinder", Category.RENDER, "Party Finder",
                 "Highlight parties still missing a class you picked.");
-        // The class picks are deliberately *not* added to the settings list. They are chosen from
-        // the strip inside the party finder itself, where you are actually looking at parties -
-        // having them in two places meant two lists that could disagree, and a settings card that
-        // was five rows of something you never set from there.
+        // The class picks used to live only in a strip drawn inside the party finder menu, kept out
+        // of the settings list so the two could not disagree. The strip is gone and the settings
+        // menu is the one place now, so they belong in it.
         for (int i = 0; i < classes.length; i++) {
             classes[i] = new BooleanSetting(this, "class_" + PartyFinder.CLASSES[i],
                     PartyFinder.CLASS_NAMES[i], false);
+            settings.add(classes[i]);
         }
         settings.add(showMissing);
         INSTANCE = this;

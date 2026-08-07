@@ -50,9 +50,4 @@ public class PetHudModule extends HudModule {
         return null;   // drawn by its own element
     }
 
-    @Override
-    public dev.diego.diegoaddons.hud.HudElement createElement(
-            com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.PetElement(this, root);
-    }
 }

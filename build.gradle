@@ -15,12 +15,8 @@ loom {
 }
 
 repositories {
-    // Loom adds the essential maven repositories automatically.
-    maven {
-        name = "RenderLib"
-        url = "https://renderlib.ifallious.com/maven"
-        content { includeGroup "com.render" }
-    }
+    // Loom adds the essential maven repositories automatically, and configlib comes from the
+    // composite build in settings.gradle - so there is nothing else to declare here.
 }
 
 dependencies {
@@ -33,8 +29,10 @@ dependencies {
     // Fabric API
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
-    // RenderLib - retained GUI / HUD / world rendering (jar-in-jar bundled).
-    implementation(include("com.render:render-lib:2.1.4"))
+    // configlib - the config GUI, the HUD manager and (via :menu) the custom title screen. Resolved
+    // from the composite build in settings.gradle, so this coordinate is the local working copy.
+    implementation(include("dev.diego:configlib:1.0.0"))
+    implementation(include("dev.diego:configlib-menu:1.0.0"))
 }
 
 processResources {

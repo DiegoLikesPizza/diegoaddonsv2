@@ -30,6 +30,26 @@ public abstract class HudModule extends Module {
         return centered.get();
     }
 
+    /** Whether the caption is drawn before the value. */
+    public boolean showLabel() {
+        return showLabel.get();
+    }
+
+    /**
+     * The caption, for whatever is drawing this element.
+     *
+     * <p>{@link #label()} and {@link #value} are protected because they are a module's own business
+     * to define; these two are how the HUD layer asks for them.
+     */
+    public String hudLabel() {
+        return label();
+    }
+
+    /** The live value, or null to show nothing this frame. */
+    public String hudValue(Minecraft mc) {
+        return value(mc);
+    }
+
     protected HudModule(String id, String name, String description) {
         this(id, name, description, true);
     }
@@ -66,19 +86,15 @@ public abstract class HudModule extends Module {
         }
     }
 
-    /**
-     * Whether this element is drawn by RenderLib's managed HUD layout ({@code HudElements}) rather
-     * than the old chip renderer. Custom-drawn elements return {@code false} until their drawing has
-     * been rebuilt out of RenderLib components.
-     */
-    public boolean managedHud() {
-        return true;
-    }
-
-    /** Builds this element's RenderLib component tree inside {@code root}. */
-    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.TextChipElement(this, root);
-    }
+    // TODO: rebuild the HUD on configlib's HudWidget.
+    //
+    // Every element used to be a RenderLib component tree built by createElement(ContainerComponent),
+    // and RenderLib is gone. configlib's HudWidget is an immediate-mode interface - width(), height()
+    // and render(GuiGraphicsExtractor) in local space - so each element is a rewrite of its drawing
+    // rather than a change of imports, which is why none of them made it into this build.
+    //
+    // hudLine(...) below still produces what each element wants to show, so the data half of every
+    // element survives intact; only the drawing has to be written again.
 
     public int color() {
         return accentColour.get() ? Themes.current().accent() : Themes.current().text();

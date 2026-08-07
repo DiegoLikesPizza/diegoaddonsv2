@@ -1,13 +1,9 @@
 package dev.diego.diegoaddons.command;
 
+import dev.diego.diegoaddons.DiegoAddonsV2Client;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import dev.diego.diegoaddons.gui.IgnoreListView;
-import dev.diego.diegoaddons.gui.DiegoClickGuiView;
-import dev.diego.diegoaddons.gui.CommandHotkeysView;
-import dev.diego.diegoaddons.gui.InventoryButtonsScreen;
-import dev.diego.diegoaddons.gui.ReplaceWordsView;
 import dev.diego.diegoaddons.config.MiningRoute;
 import dev.diego.diegoaddons.util.CustomEsp;
 import dev.diego.diegoaddons.util.IgnoreList;
@@ -42,7 +38,6 @@ public final class DiegoCommands {
             new Help("", "Open the DiegoAddons menu"),
             new Help("help", "Show this list"),
             new Help("hud", "Open the HUD editor"),
-            new Help("invbuttons", "Open the inventory button editor"),
             new Help("words", "Open the word replacement list"),
             new Help("hotkeys", "Open the command hotkey list"),
             new Help("blocked", "Open the blocked player list"),
@@ -76,21 +71,13 @@ public final class DiegoCommands {
                 .then(ClientCommands.literal("help")
                         .executes(c -> help(c.getSource(), name)))
                 .then(ClientCommands.literal("hud")
-                        .executes(c -> {
-                            Minecraft.getInstance().execute(
-                                    dev.diego.diegoaddons.hud.HudElements::openPlacementScreen);
-                            return 1;
-                        }))
-                .then(ClientCommands.literal("invbuttons")
-                        .executes(c -> open(() -> new InventoryButtonsScreen(null))))
+                        .executes(c -> run(() -> DiegoAddonsV2Client.CONFIG.openHudEditor())))
                 .then(ClientCommands.literal("words")
-                        .executes(c -> openView(() -> new ReplaceWordsView())))
+                        .executes(c -> openList("misc.words")))
                 .then(ClientCommands.literal("hotkeys")
-                        .executes(c -> openView(() -> new CommandHotkeysView())))
+                        .executes(c -> openList("misc.hotkeys")))
                 .then(ClientCommands.literal("blocked")
-                        .executes(c -> openView(() -> new IgnoreListView())))
-                .then(ClientCommands.literal("achievements")
-                        .executes(c -> openView(dev.diego.diegoaddons.gui.AchievementsView::new)))
+                        .executes(c -> openList("misc.blocked")))
                 .then(ClientCommands.literal("block")
                         .then(ClientCommands.argument("player", StringArgumentType.word())
                                 .executes(c -> block(c.getSource(), StringArgumentType.getString(c, "player"), ""))
@@ -275,10 +262,24 @@ public final class DiegoCommands {
      * Opens a screen once the command has finished running. Setting it directly would fight with the
      * chat screen closing itself immediately afterwards, which would drop us back to the game.
      */
-    /** Opens one of the RenderLib views, which own their own screen. */
-    private static int openView(Supplier<dev.diego.diegoaddons.gui.DiegoView> view) {
-        Minecraft.getInstance().execute(() -> view.get().open());
+    /** Runs something on the client thread once the command has finished. */
+    private static int run(Runnable action) {
+        Minecraft.getInstance().execute(action);
         return 1;
+    }
+
+    /**
+     * Opens one list's editor straight from a command.
+     *
+     * <p>Falls back to the settings menu rather than doing nothing, so a renamed id shows the place
+     * the list lives instead of a command that silently fails.
+     */
+    private static int openList(String id) {
+        return run(() -> {
+            if (!DiegoAddonsV2Client.CONFIG.openList(id)) {
+                DiegoAddonsV2Client.CONFIG.open();
+            }
+        });
     }
 
     private static int open(Supplier<Screen> screen) {
@@ -287,9 +288,10 @@ public final class DiegoCommands {
         return 1;
     }
 
-    /** Opens the RenderLib main menu (a GuiView, which manages its own screen). */
+    /** Opens the settings menu, which configlib owns and draws from the module list. */
     private static int openMenu() {
-        Minecraft.getInstance().execute(() -> new DiegoClickGuiView().open());
+        Minecraft.getInstance().execute(
+                () -> dev.diego.diegoaddons.DiegoAddonsV2Client.CONFIG.open());
         return 1;
     }
 }

@@ -96,9 +96,4 @@ public class CustomScoreboardModule extends HudModule {
         return null;   // drawn by its own element, not as a text chip
     }
 
-    @Override
-    public dev.diego.diegoaddons.hud.HudElement createElement(
-            com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.ScoreboardElement(this, root);
-    }
 }

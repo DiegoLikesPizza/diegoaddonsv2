@@ -33,14 +33,9 @@ public class MiningAbilityModule extends HudModule {
         return chime.get();
     }
 
-    /**
-     * Drawn large in the middle of the screen by {@code MiningAbilityOverlay}, not as a chip you
-     * place, so it stays out of the managed HUD layout and the placement screen.
-     */
-    @Override
-    public boolean managedHud() {
-        return false;
-    }
+    // TODO: this one was drawn large in the middle of the screen by MiningAbilityOverlay rather than
+    // as a placeable chip, so when it comes back on configlib it wants a plain HUD render callback
+    // rather than a HudWidget in the editor.
 
     @Override
     public void onClientTick(Minecraft mc) {

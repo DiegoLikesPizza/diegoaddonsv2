@@ -21,8 +21,9 @@ public class SecretChimeModule extends Module {
 
     private static final String DEFAULT_SOUND = "minecraft:block.note_block.pling";
 
-    private final StringSetting sound = new StringSetting(this, "sound", "Sound", DEFAULT_SOUND,
-            SecretChimeModule::openBrowser);
+    // No chooser of its own: the sound is picked through configlib's searchable picker, declared
+    // in ListSpecs. Leaving one here would give two ways in that could drift apart.
+    private final StringSetting sound = new StringSetting(this, "sound", "Sound", DEFAULT_SOUND, null);
     private final NumberSetting pitch =
             new NumberSetting(this, "pitch", "Pitch", 2.0, 0.5, 2.0, 0.1);
     private final dev.diego.diegoaddons.module.BooleanSetting onInteract =
@@ -35,7 +36,8 @@ public class SecretChimeModule extends Module {
     public SecretChimeModule() {
         super("secretchime", Category.DUNGEONS, "Secret Chime",
                 "Play a sound when a dungeon secret is found.");
-        settings.add(sound);
+        // Not added: the sound is declared to configlib as a picker (see ListSpecs), and
+        // adding it here as well would put the same value on the card twice.
         settings.add(pitch);
         settings.add(onInteract);
         settings.add(onPickup);
@@ -54,13 +56,13 @@ public class SecretChimeModule extends Module {
                 ? Identifier.parse(DEFAULT_SOUND) : id);
     }
 
-    private static void openBrowser() {
-        SecretChimeModule mod = INSTANCE;
-        if (mod == null) {
-            return;
-        }
-        Minecraft.getInstance().execute(() ->
-                new dev.diego.diegoaddons.gui.SoundBrowserView(mod.sound.get(), mod.sound::set).open());
+    /** The chosen sound id, for configlib's picker to read and write. */
+    public String soundId() {
+        return sound.get();
+    }
+
+    public void setSoundId(String id) {
+        sound.set(id);
     }
 
     public float pitch() {

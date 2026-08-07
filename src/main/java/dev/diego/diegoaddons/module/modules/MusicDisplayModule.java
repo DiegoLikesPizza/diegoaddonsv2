@@ -160,10 +160,6 @@ public class MusicDisplayModule extends HudModule {
         return custom();
     }
 
-    @Override
-    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.MusicElement(this, root);
-    }
 
 
 

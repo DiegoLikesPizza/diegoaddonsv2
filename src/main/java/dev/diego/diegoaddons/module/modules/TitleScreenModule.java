@@ -3,53 +3,55 @@ package dev.diego.diegoaddons.module.modules;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
-import dev.diego.diegoaddons.module.StringSetting;
 
 /**
- * Small changes to Minecraft's own title screen: Realms becomes a button that joins Hypixel, and the
- * language and accessibility icons in the corner go.
+ * The title screen: a one-click Hypixel button on the vanilla one, and optionally configlib's own
+ * menu in place of it.
  *
- * <p>Deliberately not a replacement menu. One of those existed for a version and was thrown away -
- * RenderLib draws its screens into a fixed 16:9 canvas, so on any other shape of window a strip down
- * each side is dead. Vanilla's menu already works at every aspect ratio; it only needed three things
- * changed. See {@link dev.diego.diegoaddons.mixin.TitleScreenMixin}.
+ * <p>The Hypixel button is deliberately not configurable. It was four settings once - whether to
+ * replace Realms, what to call the button, where it points, and whether to hide the corner icons -
+ * and none of them were ever changed from their defaults. Settings that only ever hold their default
+ * are shelf space, so the button is simply there, and the module's own switch is the one control
+ * that matters.
+ *
+ * @see dev.diego.diegoaddons.mixin.TitleScreenMixin
  */
 public class TitleScreenModule extends Module {
     public static TitleScreenModule INSTANCE;
 
-    private final BooleanSetting replaceRealms =
-            new BooleanSetting(this, "realms", "Replace Realms with a server button", true);
-    private final BooleanSetting hideCorners =
-            new BooleanSetting(this, "corners", "Hide language and accessibility", true);
-    private final StringSetting label =
-            new StringSetting(this, "label", "Button text", "Join Hypixel", null);
-    private final StringSetting server =
-            new StringSetting(this, "server", "Server address", "mc.hypixel.net", null);
+    /**
+     * Swap Minecraft's title screen for configlib's own.
+     *
+     * <p>Off by default: it replaces the whole screen rather than adjusting it, which is a bigger
+     * change than the Hypixel button makes. It can also be turned on and off from the DiegoAddons
+     * button on the title screen itself, which is where you are standing when you want to.
+     */
+    private final BooleanSetting customMenu =
+            new BooleanSetting(this, "custommenu", "Custom main menu", false);
 
     public TitleScreenModule() {
         super("titlescreen", Category.RENDER, "Title Screen",
-                "Replace Realms with a one-click server join, and drop the corner icons.");
-        settings.add(replaceRealms);
-        settings.add(hideCorners);
-        settings.add(label);
-        settings.add(server);
+                "A one-click Hypixel button, and optionally a menu of our own.");
+        settings.add(customMenu);
         INSTANCE = this;
     }
 
-    public boolean replaceRealms() {
-        return replaceRealms.get();
+    /** Whether configlib's menu should stand in for the vanilla one. */
+    public boolean customMenu() {
+        return isEnabled() && customMenu.get();
     }
 
-    public boolean hideCornerButtons() {
-        return hideCorners.get();
-    }
-
-    public String buttonLabel() {
-        return label.get();
-    }
-
-    /** Where the button connects to - a setting, because the address has changed before. */
-    public String server() {
-        return server.get();
+    /**
+     * Sets it from the other end - the switch on the title screen's own options.
+     *
+     * <p>Turning it on there enables the module too. The alternative is a switch that flips back a
+     * tick later because the module behind it is off, which reads as broken rather than as a second
+     * thing needing to be enabled somewhere else.
+     */
+    public void customMenu(boolean value) {
+        customMenu.set(value);
+        if (value && !isEnabled()) {
+            dev.diego.diegoaddons.module.ModuleManager.setEnabled(this, true);
+        }
     }
 }

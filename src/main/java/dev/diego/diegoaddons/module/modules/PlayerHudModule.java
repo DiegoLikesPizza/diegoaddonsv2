@@ -1,7 +1,6 @@
 package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.gui.SectionOrderScreen;
 import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.HudModule;
@@ -33,8 +32,8 @@ public class PlayerHudModule extends HudModule {
             new BooleanSetting(this, "slots", "Slot boxes", true);
     private final BooleanSetting background =
             new BooleanSetting(this, "background", "Background", true);
-    private final ActionSetting layout =
-            new ActionSetting(this, "layout", "Section order", "Arrange", this::openLayoutEditor);
+    // Section order is not a Setting: it is declared straight to configlib as an OrderOption,
+    // which owns the screen that arranges it. See ListSpecs.
 
     public PlayerHudModule() {
         super("playerhud", "Player HUD", "Your armour, your character and your equipment.", false);
@@ -44,7 +43,6 @@ public class PlayerHudModule extends HudModule {
         settings.add(height);
         settings.add(slotBoxes);
         settings.add(background);
-        settings.add(layout);
         INSTANCE = this;
     }
 
@@ -106,11 +104,6 @@ public class PlayerHudModule extends HudModule {
                 + slotBoxes.get() + background.get() + String.join(",", sectionOrder());
     }
 
-    private void openLayoutEditor() {
-        Minecraft mc = Minecraft.getInstance();
-        mc.execute(() -> mc.setScreen(new SectionOrderScreen(mc.screen, this)));
-    }
-
     public float height() {
         return (float) height.get();
     }
@@ -129,9 +122,4 @@ public class PlayerHudModule extends HudModule {
         return null;   // drawn by its own element
     }
 
-    @Override
-    public dev.diego.diegoaddons.hud.HudElement createElement(
-            com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.PlayerElement(this, root);
-    }
 }

@@ -10,3 +10,17 @@ pluginManagement {
 }
 
 rootProject.name = 'diegoaddonsv2'
+
+// configlib is consumed straight from its working copy rather than from a maven repository. This
+// mod and the library are developed together, so a composite build means an edit over there is
+// picked up by the next build here - no publishToMavenLocal round trip between every change.
+// Swapping to a published artifact later is a one-line change and needs nothing from the code.
+// The substitutions are spelled out because Gradle matches an included build by its *project*
+// names - 'diegos-config-lib' and 'menu' - while the artifacts it publishes are called 'configlib'
+// and 'configlib-menu'. Without these the coordinates below go looking on the network and fail.
+includeBuild('../diegos-config-lib') {
+    dependencySubstitution {
+        substitute module('dev.diego:configlib') using project(':')
+        substitute module('dev.diego:configlib-menu') using project(':menu')
+    }
+}

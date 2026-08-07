@@ -269,7 +269,7 @@ public class DungeonMapModule extends HudModule {
         return n;
     }
 
-    // --- view model for the RenderLib element ------------------------------------------------------
+    // --- view model for the HUD element ------------------------------------------------------
 
     /** Grid geometry, shared with the element that draws it. */
     public static final int MAP_ROOMS = ROOMS;
@@ -413,10 +413,6 @@ public class DungeonMapModule extends HudModule {
         return sb.toString();
     }
 
-    @Override
-    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.DungeonMapElement(this, root);
-    }
 
 
 

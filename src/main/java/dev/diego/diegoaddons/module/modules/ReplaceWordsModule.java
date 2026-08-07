@@ -1,7 +1,5 @@
 package dev.diego.diegoaddons.module.modules;
 
-import dev.diego.diegoaddons.gui.ReplaceWordsView;
-import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
@@ -21,8 +19,6 @@ public class ReplaceWordsModule extends Module {
     /** In the friend list, show the real IGN after the replacement so accounts stay identifiable. */
     private final BooleanSetting ignInFriendList =
             new BooleanSetting(this, "ignInFriends", "Keep IGN in friend list", true);
-    private final ActionSetting editor =
-            new ActionSetting(this, "editor", "Word list", "Open", ReplaceWordsModule::open);
 
     public ReplaceWordsModule() {
         super("replacewords", Category.MISC, "Replace Words",
@@ -30,13 +26,9 @@ public class ReplaceWordsModule extends Module {
         settings.add(inChat);
         settings.add(inItems);
         settings.add(ignInFriendList);
-        settings.add(editor);
+        // The list itself is a row on this card now, declared in ListSpecs - a button that
+        // opens a screen showing the same thing would be a second door to one room.
         INSTANCE = this;
-    }
-
-    private static void open() {
-        Minecraft mc = Minecraft.getInstance();
-        new ReplaceWordsView().open();
     }
 
     public boolean inChat() {

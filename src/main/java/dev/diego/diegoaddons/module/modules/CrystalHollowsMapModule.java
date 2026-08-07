@@ -50,7 +50,7 @@ public class CrystalHollowsMapModule extends HudModule {
         return null;
     }
 
-    // --- read by the RenderLib element -----------------------------------------------------------
+    // --- read by the HUD element -----------------------------------------------------------
 
     public boolean showRegions() {
         return showRegions.get();
@@ -64,10 +64,6 @@ public class CrystalHollowsMapModule extends HudModule {
         return showCoords.get();
     }
 
-    @Override
-    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.CrystalMapElement(this, root);
-    }
 
 
 

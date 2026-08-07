@@ -1,7 +1,5 @@
 package dev.diego.diegoaddons.module.modules;
 
-import dev.diego.diegoaddons.gui.CommandHotkeysView;
-import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.util.CommandHotkeys;
@@ -17,19 +15,13 @@ import net.minecraft.client.Minecraft;
 public class CommandHotkeysModule extends Module {
     public static CommandHotkeysModule INSTANCE;
 
-    private final ActionSetting editor =
-            new ActionSetting(this, "editor", "Hotkey list", "Open", CommandHotkeysModule::open);
 
     public CommandHotkeysModule() {
         super("commandhotkeys", Category.MISC, "Command Hotkeys",
                 "Run your own commands from key presses.");
-        settings.add(editor);
+        // The list itself is a row on this card now, declared in ListSpecs - a button that
+        // opens a screen showing the same thing would be a second door to one room.
         INSTANCE = this;
-    }
-
-    private static void open() {
-        Minecraft mc = Minecraft.getInstance();
-        new CommandHotkeysView().open();
     }
 
     @Override

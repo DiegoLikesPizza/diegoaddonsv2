@@ -4,7 +4,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
@@ -63,37 +65,41 @@ public final class WorldRender {
         }
         registered = true;
         LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(WorldRender::draw);
-        // Labels go through RenderLib rather than the hand-rolled billboard that used to sit in
-        // draw(). Text in the world is more than a quad - it is the font atlas, the see-through
-        // pass, the camera-facing transform and the distance scaling - and RenderLib maintains all
-        // of that against the game's renderer. Ours drew nothing at all, and none of the features
-        // that ask for a label ever showed one.
-        com.render.api.RenderLibWorld.register(WorldRender::extractLabels);
     }
 
-    /** Emits this tick's labels through RenderLib, once per frame. */
-    private static void extractLabels(com.render.api.world.WorldRenderContext ctx) {
+    /**
+     * How much a label shrinks per block of size. Minecraft's own name plates use this number; a
+     * label at scale 1 comes out the size of a name plate, which is what every caller means by it.
+     */
+    private static final float LABEL_SCALE = 0.025f;
+
+    /** Full daylight on both sky and block channels - a label is lit by nothing but itself. */
+    private static final int FULL_BRIGHT = 0x00F000F0;
+
+    /**
+     * Draws this tick's labels: each one turned to face the camera, drawn through walls, centred on
+     * its world position.
+     */
+    private static void drawLabels(PoseStack pose, MultiBufferSource buffers, Vec3 cam) {
         List<Label> labels = RENDER_LABELS;
         if (labels.isEmpty()) {
             return;
         }
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc.font;
+        Camera camera = mc.gameRenderer.getMainCamera();
         for (Label l : labels) {
-            // RenderLib wants a text size here, not a multiplier. Every caller passes 1.0f meaning
-            // "normal", which asked for one-pixel text - drawn, and far too small to see, which is
-            // indistinguishable from not drawn at all.
-            ctx.text(l.text(), l.pos(), LABEL_MATERIAL, LABEL_PX * l.scale());
+            pose.pushPose();
+            pose.translate(l.pos().x - cam.x, l.pos().y - cam.y, l.pos().z - cam.z);
+            // The camera's own rotation turns the quad to face it; the negative scale is what flips
+            // the text the right way up, since screen Y grows downwards and world Y grows up.
+            pose.mulPose(camera.rotation());
+            pose.scale(-LABEL_SCALE * l.scale(), -LABEL_SCALE * l.scale(), LABEL_SCALE * l.scale());
+            font.drawInBatch(l.text(), -font.width(l.text()) / 2f, 0f, 0xFFFFFFFF, false,
+                    pose.last().pose(), buffers, Font.DisplayMode.SEE_THROUGH, 0, FULL_BRIGHT);
+            pose.popPose();
         }
     }
-
-    /** What "scale 1" means in pixels. */
-    private static final float LABEL_PX = 12f;
-
-    /** White, drawn through walls: a label you cannot see is not worth queuing. */
-    private static final com.render.api.world.WorldMaterial LABEL_MATERIAL =
-            com.render.api.world.WorldMaterial.builder()
-                    .color(com.render.api.RenderColor.WHITE)
-                    .depthMode(com.render.api.world.WorldDepthMode.SEE_THROUGH)
-                    .build();
 
     /** Queues an outlined box. Submit it every tick it should stay visible; {@link #flip()} keeps it
      * drawn on the frames in between. */
@@ -120,26 +126,8 @@ public final class WorldRender {
      * @param thickness edge width in blocks
      */
     public static void thickBox(AABB b, int argb, double thickness, boolean throughWalls) {
-        double t = thickness / 2.0;
-        // Four edges along X, four along Z, four uprights along Y.
-        for (double[] e : new double[][]{
-                {b.minX, b.minY, b.minZ, b.maxX, b.minY, b.minZ},
-                {b.minX, b.minY, b.maxZ, b.maxX, b.minY, b.maxZ},
-                {b.minX, b.maxY, b.minZ, b.maxX, b.maxY, b.minZ},
-                {b.minX, b.maxY, b.maxZ, b.maxX, b.maxY, b.maxZ},
-                {b.minX, b.minY, b.minZ, b.minX, b.minY, b.maxZ},
-                {b.maxX, b.minY, b.minZ, b.maxX, b.minY, b.maxZ},
-                {b.minX, b.maxY, b.minZ, b.minX, b.maxY, b.maxZ},
-                {b.maxX, b.maxY, b.minZ, b.maxX, b.maxY, b.maxZ},
-                {b.minX, b.minY, b.minZ, b.minX, b.maxY, b.minZ},
-                {b.maxX, b.minY, b.minZ, b.maxX, b.maxY, b.minZ},
-                {b.minX, b.minY, b.maxZ, b.minX, b.maxY, b.maxZ},
-                {b.maxX, b.minY, b.maxZ, b.maxX, b.maxY, b.maxZ},
-        }) {
-            filledBox(new AABB(
-                    Math.min(e[0], e[3]) - t, Math.min(e[1], e[4]) - t, Math.min(e[2], e[5]) - t,
-                    Math.max(e[0], e[3]) + t, Math.max(e[1], e[4]) + t, Math.max(e[2], e[5]) + t),
-                    argb, throughWalls);
+        for (AABB edge : WorldGeometry.edges(b, thickness)) {
+            filledBox(edge, argb, throughWalls);
         }
     }
 
@@ -223,7 +211,7 @@ public final class WorldRender {
     private static void draw(LevelRenderContext ctx) {
         List<Box> boxes = RENDER;
         List<Line> segments = RENDER_LINES;
-        if (boxes.isEmpty() && segments.isEmpty()) {
+        if (boxes.isEmpty() && segments.isEmpty() && RENDER_LABELS.isEmpty()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
@@ -239,7 +227,7 @@ public final class WorldRender {
         for (Box b : boxes) {
             if (b.filled()) {
                 var rt = b.throughWalls() ? EspRenderTypes.QUADS : RenderTypes.debugFilledBox();
-                fill(pose, buffers.getBuffer(rt), b.box(), b.argb(), cam);
+                WorldGeometry.fillBox(pose.last(), buffers.getBuffer(rt), b.box(), cam, b.argb());
             } else {
                 VertexConsumer vc = buffers.getBuffer(
                         b.throughWalls() ? EspRenderTypes.LINES : RenderTypes.lines());
@@ -248,53 +236,14 @@ public final class WorldRender {
             }
         }
         try {
+            VertexConsumer vc = buffers.getBuffer(EspRenderTypes.LINES);
             for (Line l : segments) {
-                line(pose, buffers.getBuffer(EspRenderTypes.LINES), l, cam);
+                WorldGeometry.line(pose.last(), vc, l.a(), l.b(), cam, l.argb(), 2.0f);
             }
         } catch (Throwable ignored) {
             // A line-render hiccup must never take the whole batch (boxes/labels) down with it.
         }
+        drawLabels(pose, buffers, cam);
         buffers.endBatch();
-    }
-
-    /** Draws one line segment, camera-relative, with a normal along its direction. */
-    private static void line(PoseStack pose, VertexConsumer vc, Line l, Vec3 cam) {
-        PoseStack.Pose p = pose.last();
-        float ax = (float) (l.a().x - cam.x), ay = (float) (l.a().y - cam.y), az = (float) (l.a().z - cam.z);
-        float bx = (float) (l.b().x - cam.x), by = (float) (l.b().y - cam.y), bz = (float) (l.b().z - cam.z);
-        float nx = bx - ax, ny = by - ay, nz = bz - az;
-        float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (len < 1.0e-5f) {
-            return;
-        }
-        nx /= len;
-        ny /= len;
-        nz /= len;
-        // Each line vertex must carry a line width, or the buffer fails to flush and the game crashes.
-        vc.addVertex(p, ax, ay, az).setColor(l.argb()).setNormal(p, nx, ny, nz).setLineWidth(2.0f);
-        vc.addVertex(p, bx, by, bz).setColor(l.argb()).setNormal(p, nx, ny, nz).setLineWidth(2.0f);
-    }
-
-    /** The six faces of a box, wound so it is solid from any side. */
-    private static void fill(PoseStack pose, VertexConsumer vc, AABB b, int argb, Vec3 cam) {
-        PoseStack.Pose p = pose.last();
-        float x1 = (float) (b.minX - cam.x), y1 = (float) (b.minY - cam.y), z1 = (float) (b.minZ - cam.z);
-        float x2 = (float) (b.maxX - cam.x), y2 = (float) (b.maxY - cam.y), z2 = (float) (b.maxZ - cam.z);
-
-        quad(vc, p, argb, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1);   // north
-        quad(vc, p, argb, x2, y1, z2, x2, y2, z2, x1, y2, z2, x1, y1, z2);   // south
-        quad(vc, p, argb, x1, y1, z2, x1, y2, z2, x1, y2, z1, x1, y1, z1);   // west
-        quad(vc, p, argb, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2);   // east
-        quad(vc, p, argb, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2);   // bottom
-        quad(vc, p, argb, x1, y2, z2, x2, y2, z2, x2, y2, z1, x1, y2, z1);   // top
-    }
-
-    private static void quad(VertexConsumer vc, PoseStack.Pose p, int argb,
-                             float ax, float ay, float az, float bx, float by, float bz,
-                             float cx, float cy, float cz, float dx, float dy, float dz) {
-        vc.addVertex(p, ax, ay, az).setColor(argb);
-        vc.addVertex(p, bx, by, bz).setColor(argb);
-        vc.addVertex(p, cx, cy, cz).setColor(argb);
-        vc.addVertex(p, dx, dy, dz).setColor(argb);
     }
 }

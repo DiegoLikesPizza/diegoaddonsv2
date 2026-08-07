@@ -17,7 +17,7 @@ import net.minecraft.network.chat.Component;
  * everything you are carrying is not.
  *
  * <p>The drawing lives in {@link dev.diego.diegoaddons.hud.InventoryElement}, which builds it as a
- * RenderLib component tree; this class is only the settings and what they mean.
+ * HUD element; this class is only the settings and what they mean.
  */
 public class InventoryHudModule extends HudModule {
     private final BooleanSetting background = new BooleanSetting(this, "background", "Background", true);
@@ -62,7 +62,7 @@ public class InventoryHudModule extends HudModule {
         return null; // custom-drawn; see drawLocal
     }
 
-    // --- read by the RenderLib element -----------------------------------------------------------
+    // --- read by the HUD element -----------------------------------------------------------
 
     public boolean showBackground() {
         return background.get();
@@ -96,8 +96,4 @@ public class InventoryHudModule extends HudModule {
         return "" + background.get() + slotBoxes.get() + hotbar.get();
     }
 
-    @Override
-    public dev.diego.diegoaddons.hud.HudElement createElement(com.render.api.gui.ContainerComponent root) {
-        return new dev.diego.diegoaddons.hud.InventoryElement(this, root);
-    }
 }
