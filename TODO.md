@@ -47,7 +47,28 @@ Every option is currently `SpecBuilder.notPersisted()`; `ConfigManager` still ow
       is why the handle is pointed at a separate path today. Get this wrong and a real config is
       lost, so do it with someone watching, not before bed.
 
-### 3. Smaller open items
+### 3. More customization, everywhere
+Broad ask from Diego — scope it with him before building, but the concrete gaps are known:
+
+- [ ] **The theme system is currently dead.** `ConfigManager.get().theme` ("Galaxy" and the rest)
+      still exists and `Themes.current()` still drives the leftover hand-drawn bits — toasts, item
+      rarity, the unported HUD elements — but **configlib's GUI ignores it entirely**.
+      `ConfigHandle.theme()` returns `Theme.DEFAULT` and configlib's own comment says there is
+      "deliberately no way to swap it". So the theme picker changes almost nothing now. Either give
+      configlib a consumer-supplied theme, or drop the mod's picker; having it present and inert is
+      the worst of the three.
+- [ ] **HUD styling is available and unused.** `handle.hudStyle(Supplier<HudStyle>)` is re-read
+      every frame, so pointing it at config fields lets the whole HUD be restyled live — text
+      colour, plate opacity, and so on. The mod never calls it. Cheapest real win on this list.
+- [ ] **Per-element HUD style** — `HudTemplate.style(...)` already lets one element opt out of the
+      shared look. Nothing exposes it.
+- [ ] **`smoothCorners`** — a real setting that now only reaches `UiRender`, so it affects the
+      leftover hand-drawn drawing and nothing in configlib.
+- [ ] Decide how far this goes: accent colour only, a full palette per theme, or user-defined
+      themes. The answer changes whether configlib needs a `Theme` builder or just an accent
+      override.
+
+### 4. Smaller open items
 - [ ] **Shade behind the title-screen wordmark** (configlib `:menu`) — a slider for a dark scrim
       behind the mod name and subtitle on the custom main menu, so the text stays readable over a
       bright wallpaper. Distinct from the existing `MenuSettings.dim()`, which dims the whole
