@@ -216,14 +216,22 @@ preview path is the fastest way to check most of them, since it draws without li
   slot's position and its stack just before the item is submitted, so there is no ordering left to
   guess. Position comes from vanilla rather than being worked out from the window size, which also
   gets the offhand slot for free.
-- **A loadout swap now shows on the HUD at once** (2.5.2) — the Loadouts menu lays each loadout out
-  as a row: its icon on the left, its gear beside it. The scan only ever read the icon's *tooltip*,
-  which names the pieces rather than holding them, so a piece could only be drawn if this session
-  had already seen it in some other menu — and the menu stays open when you swap, so nothing else
-  came along to correct it. `scanLoadoutRow` reads the real items out of the equipped loadout's own
-  row; the tooltip is still what answers for the pet, and for a layout where the row holds nothing.
-  Armour is deliberately **not** cached from that row — yours is in your real inventory and the HUD
-  reads it live, so a copy could only ever be wrong by a helmet you had since taken off.
+- **A loadout swap now shows on the HUD at once** (2.5.2) — the Loadouts menu is in two halves, which
+  is the part that was missed. Down the **left** is a panel of what is equipped *right now*: a column
+  of trees and stones (HotF, HotM, power stone, tuning template), then the four equipment pieces,
+  then the four armour pieces, with the active pet beside the chestplate. The **3×4 grid on the
+  right** is saved presets — icons that name their contents in a tooltip and hold none of them.
+  The scan only ever read the preset tooltips, so a piece could be drawn only if this session had
+  already seen it in some other menu, and the menu does not close when you swap, so nothing came
+  along to correct it. `scanEquippedPanel` reads the panel instead, and the tooltips are the
+  fallback for when it is not where it is expected.
+  Nothing is hard-coded to a slot number: the equipment is found by its own rarity lines, which
+  places the column and the four rows, and the armour and the pet are read relative to that. A
+  preset cannot be mistaken for the panel — its bottom lore line is a price or a date, so it carries
+  no equipment category at all — and if two columns ever disagreed the scan gives up rather than
+  mixing them. The pet is now read here too, which is one more place an Autopet swap cannot go stale.
+  Armour is cached but **only** used when every live armour slot is empty. The inventory is the
+  truth; falling back per empty slot would leave a helmet you took off sitting on the HUD.
   Two things fell out of this: `equipmentLocked` was written in four places and read in none, so it
   is gone; and `persist` wrote the config on every tick a matching menu was open — twenty encodes
   and a disk write per second, to save what was already saved — so it now writes only on a change.

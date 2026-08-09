@@ -32,10 +32,16 @@ import java.util.regex.Pattern;
  * <p>Detection is heuristic (menu title + item lore), because the exact slot layout isn't exposed
  * and can change between SkyBlock versions. The keyword constants below are the tuning knobs: if a
  * future update renames a menu or category line, adjust them here. Everything is read-only.
+ *
+ * <p>No slot number is ever hard-coded. Every scan finds its anchor from something an item says
+ * about itself - a rarity line, a "Slot 1: Equipped" marker - and reads the rest relative to it, so
+ * a menu that gains a border row or shifts a column along keeps working.
  */
 public final class SkyblockHud {
     // Equipment categories as they appear on the last lore line ("LEGENDARY NECKLACE", ...).
     private static final String[] CATEGORIES = {"NECKLACE", "CLOAK", "BELT", "GLOVES"};
+    /** The armour categories, in the order they are worn and drawn: head down to feet. */
+    private static final String[] ARMOUR_CATEGORIES = {"HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"};
     // Menu titles are like "(1/2) Equipment Sets" and "(1/2) Pets" - match the stable part.
     /** Matches both "Equipment" (what you are wearing) and "(1/2) Equipment Sets" (the wardrobe). */
     private static final String EQUIPMENT_WORD = "equipment";
@@ -93,9 +99,9 @@ public final class SkyblockHud {
      *
      * <p>Names rather than items, which is the catch: they are resolved against the pieces and pets
      * seen in their own menus, and anything never seen there cannot be drawn - a name is not an item
-     * model. So this is the fallback. The menu lays each loadout out as a row with its gear beside
-     * the icon, and {@link #scanLoadoutRow} reads those items directly; the tooltip is what answers
-     * for the pet, and for a layout where the row turns out to hold nothing.
+     * model. So this is the fallback. What the menu shows down its left is the gear itself, and
+     * {@link #scanEquippedPanel} reads that; the tooltips are only reached when the panel is not
+     * where it is expected to be.
      */
     private static final Pattern LOADOUT_PIECE =
             Pattern.compile("(Necklace|Cloak|Belt|Gloves/Bracelet|Gloves|Bracelet)\\s*:\\s*(.+)");
@@ -116,6 +122,14 @@ public final class SkyblockHud {
             Pattern.compile("(?i)click\\s+to\\s+equip");
 
     private static final ItemStack[] equipment = new ItemStack[4];
+    /**
+     * The armour the Loadouts menu says you have on, head to feet.
+     *
+     * <p>A fallback, not the source: your armour is in your real inventory and the HUD reads it from
+     * there, live. This is only reached when the live slots are <i>all</i> empty, which is the one
+     * case the menu can answer and the inventory cannot.
+     */
+    private static final ItemStack[] armour = new ItemStack[4];
     private static ItemStack pet = ItemStack.EMPTY;
 
     /**
@@ -144,6 +158,7 @@ public final class SkyblockHud {
 
     static {
         Arrays.fill(equipment, ItemStack.EMPTY);
+        Arrays.fill(armour, ItemStack.EMPTY);
     }
 
     private SkyblockHud() {
@@ -152,6 +167,16 @@ public final class SkyblockHud {
     /** Equipment item for slot 0=necklace, 1=cloak, 2=belt, 3=gloves (never null). */
     public static ItemStack equipment(int i) {
         ItemStack s = (i >= 0 && i < equipment.length) ? equipment[i] : null;
+        return s == null ? ItemStack.EMPTY : s;
+    }
+
+    /**
+     * Armour read from the Loadouts menu: 0=helmet, 1=chestplate, 2=leggings, 3=boots.
+     *
+     * <p>For the case where the live inventory has nothing to show - see {@link #armour}.
+     */
+    public static ItemStack armour(int i) {
+        ItemStack s = (i >= 0 && i < armour.length) ? armour[i] : null;
         return s == null ? ItemStack.EMPTY : s;
     }
 
@@ -389,16 +414,25 @@ public final class SkyblockHud {
     }
 
     /**
-     * Reads the active loadout, which names its own contents in its tooltip.
+     * Reads what the Loadouts menu says you have on.
      *
-     * <p>Only the loadout that says it is equipped is read. There is one icon per loadout and they
-     * all look alike, so picking the wrong one would swap the whole HUD - gear and pet - to a set
-     * you are not wearing. That is the same mistake the wardrobe scan used to make, and it is worse
-     * here because a loadout carries five things rather than four.
+     * <p>The menu is in two halves. Down the left is a panel of what is <b>equipped right now</b>:
+     * a column of trees and stones (Heart of the Forest, Heart of the Mountain, power stone, tuning
+     * template), then your four equipment pieces, then your four armour pieces, with the active pet
+     * beside the chestplate. To the right of that is a grid of saved loadout presets, which are only
+     * icons - each names its contents in its tooltip and holds none of them.
+     *
+     * <p>So the panel is read first and the presets are the fallback. That is what makes a swap show
+     * up at once: the menu does not close when you change a loadout, so the panel updates under an
+     * open screen, while the tooltip route could only ever draw a piece this session had already
+     * seen somewhere else. It also removes the guess about <i>which</i> preset is worn - the panel
+     * states it rather than it being inferred from a tooltip that lacks the offer to equip it.
      */
     private static void scanLoadouts(List<Slot> slots, int limit) {
+        if (scanEquippedPanel(slots, limit)) {
+            return;
+        }
         List<String> equipped = null;
-        int equippedAt = -1;
         int count = 0;
         for (int i = 0; i < limit; i++) {
             ItemStack stack = slots.get(i).getItem();
@@ -419,48 +453,37 @@ public final class SkyblockHud {
             }
             if (isLoadout && !offersEquip) {
                 equipped = lore;
-                equippedAt = i;
                 count++;
             }
         }
         // Exactly one, or none of them. Only one loadout can be worn, so two candidates means the
         // test has stopped meaning what it is assumed to mean - and applying either would swap the
         // whole HUD, gear and pet, to something that is not on your body.
-        if (count != 1) {
-            return;
+        if (count == 1) {
+            applyLoadout(equipped);
         }
-        // The pieces themselves, when the menu is showing them: the loadout's own row holds the
-        // real items, so they can be read rather than resolved by name. That is what makes a swap
-        // show up at once - the Loadouts menu stays open when you change a piece in it, and the
-        // tooltip route could only ever draw a piece this session had already seen somewhere else.
-        boolean read = scanLoadoutRow(slots, limit, equippedAt);
-        // The tooltip still carries the pet, and names the pieces this did not find.
-        applyLoadout(equipped, !read);
     }
 
     /**
-     * Reads the equipment out of one loadout's row.
+     * Reads the equipped panel down the left of the Loadouts menu.
      *
-     * <p>The menu is a row per loadout: its icon on the left, then the gear it holds - equipment
-     * and armour - laid out beside it. So the pieces belonging to the worn loadout are the ones on
-     * the same row as the icon that says it is worn, which is a fact of the layout rather than
-     * something inferred from an item.
+     * <p>Anchored on the equipment rather than on slot numbers. The four pieces are found by their
+     * own category lines, which puts them in one column and on four consecutive rows; armour is the
+     * column to the right of that one and the pet is the column after, beside the chestplate. So the
+     * whole panel is located from one thing it states about itself, and a menu that gains a border
+     * row or moves down a slot is still read correctly.
      *
-     * <p>Only the equipment is taken. Armour is on the row too, but your armour is in your real
-     * inventory and the HUD reads it from there, live - caching a copy from a menu could only ever
-     * make it wrong, by holding a helmet you have since taken off.
+     * <p>The presets cannot be mistaken for the panel: an icon's bottom lore line is its price or
+     * its creation date, so it has no equipment category at all. If one ever did, the two columns
+     * would disagree and this gives up rather than mixing them - the tooltip route still answers.
      *
-     * @return whether any piece was found, i.e. whether this row actually held the gear
+     * @return whether the panel was found, i.e. whether the caller can stop here
      */
-    private static boolean scanLoadoutRow(List<Slot> slots, int limit, int iconSlot) {
-        if (iconSlot < 0) {
-            return false;
-        }
-        int start = (iconSlot / COLS) * COLS;
-        int end = Math.min(start + COLS, limit);
+    private static boolean scanEquippedPanel(List<Slot> slots, int limit) {
         ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
-        boolean any = false;
-        for (int i = start; i < end; i++) {
+        int[] rows = {-1, -1, -1, -1};
+        int col = -1;
+        for (int i = 0; i < limit; i++) {
             ItemStack stack = slots.get(i).getItem();
             if (stack.isEmpty()) {
                 continue;
@@ -469,34 +492,97 @@ public final class SkyblockHud {
             if (cat < 0) {
                 continue;
             }
+            if (col >= 0 && i % COLS != col) {
+                return false;   // two columns claim a piece; this is not the panel
+            }
+            col = i % COLS;
             set[cat] = stack;
-            any = true;
-            // Worth remembering by name as well: a loadout that only names its pieces still needs
-            // an item to draw, and this is one of the few menus that holds them.
+            rows[cat] = i / COLS;
             seenEquipment.put(strip(stack.getHoverName().getString()).trim()
                     .toLowerCase(Locale.ROOT), stack.copy());
         }
-        if (any) {
-            System.arraycopy(set, 0, equipment, 0, 4);
+        if (col < 0) {
+            return false;
         }
-        return any;
+        System.arraycopy(set, 0, equipment, 0, 4);
+
+        // The row the panel starts on, from whichever piece was found: the four sit in category
+        // order, so a piece's own category is how far down the panel it is.
+        int top = -1;
+        for (int c = 0; c < 4; c++) {
+            if (rows[c] >= 0) {
+                top = rows[c] - c;
+                break;
+            }
+        }
+        if (top >= 0) {
+            scanPanelArmour(slots, limit, top, col + 1);
+            scanPanelPet(slots, limit, top, col + 2);
+        }
+        return true;
     }
 
     /**
-     * Fills the pet, and the equipment, from a loadout's tooltip.
+     * The armour column of the panel, one piece per row beside the equipment.
      *
-     * @param pieces whether to take the equipment from here too. False when the row itself has
-     *               already been read - the items in it are the same gear said properly, and a name
-     *               resolved against a piece seen earlier in the session is the weaker of the two
+     * <p>Each slot still has to look like the armour piece its position claims - the column beyond
+     * the equipment is only armour in the layout as it stands today, and a wrong piece drawn
+     * confidently is worse than an empty slot.
      */
-    private static void applyLoadout(List<String> lore, boolean pieces) {
+    private static void scanPanelArmour(List<Slot> slots, int limit, int top, int col) {
+        if (col >= COLS) {
+            return;
+        }
+        for (int c = 0; c < 4; c++) {
+            int i = (top + c) * COLS + col;
+            ItemStack stack = i >= 0 && i < limit ? slots.get(i).getItem() : ItemStack.EMPTY;
+            armour[c] = armourCategoryOf(stack) == c ? stack : ItemStack.EMPTY;
+        }
+    }
+
+    /** The active pet, which sits beside the chestplate - the panel's second row. */
+    private static void scanPanelPet(List<Slot> slots, int limit, int top, int col) {
+        if (col >= COLS) {
+            return;
+        }
+        int i = (top + 1) * COLS + col;
+        if (i < 0 || i >= limit) {
+            return;
+        }
+        ItemStack stack = slots.get(i).getItem();
+        if (stack.isEmpty() || !LEVEL.matcher(strip(stack.getHoverName().getString())).find()) {
+            return;
+        }
+        seenPets.put(petKey(stack), stack.copy());
+        pet = stack;
+        petInfoSource = null;   // force a re-parse against the new stack
+        petInfoCache = null;
+    }
+
+    /** @return armour category index (0=helmet .. 3=boots), or -1 if this isn't a piece of armour. */
+    private static int armourCategoryOf(ItemStack stack) {
+        String last = lastLoreLine(stack);
+        for (int c = 0; c < ARMOUR_CATEGORIES.length; c++) {
+            if (last.endsWith(ARMOUR_CATEGORIES[c])) {
+                return c;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Fills the equipment and pet from a loadout's tooltip, as far as the names can be resolved.
+     *
+     * <p>The fallback for when the equipped panel could not be read - see {@link #scanLoadouts}.
+     */
+    private static void applyLoadout(List<String> lore) {
         ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
         boolean anyPiece = false;
         for (String raw : lore) {
             String line = strip(raw).trim();
 
             Matcher piece = LOADOUT_PIECE.matcher(line);
-            if (pieces && piece.matches()) {
+            if (piece.matches()) {
                 int cat = loadoutCategory(piece.group(1));
                 ItemStack known = seenEquipment.get(piece.group(2).trim().toLowerCase(Locale.ROOT));
                 if (cat >= 0 && known != null) {
@@ -743,25 +829,33 @@ public final class SkyblockHud {
 
     /** @return equipment category index (0..3), or -1 if this isn't an equipment piece. */
     private static int categoryOf(ItemStack stack) {
-        List<String> lore = loreOf(stack);
-        if (lore.isEmpty()) {
-            return -1;
-        }
-        // The rarity/category line is the last non-blank lore line, e.g. "LEGENDARY NECKLACE".
-        String last = "";
-        for (int i = lore.size() - 1; i >= 0; i--) {
-            String l = lore.get(i).trim();
-            if (!l.isEmpty()) {
-                last = l.toUpperCase(Locale.ROOT);
-                break;
-            }
-        }
+        String last = lastLoreLine(stack);
         for (int c = 0; c < CATEGORIES.length; c++) {
             if (last.endsWith(CATEGORIES[c])) {
                 return c;
             }
         }
         return -1;
+    }
+
+    /**
+     * The item's rarity line, upper-cased - its last non-blank lore line, e.g. "LEGENDARY NECKLACE".
+     *
+     * <p>Empty for anything without lore, which is how a loadout preset icon fails both category
+     * tests: its bottom line is a price or a date, not a rarity.
+     */
+    private static String lastLoreLine(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "";
+        }
+        List<String> lore = loreOf(stack);
+        for (int i = lore.size() - 1; i >= 0; i--) {
+            String l = lore.get(i).trim();
+            if (!l.isEmpty()) {
+                return l.toUpperCase(Locale.ROOT);
+            }
+        }
+        return "";
     }
 
     /** True when any lore line contains {@code needle} (lower-case, colour codes already stripped). */
@@ -777,6 +871,7 @@ public final class SkyblockHud {
     /** Clear the cache when leaving a server (a different profile has different pet/equipment). */
     public static void reset() {
         Arrays.fill(equipment, ItemStack.EMPTY);
+        Arrays.fill(armour, ItemStack.EMPTY);
         pet = ItemStack.EMPTY;
         petInfoSource = null;
         petInfoCache = null;

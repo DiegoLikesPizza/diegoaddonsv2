@@ -295,11 +295,30 @@ public class PlayerHudModule extends HudModule {
             if (showSlotBoxes()) {
                 HudSlots.plate(g, x, y, cell, smooth);
             }
-            ItemStack stack = armour
-                    ? (mc.player == null ? ItemStack.EMPTY : mc.player.getItemBySlot(ARMOR[i]))
-                    : SkyblockHud.equipment(i);
+            ItemStack stack = armour ? armour(mc, i) : SkyblockHud.equipment(i);
             HudSlots.item(g, font, stack, x, y, cell);
         }
+    }
+
+    /**
+     * One armour slot: what you are actually wearing, or what the Loadouts menu last said.
+     *
+     * <p>The live inventory wins whenever it has anything at all, because it is the truth and the
+     * menu's copy is a snapshot. The fallback is for the case the inventory cannot answer - every
+     * slot empty while SkyBlock has you in full gear, which is what a lobby or a not-yet-synced
+     * profile looks like. Falling back per empty slot instead would leave a helmet you took off
+     * sitting on the HUD for the rest of the session.
+     */
+    private static ItemStack armour(Minecraft mc, int i) {
+        if (mc.player == null) {
+            return ItemStack.EMPTY;
+        }
+        for (EquipmentSlot slot : ARMOR) {
+            if (!mc.player.getItemBySlot(slot).isEmpty()) {
+                return mc.player.getItemBySlot(ARMOR[i]);
+            }
+        }
+        return SkyblockHud.armour(i);
     }
 
     /**
