@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.1.** RenderLib is gone; the mod runs on
+**Current version: 2.5.2.** RenderLib is gone; the mod runs on
 [diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
 `includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
@@ -102,9 +102,11 @@ Worth a pass before trusting any of it:
 - [ ] Sound picker for Secret Chime
 - [ ] HUD editor: ten draggable elements, and a position that survives a restart
 - [ ] Chat search (Ctrl+F) — jump and copy
-- [x] Intro screen on a fresh instance — **seen, and it was wrong.** It drew at twice its size, so
-      only its top-left quarter was on screen, down in the bottom-right. Fixed in 2.5.1; the fixed
-      version has not been looked at yet. To see it again, set `introShown` back to false in
+- [x] Intro screen on a fresh instance — **seen twice, wrong both times.** 2.5.1 fixed the doubled
+      size; the screenshot after it showed the panel far too small for the window, "VERSION 2" drawn
+      through the middle of the "DiegoAddons" title, and the "Not now" button sitting on top of the
+      "You can change everything later." note. Re-laid out in 2.5.2 (see Done) and **not looked at
+      since**. To see it again, set `introShown` back to false in
       `config/diegoaddonsv2-configlib.json`.
 - [ ] Custom title screen, the Join Hypixel button on both title screens, and the DiegoAddons button
       — **now the default** (2.5.1), so a fresh instance lands on it rather than the vanilla screen
@@ -174,6 +176,19 @@ preview path is the fastest way to check most of them, since it draws without li
 
 ## Done
 
+- **The welcome screen was tiny, and two of its lines drew through each other** (2.5.2) — with the
+  hi-res fix from 2.5.1 in place the panel was finally the size it had always asked for, and that
+  size was wrong: 620×420 units against the settings panel's 1320, so it read as a small box in the
+  middle of a large window. It is now `min(960, window - 80)` wide by 500 tall, with the paddings,
+  the brand tile, the buttons and the row rhythm scaled to match.
+  The two overlaps were both hand-guessed offsets. The title and the eyebrow were positioned by two
+  independent centre-of-band calls whose bands overlapped, which put "VERSION 2" through the middle
+  of the name; they are now **two stacked bands that add up to the brand tile's height**, so neither
+  can wander into the other. The footer note was drawn at a fixed x with no width limit while the
+  buttons were drawn on top of it — it is now truncated against the left edge of the "Not now"
+  button, so the note gives way rather than the controls. Button widths and hit boxes come from the
+  same constants now (`PRIMARY_W` / `SECONDARY_W`), instead of the literals that had to be kept in
+  step by hand between drawing and `mouseClicked`.
 - **The music overlay is a card** (2.5.1) — cover on the left, title over artist, a progress bar
   under them with the time right-aligned beneath it, off a mockup Diego drew. It was a stack of
   equal text lines with a bar the width of the longest one; the hierarchy is the point, so the title

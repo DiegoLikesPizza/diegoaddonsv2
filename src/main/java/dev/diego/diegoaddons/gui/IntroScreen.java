@@ -24,10 +24,15 @@ import org.lwjgl.glfw.GLFW;
  */
 public final class IntroScreen extends Screen {
 
-    private static final int PANEL_W = 620;
-    private static final int PANEL_H = 420;
-    private static final int PAD = 34;
-    private static final int BTN_H = 38;
+    /** Widest the panel is allowed to get; it shrinks with the window but never past this. */
+    private static final int PANEL_MAX_W = 960;
+    private static final int PANEL_H = 500;
+    private static final int PAD = 44;
+    private static final int BTN_H = 46;
+    private static final int PRIMARY_W = 240;
+    private static final int SECONDARY_W = 130;
+    /** Height of the brand tile, and of the title + eyebrow stack that sits beside it. */
+    private static final int HEAD_H = 48;
 
     private record Point(String number, String title, String detail) {
     }
@@ -44,6 +49,7 @@ public final class IntroScreen extends Screen {
     private final Screen parent;
     private int panelX;
     private int panelY;
+    private int panelW;
 
     public IntroScreen(Screen parent) {
         super(Component.literal("Welcome"));
@@ -52,7 +58,8 @@ public final class IntroScreen extends Screen {
 
     @Override
     protected void init() {
-        panelX = (Ui.u(width) - PANEL_W) / 2;
+        panelW = Math.min(PANEL_MAX_W, Ui.u(width) - 80);
+        panelX = (Ui.u(width) - panelW) / 2;
         panelY = (Ui.u(height) - PANEL_H) / 2;
     }
 
@@ -69,7 +76,11 @@ public final class IntroScreen extends Screen {
     }
 
     private int primaryX() {
-        return panelX + PANEL_W - PAD - 190;
+        return panelX + panelW - PAD - PRIMARY_W;
+    }
+
+    private int secondaryX() {
+        return primaryX() - 12 - SECONDARY_W;
     }
 
     @Override
@@ -79,44 +90,50 @@ public final class IntroScreen extends Screen {
         Theme t = DiegoAddonsV2Client.CONFIG.theme();
         int mx = Ui.u(mouseX);
         int my = Ui.u(mouseY);
-        int inner = PANEL_W - PAD * 2;
+        int inner = panelW - PAD * 2;
 
         // Everything below is in units, where one unit is half a screen pixel. Without this the
         // panel drew at twice its size from twice its offset, which put its top-left quarter in the
         // bottom-right of the screen and the rest of it past the edge - see ChatSearchScreen, which
         // is the same kind of screen and has always done this.
         Ui.beginHiRes(g);
-        Ui.roundRect(g, panelX, panelY, PANEL_W, PANEL_H, 20, t.surface());
-        Ui.roundOutline(g, panelX, panelY, PANEL_W, PANEL_H, 20, 1, t.stroke());
+        Ui.roundRect(g, panelX, panelY, panelW, PANEL_H, 20, t.surface());
+        Ui.roundOutline(g, panelX, panelY, panelW, PANEL_H, 20, 1, t.stroke());
 
         // Brand mark: the same rounded tile with a cut-out ring the settings sidebar uses.
-        Ui.roundRect(g, panelX + PAD, panelY + PAD, 34, 34, 11, t.accent());
-        Ui.roundOutline(g, panelX + PAD + 10, panelY + PAD + 10, 14, 14, 7, 2, t.surfaceAlt());
-        Fonts.draw(g, font, "DiegoAddons", panelX + PAD + 48,
-                Fonts.centerY(panelY + PAD, 20, Fonts.TITLE_SZ), Fonts.UI_TITLE, t.text());
-        Fonts.draw(g, font, "VERSION 2", panelX + PAD + 48,
-                Fonts.centerY(panelY + PAD + 18, 16, Fonts.EYEBROW_SZ), Fonts.UI_EYEBROW, t.accent());
+        int headY = panelY + PAD;
+        Ui.roundRect(g, panelX + PAD, headY, HEAD_H, HEAD_H, 15, t.accent());
+        Ui.roundOutline(g, panelX + PAD + 14, headY + 14, 20, 20, 10, 3, t.surfaceAlt());
+        // The title and the eyebrow are two stacked bands filling the tile's height, rather than two
+        // guessed offsets - guessing is what drew "VERSION 2" through the middle of the name.
+        Fonts.draw(g, font, "DiegoAddons", panelX + PAD + 66,
+                Fonts.centerY(headY, 30, Fonts.TITLE_SZ), Fonts.UI_TITLE, t.text());
+        Fonts.draw(g, font, "VERSION 2", panelX + PAD + 66,
+                Fonts.centerY(headY + 30, HEAD_H - 30, Fonts.EYEBROW_SZ), Fonts.UI_EYEBROW, t.accent());
 
-        Fonts.drawTruncated(g, font, "Your SkyBlock tools, finally in one place.",
-                panelX + PAD, panelY + PAD + 62, inner, Fonts.UI_LABEL, t.text());
+        Fonts.drawTruncated(g, font, "Your SkyBlock tools, finally in one place.", panelX + PAD,
+                Fonts.centerY(headY + HEAD_H + 30, 30, Fonts.LABEL_SZ), inner, Fonts.UI_LABEL, t.text());
 
-        int y = panelY + PAD + 100;
+        int y = headY + HEAD_H + 72;
         for (Point p : POINTS) {
-            Ui.roundRect(g, panelX + PAD, y, 26, 22, 7, Ui.fade(t.accent(), 0.22f));
-            Fonts.drawCentered(g, font, p.number(), panelX + PAD + 13,
-                    Fonts.centerY(y, 22, Fonts.SMALL_SZ), Fonts.UI_SMALL, t.accent());
-            Fonts.drawTruncated(g, font, p.title(), panelX + PAD + 38, y + 1,
-                    inner - 38, Fonts.UI_BODY, t.text());
-            Fonts.drawTruncated(g, font, p.detail(), panelX + PAD + 38, y + 22,
-                    inner - 38, Fonts.UI_SMALL, t.textDim());
-            y += 56;
+            Ui.roundRect(g, panelX + PAD, y, 36, 30, 10, Ui.fade(t.accent(), 0.22f));
+            Fonts.drawCentered(g, font, p.number(), panelX + PAD + 18,
+                    Fonts.centerY(y, 30, Fonts.SMALL_SZ), Fonts.UI_SMALL, t.accent());
+            Fonts.drawTruncated(g, font, p.title(), panelX + PAD + 52, y + 2,
+                    inner - 52, Fonts.UI_BODY, t.text());
+            Fonts.drawTruncated(g, font, p.detail(), panelX + PAD + 52, y + 30,
+                    inner - 52, Fonts.UI_SMALL, t.textDim());
+            y += 74;
         }
 
-        Fonts.draw(g, font, "You can change everything later.", panelX + PAD,
-                Fonts.centerY(buttonY(), BTN_H, Fonts.SMALL_SZ), Fonts.UI_SMALL, t.textFaint());
+        // Truncated against the buttons' left edge: the note is the part that gives way, not the
+        // controls it was previously drawn underneath.
+        Fonts.drawTruncated(g, font, "You can change everything later.", panelX + PAD,
+                Fonts.centerY(buttonY(), BTN_H, Fonts.SMALL_SZ), secondaryX() - 20 - panelX - PAD,
+                Fonts.UI_SMALL, t.textFaint());
 
-        button(g, t, primaryX(), buttonY(), 190, "Open settings", mx, my, true);
-        button(g, t, primaryX() - 108, buttonY(), 100, "Not now", mx, my, false);
+        button(g, t, primaryX(), buttonY(), PRIMARY_W, "Open settings", mx, my, true);
+        button(g, t, secondaryX(), buttonY(), SECONDARY_W, "Not now", mx, my, false);
         Ui.endHiRes(g);
     }
 
@@ -135,12 +152,12 @@ public final class IntroScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         int mx = Ui.u(event.x());
         int my = Ui.u(event.y());
-        if (Ui.hovered(mx, my, primaryX(), buttonY(), 190, BTN_H)) {
+        if (Ui.hovered(mx, my, primaryX(), buttonY(), PRIMARY_W, BTN_H)) {
             markSeen();
             DiegoAddonsV2Client.CONFIG.open();
             return true;
         }
-        if (Ui.hovered(mx, my, primaryX() - 108, buttonY(), 100, BTN_H)) {
+        if (Ui.hovered(mx, my, secondaryX(), buttonY(), SECONDARY_W, BTN_H)) {
             onClose();
             return true;
         }
