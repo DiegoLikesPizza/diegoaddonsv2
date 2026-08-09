@@ -82,8 +82,6 @@ public final class Updater {
     private static volatile State state = State.IDLE;
     private static volatile String detail = "";
     private static volatile Release latest;
-    /** The verified jar waiting to be installed, and where it should end up. Null until staged. */
-    private static volatile Path staged;
     /** What the shutdown hook should swap, read when it runs rather than when it was registered. */
     private static volatile Path pendingOld;
     private static volatile Path pendingNew;
@@ -189,7 +187,6 @@ public final class Updater {
         state = State.DOWNLOADING;
         detail = "Downloading " + release.version() + "…";
         Path jar = downloadAndVerify(release);
-        staged = jar;
         state = State.STAGED;
 
         Path currentJar = ownJar();
