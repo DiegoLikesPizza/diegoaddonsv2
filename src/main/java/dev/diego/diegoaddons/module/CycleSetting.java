@@ -14,15 +14,18 @@ public class CycleSetting extends Setting {
     public final String[] options;
     public final int def;
 
+    private int value;
+
     public CycleSetting(Module owner, String key, String name, int def, String... options) {
         super(owner, key, name);
         this.options = options.length > 0 ? options : new String[]{""};
         this.def = clamp(def);
+        this.value = this.def;
     }
 
     /** The current option's index, 0..options.length-1. */
     public int get() {
-        return clamp((int) Math.round(ConfigManager.moduleConfig(owner.id).numbers.getOrDefault(key, (double) def)));
+        return clamp(value);
     }
 
     /** The current option's display text. */
@@ -31,7 +34,11 @@ public class CycleSetting extends Setting {
     }
 
     public void set(int index) {
-        ConfigManager.moduleConfig(owner.id).numbers.put(key, (double) clamp(index));
+        int next = clamp(index);
+        if (next == this.value) {
+            return;
+        }
+        this.value = next;
         ConfigManager.save();
     }
 

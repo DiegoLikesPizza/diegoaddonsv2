@@ -38,6 +38,7 @@ public final class DiegoCommands {
             new Help("", "Open the DiegoAddons menu"),
             new Help("help", "Show this list"),
             new Help("hud", "Open the HUD editor"),
+            new Help("update", "Check for a new version of the mod"),
             new Help("words", "Open the word replacement list"),
             new Help("hotkeys", "Open the command hotkey list"),
             new Help("blocked", "Open the blocked player list"),
@@ -72,6 +73,8 @@ public final class DiegoCommands {
                         .executes(c -> help(c.getSource(), name)))
                 .then(ClientCommands.literal("hud")
                         .executes(c -> run(() -> DiegoAddonsV2Client.CONFIG.openHudEditor())))
+                .then(ClientCommands.literal("update")
+                        .executes(c -> update(c.getSource())))
                 .then(ClientCommands.literal("words")
                         .executes(c -> openList("misc.words")))
                 .then(ClientCommands.literal("hotkeys")
@@ -132,6 +135,26 @@ public final class DiegoCommands {
             source.sendFeedback(Component.literal("  §e" + usage + " §8- §7" + h.description()));
         }
         source.sendFeedback(Component.literal("§7Also available as §e/diego§7, and §e\\§7 opens the menu."));
+        return 1;
+    }
+
+    /**
+     * Asks for a version check by hand.
+     *
+     * <p>Works with the Auto Update module switched off, because typing the command is the asking -
+     * but with it off the check only ever reports, never downloads. What the module's mode setting
+     * decides is what happens <i>without</i> being asked.
+     */
+    private static int update(FabricClientCommandSource source) {
+        var module = dev.diego.diegoaddons.module.modules.AutoUpdateModule.INSTANCE;
+        boolean on = module != null && module.isEnabled();
+        source.sendFeedback(Component.literal("§b[DiegoAddons] §fChecking for a new version… §7(you are on "
+                + dev.diego.diegoaddons.util.Updater.currentVersion() + ")"));
+        if (on) {
+            module.checkNow();
+        } else {
+            dev.diego.diegoaddons.util.Updater.check(false, false, false, true, true);
+        }
         return 1;
     }
 

@@ -16,17 +16,21 @@ public class KeybindSetting extends Setting {
     public static final int UNBOUND = InputConstants.UNKNOWN.getValue();
 
     private boolean wasDown;
+    private int value = UNBOUND;
 
     public KeybindSetting(Module owner, String key, String name) {
         super(owner, key, name);
     }
 
     public int get() {
-        return ConfigManager.moduleConfig(owner.id).keys.getOrDefault(key, UNBOUND);
+        return value;
     }
 
     public void set(int keyCode) {
-        ConfigManager.moduleConfig(owner.id).keys.put(key, keyCode);
+        if (keyCode == this.value) {
+            return;
+        }
+        this.value = keyCode;
         ConfigManager.save();
     }
 

@@ -23,9 +23,28 @@ import net.minecraft.resources.Identifier;
  * </ul>
  */
 public final class Fonts {
+    private static FontDescription face(String path) {
+        return new FontDescription.Resource(Identifier.fromNamespaceAndPath("diegoaddonsv2", path));
+    }
+
     private static Style font(String path) {
-        Identifier id = Identifier.fromNamespaceAndPath("diegoaddonsv2", path);
-        return Style.EMPTY.withFont(new FontDescription.Resource(id));
+        return Style.EMPTY.withFont(face(path));
+    }
+
+    /** {@link #MEDIUM}'s typeface alone, for {@link #reface}. */
+    public static final FontDescription MEDIUM_FACE = face("ui_medium");
+
+    /**
+     * Puts one of the mod's typefaces on a component that already carries its own colours.
+     *
+     * <p>{@link #t} is for text the mod wrote, where a whole {@link Style} can simply be set. Text
+     * that came from the server is different: a scoreboard line or a chat message says a great deal
+     * with colour, and setting a Style over it would flatten all of that to one shade. Setting only
+     * the font leaves every other field alone, and because an unset field is inherited from the
+     * parent, the face reaches the child runs while their colours stay theirs.
+     */
+    public static Component reface(Component text, FontDescription face) {
+        return text.copy().withStyle(s -> s.withFont(face));
     }
 
     // --- HUD family (normal space) -------------------------------------------------------------

@@ -14,6 +14,9 @@ public class StringSetting extends Setting {
     private final String def;
     private final Runnable chooser;
 
+    /** Null means "unset", which reads back as {@link #def}. */
+    private String value;
+
     public StringSetting(Module owner, String key, String name, String def, Runnable chooser) {
         super(owner, key, name);
         this.def = def;
@@ -32,16 +35,16 @@ public class StringSetting extends Setting {
     }
 
     public String get() {
-        String v = ConfigManager.moduleConfig(owner.id).texts.get(key);
-        return v == null || v.isBlank() ? def : v;
+        return value == null || value.isBlank() ? def : value;
     }
 
     public void set(String value) {
-        if (value == null || value.isBlank()) {
-            ConfigManager.moduleConfig(owner.id).texts.remove(key);
-        } else {
-            ConfigManager.moduleConfig(owner.id).texts.put(key, value.trim());
+        // Blank means "no value", which is the default - not an empty string to be stored.
+        String next = value == null || value.isBlank() ? null : value.trim();
+        if (java.util.Objects.equals(next, this.value)) {
+            return;
         }
+        this.value = next;
         ConfigManager.save();
         // No menu refresh needed: configlib's rows read through this setting's own getter every
         // frame, so a new value is on screen the moment it is written.

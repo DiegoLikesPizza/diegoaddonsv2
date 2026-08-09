@@ -32,25 +32,39 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        ConfigManager.load();
         SkinChanger.ensureFolder();
         ModuleManager.init();
         // After ModuleManager.init(), because the spec describes what is actually registered.
         //
-        // The file is deliberately *not* config/diegoaddonsv2.json - ConfigManager owns that one,
-        // and configlib defaults to <modid>.json, so the two would write the same path with
-        // incompatible schemas. Every option is non-persistent for now anyway, so this file stays
-        // empty until ConfigManager is retired and configlib takes storage over properly.
-        CONFIG = dev.diego.configlib.ConfigLib.builder(MOD_ID)
-                .spec(dev.diego.diegoaddons.config.ModuleSpec.build())
-                .title("DiegoAddons V2")
-                .subtitle(net.fabricmc.loader.api.FabricLoader.getInstance()
-                        .getModContainer(MOD_ID)
-                        .map(c -> "v" + c.getMetadata().getVersion().getFriendlyString())
-                        .orElse(""))
-                .file(net.fabricmc.loader.api.FabricLoader.getInstance()
-                        .getConfigDir().resolve("diegoaddonsv2-configlib.json"))
-                .register();
+        // configlib owns the config now: registering builds the spec off the live modules and then
+        // reads the file straight into them. The separate path is kept because the old file still
+        // exists in people's instances and is read once, below, to carry their settings over.
+        // Registering reads the file, which means calling every setter - so it runs marked as a
+        // load. Otherwise each restored value would ask for a save while the file was still being
+        // read, and every module that came back enabled would wake up here rather than below.
+        dev.diego.diegoaddons.config.ConfigManager.whileLoading(() ->
+                CONFIG = dev.diego.configlib.ConfigLib.builder(MOD_ID)
+                        .spec(dev.diego.diegoaddons.config.ModuleSpec.build())
+                        .title("DiegoAddons V2")
+                        .subtitle(net.fabricmc.loader.api.FabricLoader.getInstance()
+                                .getModContainer(MOD_ID)
+                                .map(c -> "v" + c.getMetadata().getVersion().getFriendlyString())
+                                .orElse(""))
+                        .file(net.fabricmc.loader.api.FabricLoader.getInstance()
+                                .getConfigDir().resolve("diegoaddonsv2-configlib.json"))
+                        .register());
+        // A config written by 2.4.1 or earlier, carried over once. Does nothing if there is none,
+        // or if configlib's own file already has settings in it.
+        dev.diego.diegoaddons.config.LegacyImport.run(CONFIG);
+        // The mod's theme, reaching the parts configlib draws. Both are suppliers rather than
+        // values, because configlib re-reads them every frame - so changing the theme in the menu
+        // recolours the menu you are standing in rather than waiting for a restart.
+        CONFIG.accent(() -> dev.diego.diegoaddons.gui.Themes.accent());
+        CONFIG.hudStyle(dev.diego.diegoaddons.hud.HudElements::sharedStyle);
+        // Everything that came back enabled is woken here rather than as the flag was set, because
+        // the flags are set while this method is still running and a module's onEnable expects a
+        // client that exists.
+        ModuleManager.applyEnabled();
         // The inventory buttons and the party finder's class picker attach themselves to any
         // container screen that qualifies, deciding per screen whether they apply - so this stays
         // The drawing half of the HUD, attached after registration because it binds to the HUD

@@ -3,7 +3,16 @@ package dev.diego.diegoaddons.config;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Persisted per-module state: enabled flag, HUD position, and arbitrary boolean settings. */
+/**
+ * One module's block in the <b>old</b> config file.
+ *
+ * <p>Nothing writes this any more - configlib stores each setting under its own id, read and written
+ * through the setting object itself. It survives only as the shape {@link LegacyImport} parses a
+ * pre-configlib file into, and goes when that does.
+ *
+ * @deprecated read-only, for {@link LegacyImport}.
+ */
+@Deprecated
 public class ModuleConfig {
     public boolean enabled = false;
 

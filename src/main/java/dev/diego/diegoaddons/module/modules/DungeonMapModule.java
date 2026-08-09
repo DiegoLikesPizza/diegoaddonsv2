@@ -1,7 +1,10 @@
 package dev.diego.diegoaddons.module.modules;
 
+import dev.diego.configlib.hud.HudWidget;
+import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.gui.Fonts;
 import dev.diego.diegoaddons.gui.Theme;
+import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
@@ -50,6 +53,8 @@ public class DungeonMapModule extends HudModule {
     private static final int RESCAN_TICKS = 4;
     private static final int DOOR_Y = 69;
     private static final int DOOR_BAR = 6;   // length of a door bar along the wall, px
+    /** Corner radius of a room. Big enough to read as a rounded card, not as a blob. */
+    private static final int CORNER = 4;
 
     // Seam kinds, cached from the roof probe so the render does no world lookups.
     private static final byte NONE = 0;
@@ -424,38 +429,110 @@ public class DungeonMapModule extends HudModule {
         return PAD + rz * STRIDE;
     }
 
+    // --- the HUD element ------------------------------------------------------------------------
+
+    /**
+     * The map as a configlib element.
+     *
+     * <p>The drawing below is the pre-RenderLib immediate-mode code, unchanged - it always drew from
+     * a local origin with plain {@code fill} and {@code text} calls, which is exactly the contract
+     * {@link HudWidget} asks for. Only the entry point is new.
+     *
+     * <p>The size is fixed rather than measured: the grid is a constant 6x6 of 15px rooms, and the
+     * stats block is however many rows are switched on. Reporting it honestly is what lets the editor
+     * outline the real map instead of a text-sized box.
+     */
+    @Override
+    public HudWidget hudWidget() {
+        return new HudWidget() {
+            @Override
+            public int width() {
+                return PAD * 2 + SIZE;
+            }
+
+            @Override
+            public int height() {
+                int n = statCount();
+                return PAD * 2 + SIZE + (n == 0 ? 0 : STAT_GAP + n * LINE_H);
+            }
+
+            /** Outside a dungeon there is no map to draw - and the grid would be blank anyway. */
+            @Override
+            public boolean shouldRender() {
+                return DungeonState.inDungeons();
+            }
+
+            @Override
+            public void render(GuiGraphicsExtractor g) {
+                paint(g, false);
+            }
+
+            /**
+             * The editor is usually opened from a lobby, where the seam scan has nothing to read. The
+             * panel and a filled-in stats block are drawn anyway so the element is visible and
+             * draggable rather than an invisible box the user has to hunt for.
+             */
+            @Override
+            public void renderPreview(GuiGraphicsExtractor g) {
+                paint(g, true);
+            }
+        };
+    }
+
+    /** Draws the whole element from its own top-left. {@code sample} fills the stats with stand-ins. */
+    private void paint(GuiGraphicsExtractor g, boolean sample) {
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc.font;
+        if (font == null) {
+            return;
+        }
+        Theme t = Themes.current();
+        boolean smooth = ConfigManager.get().smoothCorners;
+
+        int n = statCount();
+        int w = PAD * 2 + SIZE;
+        int h = PAD * 2 + SIZE + (n == 0 ? 0 : STAT_GAP + n * LINE_H);
+        dev.diego.diegoaddons.hud.HudElements.panel(g, this, w, h, 8, smooth);
+
+        // Every one of these reads the world, so they only run when there is one.
+        if (mc.level != null) {
+            drawRooms(g, font, mc, smooth);
+            drawDoors(g);
+            drawLabels(g, font, mc);
+            if (showPlayers.get()) {
+                drawPlayers(g, t, mc);
+            }
+        }
+        drawStats(g, font, t, sample);
+    }
+
     // --- drawing --------------------------------------------------------------------------------
 
 
-    private void drawSeams(GuiGraphicsExtractor g, Minecraft mc) {
+    /**
+     * The doors between rooms.
+     *
+     * <p>Only doors. The seams <i>within</i> a room used to be filled here too, which is how a
+     * multi-tile room was held together; {@link #drawRooms} measures the room and draws it as one
+     * shape now, so filling the seams again would put square corners back over the rounded ones.
+     */
+    private void drawDoors(GuiGraphicsExtractor g) {
         for (int rz = 0; rz < ROOMS; rz++) {
             for (int rx = 0; rx < ROOMS; rx++) {
                 int i = rx + rz * ROOMS;
-                DungeonRooms.RoomData room = DungeonRooms.roomAt(mc, rx, rz);
 
                 byte right = rightSeam[i];
-                if (right == SEP) {
-                    int col = typeColor(colorRoom(mc, room, rx + 1, rz));
-                    g.fill(roomX(rx) + ROOM, roomY(rz), roomX(rx + 1), roomY(rz) + ROOM, col);
-                } else if (right >= DOOR_NORMAL) {
+                if (right >= DOOR_NORMAL) {
                     int x = roomX(rx) + ROOM;
                     int y = roomY(rz) + (ROOM - DOOR_BAR) / 2;
                     g.fill(x, y, x + GAP, y + DOOR_BAR, doorColor(right));
                 }
 
                 byte down = downSeam[i];
-                if (down == SEP) {
-                    int col = typeColor(colorRoom(mc, room, rx, rz + 1));
-                    g.fill(roomX(rx), roomY(rz) + ROOM, roomX(rx) + ROOM, roomY(rz + 1), col);
-                } else if (down >= DOOR_NORMAL) {
+                if (down >= DOOR_NORMAL) {
                     int x = roomX(rx) + (ROOM - DOOR_BAR) / 2;
                     int y = roomY(rz) + ROOM;
                     g.fill(x, y, x + DOOR_BAR, y + GAP, doorColor(down));
-                }
-
-                if (centreFill[i]) {
-                    int col = typeColor(colorRoom(mc, room, rx + 1, rz + 1));
-                    g.fill(roomX(rx) + ROOM, roomY(rz) + ROOM, roomX(rx + 1), roomY(rz + 1), col);
                 }
             }
         }
@@ -482,21 +559,107 @@ public class DungeonMapModule extends HudModule {
         };
     }
 
+    /** How far a room reaches right from its top-left tile, in tiles. */
+    private int extentX(int rx, int rz) {
+        int w = 1;
+        while (rx + w < ROOMS && rightSeam[(rx + w - 1) + rz * ROOMS] == SEP) {
+            w++;
+        }
+        return w;
+    }
+
+    /** How far a room reaches down from its top-left tile, in tiles. */
+    private int extentZ(int rx, int rz) {
+        int h = 1;
+        while (rz + h < ROOMS && downSeam[rx + (rz + h - 1) * ROOMS] == SEP) {
+            h++;
+        }
+        return h;
+    }
+
+    /**
+     * Whether a room fills its whole bounding box rather than being an L or a T.
+     *
+     * <p>Decides how it is drawn. A rectangular room is one rounded shape, which is what makes the
+     * map read as rooms rather than as a grid of tiles - but the dungeon also has L-shaped rooms,
+     * and drawing one of those as its bounding box would colour in a tile that is not part of it.
+     * Those keep the tile-by-tile fill, which cannot be wrong about its own shape.
+     */
+    private boolean solidRect(int rx, int rz, int w, int h) {
+        for (int dz = 0; dz < h; dz++) {
+            for (int dx = 0; dx < w; dx++) {
+                if (dx + 1 < w && rightSeam[(rx + dx) + (rz + dz) * ROOMS] != SEP) {
+                    return false;
+                }
+                if (dz + 1 < h && downSeam[(rx + dx) + (rz + dz) * ROOMS] != SEP) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The rooms, each drawn as one shape.
+     *
+     * <p>Every tile used to be its own rounded square with the seams between them filled in
+     * afterwards, so a 2x2 room came out as four lumps joined by strips - rounded corners appearing
+     * in the middle of what is supposed to be one room. A room is measured first and drawn once.
+     */
     private void drawRooms(GuiGraphicsExtractor g, Font font, Minecraft mc, boolean smooth) {
         boolean states = DungeonMapData.valid();
         for (int rz = 0; rz < ROOMS; rz++) {
             for (int rx = 0; rx < ROOMS; rx++) {
-                DungeonRooms.RoomData room = DungeonRooms.roomAt(mc, rx, rz);
-                if (room == null) {
+                if (!isRoomCorner(rx, rz)) {
                     continue;
                 }
+                DungeonRooms.RoomData room = DungeonRooms.roomAt(mc, rx, rz);
+                int colour = tileColor(rx, rz, room);
+                if (colour == 0) {
+                    continue;   // neither the scan nor the map knows of a room here yet
+                }
+                int w = extentX(rx, rz);
+                int h = extentZ(rx, rz);
                 int x = roomX(rx);
                 int y = roomY(rz);
-                UiRender.fillRounded(g, x, y, ROOM, ROOM, 2, typeColor(room.type()), smooth);
+                if (solidRect(rx, rz, w, h)) {
+                    UiRender.fillRounded(g, x, y,
+                            w * ROOM + (w - 1) * GAP, h * ROOM + (h - 1) * GAP,
+                            CORNER, colour, smooth);
+                } else {
+                    drawRagged(g, rx, rz, w, h, colour, smooth);
+                }
 
-                // Checkmark once per room, on its top-left tile.
-                if (showChecks.get() && states && isRoomCorner(rx, rz)) {
+                if (showChecks.get() && states) {
                     drawCheck(g, font, DungeonMapData.state(rx * 2, rz * 2), x, y);
+                }
+            }
+        }
+    }
+
+    /**
+     * A room that is not a rectangle: its tiles, plus the seams that join them.
+     *
+     * <p>Square corners throughout. Rounding each tile is what the whole change was to get away
+     * from, and rounding only the outer corners of an arbitrary polyomino is a great deal of work
+     * for the handful of rooms this applies to.
+     */
+    private void drawRagged(GuiGraphicsExtractor g, int rx, int rz, int w, int h, int colour,
+                            boolean smooth) {
+        for (int dz = 0; dz < h; dz++) {
+            for (int dx = 0; dx < w; dx++) {
+                int i = (rx + dx) + (rz + dz) * ROOMS;
+                int x = roomX(rx + dx);
+                int y = roomY(rz + dz);
+                if (dx > 0 && rightSeam[i - 1] != SEP && dz > 0 && downSeam[i - ROOMS] != SEP) {
+                    continue;   // not actually part of this room
+                }
+                g.fill(x, y, x + ROOM, y + ROOM, colour);
+                if (dx + 1 < w && rightSeam[i] == SEP) {
+                    g.fill(x + ROOM, y, x + ROOM + GAP, y + ROOM, colour);
+                }
+                if (dz + 1 < h && downSeam[i] == SEP) {
+                    g.fill(x, y + ROOM, x + ROOM, y + ROOM + GAP, colour);
                 }
             }
         }

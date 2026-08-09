@@ -33,9 +33,14 @@ public class MiningAbilityModule extends HudModule {
         return chime.get();
     }
 
-    // TODO: this one was drawn large in the middle of the screen by MiningAbilityOverlay rather than
-    // as a placeable chip, so when it comes back on configlib it wants a plain HUD render callback
-    // rather than a HudWidget in the editor.
+    /**
+     * Drawn across the middle of the screen by {@link dev.diego.diegoaddons.hud.CentreOverlay}, not
+     * placed in the editor: an ability coming up is a message, not a readout you park in a corner.
+     */
+    @Override
+    public boolean placeable() {
+        return false;
+    }
 
     @Override
     public void onClientTick(Minecraft mc) {

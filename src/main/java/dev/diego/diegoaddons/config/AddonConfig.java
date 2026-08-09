@@ -1,29 +1,53 @@
 package dev.diego.diegoaddons.config;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Plain data object persisted to {@code config/diegoaddonsv2.json} (per Prism instance, since each
- * instance has its own config directory). Gson serializes/deserializes these fields directly.
+ * The mod's state that is not a module setting.
+ *
+ * <p>Module settings are the {@link dev.diego.diegoaddons.module.Setting} objects themselves; what
+ * is left here is the rest - which theme is on, whether a one-time notice has been shown, and the
+ * lists the list-editor modules own. Each field is declared to configlib as a hidden option (see
+ * {@link ModuleSpec}), so it is persisted without ever being drawn as a row.
+ *
+ * <p>The {@code modules} map that used to sit here is gone: it was a second copy of every setting,
+ * keyed by name, and keeping it in step with the settings was exactly the bug that arrangement
+ * invites.
  */
 public class AddonConfig {
     /** Name of the active theme (see {@link dev.diego.diegoaddons.gui.Themes}). */
     public String theme = "Galaxy";
 
+    /**
+     * Whether {@link #accentColor} replaces the active theme's own accent.
+     *
+     * <p>A flag rather than "a colour of 0 means unset": every opaque ARGB colour has its top bit
+     * set, so a zero sentinel is indistinguishable from a deliberate transparent black, and the
+     * user losing their chosen colour by turning the option off and on again is worse than a field.
+     */
+    public boolean customAccent = false;
+
+    /** The accent used when {@link #customAccent} is on. Defaults to Galaxy's own. */
+    public int accentColor = 0xFF8B5CF6;
+
     /** Set once the first-run introduction screen has been shown in this instance. */
     public boolean introShown = false;
+
+    /**
+     * Set once the pre-configlib config file has been read into these settings.
+     *
+     * <p>Lives here rather than being inferred from the old file's absence, so an import is never
+     * run twice - the old file is kept after being read, and re-importing it would undo whatever
+     * the user changed since. See {@link LegacyImport}.
+     */
+    public boolean legacyImported = false;
 
     /** Set once the "open all your SkyBlock menu pages" hint has been shown. */
     public boolean sbHintShown = false;
 
     /** Anti-alias the rounded corners with a soft edge pixel. */
     public boolean smoothCorners = true;
-
-    /** Per-module settings, keyed by the module id. */
-    public Map<String, ModuleConfig> modules = new LinkedHashMap<>();
 
     /**
      * Last seen SkyBlock equipment and pet, serialised as JSON item stacks. Those live only inside

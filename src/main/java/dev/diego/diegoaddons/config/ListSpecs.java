@@ -34,6 +34,21 @@ public final class ListSpecs {
     }
 
     /** "equipment" reads as "Equipment"; the keys are storage names, not labels. */
+    /**
+     * A whole count typed into a list row, or {@code fallback} if it is not one.
+     *
+     * <p>The list editor's fields are text, so a number has to survive being half-typed: a box
+     * momentarily reading "" or "-" must not become a threshold of zero and start refilling
+     * constantly. Anything unparseable keeps the previous value.
+     */
+    private static int count(String typed, int fallback) {
+        try {
+            return Math.max(0, Integer.parseInt(typed.trim()));
+        } catch (RuntimeException e) {
+            return fallback;
+        }
+    }
+
     private static String prettyKey(String key) {
         if (key == null || key.isEmpty()) {
             return "";
@@ -67,7 +82,12 @@ public final class ListSpecs {
                     "Kept topped up from your sacks", () -> ConfigManager.get().gfsItems,
                     GfsItem::new, f -> f.itemName("item")
                             .field("Name", i -> i.name, (i, v) -> i.name = v, "Cobblestone")
-                            .field("Item id", i -> i.id, (i, v) -> i.id = v, "COBBLESTONE"));
+                            .field("Item id", i -> i.id, (i, v) -> i.id = v, "COBBLESTONE")
+                            // How low it may get before a refill. This was lost when the three
+                            // hard-coded toggles became a list: every item carries its own
+                            // threshold, and nothing was showing it.
+                            .field("Refill below", i -> String.valueOf(i.threshold),
+                                    (i, v) -> i.threshold = count(v, i.threshold), "4"));
 
             // Points are recorded in the world with /da route add, never typed.
             case "miningroutes" -> b.list("routes", "Mining routes",

@@ -18,21 +18,29 @@ public class NumberSetting extends Setting {
     /** Decimal places to show; derived from the step so 0.05 reads "0.05" and 1 reads "1". */
     public final int decimals;
 
+    private double value;
+
     public NumberSetting(Module owner, String key, String name, double def, double min, double max, double step) {
         super(owner, key, name);
         this.def = def;
+        this.value = def;
         this.min = min;
         this.max = max;
         this.step = step > 0 ? step : 0.01;
         this.decimals = this.step >= 1 ? 0 : (this.step >= 0.1 ? 1 : 2);
     }
 
+    /** Clamped on the way out as well as in, so a config edited by hand cannot push it out of range. */
     public double get() {
-        return clamp(ConfigManager.moduleConfig(owner.id).numbers.getOrDefault(key, def));
+        return clamp(value);
     }
 
     public void set(double value) {
-        ConfigManager.moduleConfig(owner.id).numbers.put(key, snap(clamp(value)));
+        double next = snap(clamp(value));
+        if (next == this.value) {
+            return;
+        }
+        this.value = next;
         ConfigManager.save();
     }
 

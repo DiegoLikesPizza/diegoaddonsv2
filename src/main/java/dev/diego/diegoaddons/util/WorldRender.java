@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import dev.diego.diegoaddons.DiegoAddonsV2Client;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -77,29 +78,66 @@ public final class WorldRender {
     private static final int FULL_BRIGHT = 0x00F000F0;
 
     /**
+     * The labels' own vertex buffer, flushed as soon as they are written.
+     *
+     * <p>They used to be batched into the buffer source the level renderer hands out, and never
+     * appeared: the boxes drawn immediately before them did, so the geometry and the submission
+     * were fine and only the text was lost - the engine has already finished with that buffer by
+     * the time this event runs, and text goes through a sorted transparency type that is dropped
+     * rather than drawn. Owning the buffer and ending the batch here takes the engine's timing out
+     * of it entirely.
+     */
+    private static com.mojang.blaze3d.vertex.ByteBufferBuilder labelBuffer;
+
+    /**
      * Draws this tick's labels: each one turned to face the camera, drawn through walls, centred on
      * its world position.
+     *
+     * @param unused the level renderer's buffer source, which is deliberately not written to - see
+     *               {@link #labelBuffer}
      */
-    private static void drawLabels(PoseStack pose, MultiBufferSource buffers, Vec3 cam) {
+    private static void drawLabels(PoseStack pose, MultiBufferSource unused, Vec3 cam) {
         List<Label> labels = RENDER_LABELS;
         if (labels.isEmpty()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
+        if (font == null || mc.gameRenderer == null) {
+            return;
+        }
         Camera camera = mc.gameRenderer.getMainCamera();
-        for (Label l : labels) {
-            pose.pushPose();
-            pose.translate(l.pos().x - cam.x, l.pos().y - cam.y, l.pos().z - cam.z);
-            // The camera's own rotation turns the quad to face it; the negative scale is what flips
-            // the text the right way up, since screen Y grows downwards and world Y grows up.
-            pose.mulPose(camera.rotation());
-            pose.scale(-LABEL_SCALE * l.scale(), -LABEL_SCALE * l.scale(), LABEL_SCALE * l.scale());
-            font.drawInBatch(l.text(), -font.width(l.text()) / 2f, 0f, 0xFFFFFFFF, false,
-                    pose.last().pose(), buffers, Font.DisplayMode.SEE_THROUGH, 0, FULL_BRIGHT);
-            pose.popPose();
+        try {
+            if (labelBuffer == null) {
+                labelBuffer = new com.mojang.blaze3d.vertex.ByteBufferBuilder(1536);
+            }
+            MultiBufferSource.BufferSource own = MultiBufferSource.immediate(labelBuffer);
+            for (Label l : labels) {
+                pose.pushPose();
+                pose.translate(l.pos().x - cam.x, l.pos().y - cam.y, l.pos().z - cam.z);
+                // The camera's own rotation turns the quad to face it; the negative scale is what
+                // flips the text the right way up, since screen Y grows downwards and world Y up.
+                pose.mulPose(camera.rotation());
+                pose.scale(-LABEL_SCALE * l.scale(), -LABEL_SCALE * l.scale(),
+                        LABEL_SCALE * l.scale());
+                font.drawInBatch(l.text(), -font.width(l.text()) / 2f, 0f, 0xFFFFFFFF, false,
+                        pose.last().pose(), own, Font.DisplayMode.SEE_THROUGH, 0, FULL_BRIGHT);
+                pose.popPose();
+            }
+            own.endBatch();
+        } catch (RuntimeException | LinkageError e) {
+            // Once, by design: this runs every frame, and a label that cannot draw is not worth
+            // taking the world render down for - but it is worth being able to find out why.
+            if (labelFailure == null) {
+                labelFailure = e;
+                DiegoAddonsV2Client.LOGGER.error("[DiegoAddons] World labels failed to draw; "
+                        + "solver timers and waypoint names will be missing", e);
+            }
         }
     }
+
+    /** The first label-render failure, so it is reported once rather than sixty times a second. */
+    private static Throwable labelFailure;
 
     /** Queues an outlined box. Submit it every tick it should stay visible; {@link #flip()} keeps it
      * drawn on the frames in between. */

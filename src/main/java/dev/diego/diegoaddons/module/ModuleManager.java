@@ -2,7 +2,6 @@ package dev.diego.diegoaddons.module;
 
 import dev.diego.diegoaddons.DiegoAddonsV2Client;
 import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.config.ModuleConfig;
 import dev.diego.diegoaddons.gui.Fonts;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
@@ -12,6 +11,7 @@ import dev.diego.diegoaddons.module.modules.ArmorHiderModule;
 import dev.diego.diegoaddons.module.modules.AnnounceKickModule;
 import dev.diego.diegoaddons.module.modules.AutoRequeueModule;
 import dev.diego.diegoaddons.module.modules.AutoSprintModule;
+import dev.diego.diegoaddons.module.modules.AutoUpdateModule;
 import dev.diego.diegoaddons.module.modules.ForceNametagModule;
 import dev.diego.diegoaddons.module.modules.FullbrightModule;
 import dev.diego.diegoaddons.module.modules.HydrationReminderModule;
@@ -170,12 +170,12 @@ public final class ModuleManager {
         register(new PlayerEspModule(), false);
         register(new CustomScoreboardModule(), false);
         register(new SlotLockModule(), false);
-        ConfigManager.save();
-
-        // Apply persisted enabled states.
-        for (Module m : MODULES) {
-            m.setEnabled(ConfigManager.moduleConfig(m.id).enabled);
-        }
+        // Off by default like everything else, and for one more reason: it reaches the network and
+        // replaces the mod's own jar, which is nobody's default.
+        register(new AutoUpdateModule(), false);
+        // Nothing is read or written here any more. The saved state arrives when configlib reads
+        // its file, which happens after this method - the spec it reads into is built from what was
+        // just registered - and the modules that came back on are woken by applyEnabled.
 
         // A secret is usually a block you clicked: the chime listens for that rather than for the
         // counter catching up with it.
@@ -270,6 +270,10 @@ public final class ModuleManager {
                 dev.diego.diegoaddons.util.FishingAlerts.onMessage(plain);
                 PrinceMessageModule.onMessage(plain);
                 AutoRequeueModule.onMessage(plain);
+                AnnounceKickModule.onMessage(plain);
+                // Autopet swaps the pet without any menu being opened, so chat is the only place
+                // the HUD can learn about it.
+                dev.diego.diegoaddons.util.SkyblockHud.onChat(plain);
             }
         });
 
@@ -341,18 +345,43 @@ public final class ModuleManager {
         DiegoAddonsV2Client.LOGGER.info("[DiegoAddons V2] {} modules registered", MODULES.size());
     }
 
+    /**
+     * @param defaultOn whether this module is on before anything has been saved. configlib only
+     *                  calls the setter for options actually present in the file, so a module the
+     *                  user has never touched simply keeps whatever is set here.
+     */
     private static void register(Module m, boolean defaultOn) {
         MODULES.add(m);
-        // Seed default settings the first time we ever see this module in this instance.
-        if (!ConfigManager.get().modules.containsKey(m.id)) {
-            ConfigManager.get().modules.put(m.id, new ModuleConfig(defaultOn));
+        // Quietly: onEnable runs against a client that is still starting up. The enabled modules
+        // are woken in one pass once the config has been read - see applyEnabled.
+        m.setEnabledQuietly(defaultOn);
+    }
+
+    /**
+     * Fires {@code onEnable} for everything that came back enabled.
+     *
+     * <p>Separate from loading because the two cannot be the same step: configlib pushes the saved
+     * values in while the client is still being built, and a module's {@code onEnable} may touch
+     * parts of it that do not exist yet. Reading first and waking second keeps that order honest.
+     */
+    public static void applyEnabled() {
+        for (Module m : MODULES) {
+            m.wake();
         }
     }
 
     /** Toggle a module on/off and persist the choice. Live. */
     public static void setEnabled(Module m, boolean enabled) {
+        if (m.isEnabled() == enabled) {
+            return;
+        }
+        // While the config is being read this is a restore, not a choice: set the flag and leave
+        // the waking to applyEnabled, and do not write the file back out mid-load.
+        if (ConfigManager.isLoading()) {
+            m.setEnabledQuietly(enabled);
+            return;
+        }
         m.setEnabled(enabled);
-        ConfigManager.moduleConfig(m.id).enabled = enabled;
         ConfigManager.save();
     }
 
@@ -430,6 +459,9 @@ public final class ModuleManager {
         dev.diego.diegoaddons.util.ItemRarity.renderHotbar(g, mc);
         dev.diego.diegoaddons.util.AbilityCooldown.renderHotbar(g, mc);
         dev.diego.diegoaddons.util.EspDraw.renderHud(g, mc);
+        // The mining ability and hydration reminders, which are shouted across the middle of the
+        // screen rather than placed - see CentreOverlay.
+        dev.diego.diegoaddons.hud.CentreOverlay.render(g, mc);
         // Toasts, except on the screens that draw them themselves - those sit above the HUD (and
         // dim it), so drawing here too would show a faded ghost behind the crisp one.
         if (!(mc.screen instanceof AbstractContainerScreen<?>)) {

@@ -1,6 +1,9 @@
 package dev.diego.diegoaddons.module;
 
+import dev.diego.configlib.hud.HudStyle;
+import dev.diego.configlib.hud.HudWidget;
 import dev.diego.diegoaddons.gui.Themes;
+import dev.diego.diegoaddons.hud.HudElements;
 import net.minecraft.client.Minecraft;
 
 import java.util.List;
@@ -11,7 +14,6 @@ import java.util.List;
  * driven live by two {@link BooleanSetting}s exposed in the ClickGUI.
  */
 public abstract class HudModule extends Module {
-    protected final BooleanSetting accentColour = new BooleanSetting(this, "accentColour", "Accent colour", true);
     protected final BooleanSetting showLabel = new BooleanSetting(this, "showLabel", "Show label", true);
     protected final BooleanSetting centered = new BooleanSetting(this, "centered", "Centered", defaultCentered());
 
@@ -66,10 +68,10 @@ public abstract class HudModule extends Module {
     protected HudModule(String id, Category category, String name, String description, boolean textSettings) {
         super(id, category, name, description);
         if (textSettings) {
-            settings.add(accentColour);
             settings.add(showLabel);
             settings.add(centered);
         }
+        addStyleSettings();
     }
 
     /**
@@ -80,24 +82,133 @@ public abstract class HudModule extends Module {
     protected HudModule(String id, String name, String description, boolean textSettings) {
         super(id, Category.HUD, name, description);
         if (textSettings) {
-            settings.add(accentColour);
             settings.add(showLabel);
             settings.add(centered);
         }
+        addStyleSettings();
     }
 
-    // TODO: rebuild the HUD on configlib's HudWidget.
-    //
-    // Every element used to be a RenderLib component tree built by createElement(ContainerComponent),
-    // and RenderLib is gone. configlib's HudWidget is an immediate-mode interface - width(), height()
-    // and render(GuiGraphicsExtractor) in local space - so each element is a rewrite of its drawing
-    // rather than a change of imports, which is why none of them made it into this build.
-    //
-    // hudLine(...) below still produces what each element wants to show, so the data half of every
-    // element survives intact; only the drawing has to be written again.
+    // --- per-element appearance -------------------------------------------------------------------
 
+    /**
+     * Whether this element opts out of the shared HUD look.
+     *
+     * <p>Off by default, and that matters: the point of the shared style is that ten elements look
+     * like one HUD. An override is for the one element you want to stand out - a timer you need to
+     * catch out of the corner of your eye - not the way each element is expected to be dressed.
+     */
+    protected final BooleanSetting customStyle =
+            new BooleanSetting(this, "customStyle", "Custom appearance", false);
+    protected final ColorSetting styleColor =
+            new ColorSetting(this, "styleColor", "Text colour", 0xFFFFFFFF);
+    protected final BooleanSetting stylePlate =
+            new BooleanSetting(this, "stylePlate", "Background plate", true);
+    protected final NumberSetting stylePlateOpacity =
+            new NumberSetting(this, "stylePlateOpacity", "Plate opacity", 80, 0, 100, 5);
+
+    /**
+     * Adds the appearance rows. Every HUD element gets these, including the custom-drawn ones -
+     * unlike the text toggles, which only mean something for an element that is a line of text.
+     */
+    private void addStyleSettings() {
+        settings.add(customStyle);
+        settings.add(styleColor);
+        settings.add(stylePlate);
+        settings.add(stylePlateOpacity);
+    }
+
+    /**
+     * Whether this element draws text that a colour would apply to.
+     *
+     * <p>False for the ones that are pictures - the inventory grid is item models, the player HUD is
+     * a model between two columns of them. Offering "Text colour" on those is offering a control
+     * that cannot do anything, so the config layer leaves the row out.
+     */
+    public boolean hasStyledText() {
+        return true;
+    }
+
+    /** Whether the override is on, so the config layer can hide the rows that depend on it. */
+    public boolean customStyleOn() {
+        return customStyle.get();
+    }
+
+    /**
+     * Whether {@code s} is one of the rows that only mean anything while the override is on.
+     *
+     * <p>Asked by the config layer so those rows are hidden rather than sitting there doing
+     * nothing - a control that is present and inert is worse than one that is absent.
+     */
+    public boolean isStyleDetail(Setting s) {
+        return s == styleColor || s == stylePlate || s == stylePlateOpacity;
+    }
+
+    /** Whether {@code s} is a row this element has no use for at all, rather than one it hides. */
+    public boolean isUselessSetting(Setting s) {
+        return s == styleColor && !hasStyledText();
+    }
+
+    /**
+     * The look this element draws with: its own when it has opted out, otherwise the shared one.
+     *
+     * <p>Read every frame rather than cached, because both halves can change while the game is
+     * running - the theme from the appearance page, the override from this module's own card.
+     */
+    public HudStyle style() {
+        HudStyle shared = HudElements.sharedStyle();
+        if (!customStyle.get()) {
+            return shared;
+        }
+        // plate(...) last, and that is not style: plateOpacity turns the plate back on whenever the
+        // alpha it is given is above zero, so setting the toggle before it meant "no background"
+        // was silently undone by the opacity slider sitting at 80%.
+        return shared.derive()
+                .textColor(styleColor.argb())
+                .plateOpacity((float) (stylePlateOpacity.get() / 100.0))
+                .plate(stylePlate.get())
+                .build();
+    }
+
+    /**
+     * Whether this element is placed by the user in the HUD editor.
+     *
+     * <p>Almost every element is. The exception is one that has a place of its own for a reason - a
+     * "look at this now" message belongs across the middle of the screen and nowhere else, and
+     * offering a position for it would be offering a setting that should not be honoured. Such a
+     * module draws from a plain HUD callback instead and declares no position at all, rather than
+     * declaring one and quietly ignoring it.
+     */
+    public boolean placeable() {
+        return true;
+    }
+
+    /**
+     * Custom drawing for this element, or {@code null} to be drawn as a plain text chip.
+     *
+     * <p>Most HUD elements are a caption and a value, and {@link HudElements} draws those with
+     * configlib's {@code labelValue} prefab off {@link #hudLabel} and {@link #hudValue} - no module
+     * needs to say anything. An element that is not text at all (a map, a slot grid, a column of
+     * armour) overrides this and returns its own {@link HudWidget}, which draws in local space from
+     * the element's own top-left with configlib owning placement, scale and the editor.
+     *
+     * <p>Returning {@code null} is the default precisely so the two halves can be converted apart:
+     * an element whose drawing has not been written yet keeps the text chip rather than vanishing.
+     * That is the whole reason this is a hook and not an abstract method.
+     */
+    public HudWidget hudWidget() {
+        return null;
+    }
+
+    /**
+     * The colour this element's text draws in - its own when it has an override, else the theme's.
+     *
+     * <p>Was a boolean "Accent colour" toggle picking between two theme colours. That was a second
+     * colour control beside Custom appearance's, so it is gone; the accent it defaulted to is now
+     * the shared style's text colour, which means the default look is unchanged and choosing
+     * anything else happens in one place.
+     */
     public int color() {
-        return accentColour.get() ? Themes.current().accent() : Themes.current().text();
+        return style().textColor();
     }
 
     /** The label shown before the value when enabled (e.g. "FPS"). */

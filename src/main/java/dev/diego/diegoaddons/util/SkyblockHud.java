@@ -37,20 +37,104 @@ public final class SkyblockHud {
     // Equipment categories as they appear on the last lore line ("LEGENDARY NECKLACE", ...).
     private static final String[] CATEGORIES = {"NECKLACE", "CLOAK", "BELT", "GLOVES"};
     // Menu titles are like "(1/2) Equipment Sets" and "(1/2) Pets" - match the stable part.
-    private static final String EQUIPMENT_TITLE = "equipment sets";
+    /** Matches both "Equipment" (what you are wearing) and "(1/2) Equipment Sets" (the wardrobe). */
+    private static final String EQUIPMENT_WORD = "equipment";
+    /** What separates the two: the wardrobe is the one listing sets. */
+    private static final String SETS_WORD = "sets";
+    /** A chest menu is nine wide, which is what makes a column of the wardrobe one saved set. */
+    private static final int COLS = 9;
+    /**
+     * The wardrobe's per-set state markers: {@code Slot 1: Equipped}, {@code Slot 2: Empty},
+     * {@code Slot 3: Ready}.
+     *
+     * <p>These sit in a row of their own beneath the sets, one under each column, and they are the
+     * only thing in the menu that says which set you are actually wearing.
+     */
+    private static final Pattern SLOT_STATE =
+            Pattern.compile("Slot\\s*\\d+\\s*:\\s*([A-Za-z]+)");
     private static final String PETS_TITLE = "pets";
+    /** A loadout menu carries a pet and an equipment set together, so both scans are offered it. */
+    private static final String LOADOUT_TITLE = "loadout";
     private static final String ACTIVE_PET_MARKER = "despawn";   // active pet lore: "Click to despawn!"
-    private static final String EQUIPPED_MARKER = "equipped";    // the equipped set's items are marked
 
     // Pet name prefix ("[Lvl 100] ...") and the XP bar's "current/needed" tail.
     private static final Pattern LEVEL = Pattern.compile("\\[Lvl (\\d+)]");
     private static final Pattern XP_BAR = Pattern.compile("([\\d,.]+)\\s*/\\s*([\\d,.]+)\\s*$");
+    /**
+     * Autopet's announcement: {@code Autopet equipped your [Lvl 100] Golden Dragon! VIEW RULE}.
+     *
+     * <p>Deliberately loose about what follows the name - the trailing "! VIEW RULE" is a clickable
+     * suffix that has changed before, and the name is the only part worth being strict about.
+     */
+    private static final Pattern AUTOPET =
+            Pattern.compile("Autopet\\s+equipped\\s+your\\s+\\[Lvl (\\d+)]\\s+([^!]+)!");
+    /**
+     * Summoning and despawning by hand: {@code You summoned your [Lvl 100] Golden Dragon!}
+     *
+     * <p>Needed for the same reason as {@link #AUTOPET}. Clicking a pet closes the menu, so the scan
+     * that would have noticed the change is not running by the time the change happens - the HUD
+     * went on showing the previous pet until the menu was opened again, which is exactly the moment
+     * you no longer need to be told.
+     */
+    private static final Pattern SUMMON =
+            Pattern.compile("You\\s+summoned\\s+your\\s+\\[Lvl (\\d+)]\\s+([^!]+)!");
+    private static final Pattern DESPAWN = Pattern.compile("You\\s+despawned\\s+your\\s+");
+
+    /**
+     * A loadout's contents, which it lists in its own tooltip.
+     *
+     * <pre>
+     *   Necklace: Peony Necklace
+     *   Cloak: Zorro's Cape
+     *   Belt: Peony Belt
+     *   Gloves/Bracelet: Peony Bracelet
+     *   Pet: [Lvl 189] Rose Dragon
+     * </pre>
+     *
+     * <p>Names rather than items, which is the catch: a loadout menu holds one icon per loadout, not
+     * the equipment itself, so these are resolved against the pieces and pets seen in their own
+     * menus. Anything never seen there cannot be drawn - a name is not an item model.
+     */
+    private static final Pattern LOADOUT_PIECE =
+            Pattern.compile("(Necklace|Cloak|Belt|Gloves/Bracelet|Gloves|Bracelet)\\s*:\\s*(.+)");
+    private static final Pattern LOADOUT_PET =
+            Pattern.compile("Pet\\s*:\\s*\\[Lvl (\\d+)]\\s*(.+)");
+    /**
+     * How a loadout says it is <i>not</i> the one you are wearing: {@code Left-click to equip!}
+     *
+     * <p>Inverted, because that is how the menu actually distinguishes them. The two tooltips are
+     * otherwise identical - same gear, same pet, same "Right-click to edit" - and the equipped one
+     * carries no badge of its own. What it lacks is the offer to equip it, which it does not need.
+     *
+     * <p>So the test is an absence, and an absence is only meaningful about something already known
+     * to be a loadout - see {@link #scanLoadouts}, which never applies this to anything that has not
+     * already declared a pet or an equipment piece.
+     */
+    private static final Pattern LOADOUT_EQUIP_PROMPT =
+            Pattern.compile("(?i)click\\s+to\\s+equip");
 
     private static final ItemStack[] equipment = new ItemStack[4];
     private static boolean equipmentLocked = false;   // true once the *equipped* set has been captured
     /** The wardrobe screen the lock belongs to; a new one starts the reading again. */
     private static Object lastEquipmentScreen;
     private static ItemStack pet = ItemStack.EMPTY;
+
+    /**
+     * Every pet seen in a menu this session, by lower-cased name without its level prefix.
+     *
+     * <p>So an Autopet swap has an item to show. The menus are the only place a pet item exists, and
+     * a swap does not open one - without this the icon would either stay on the previous pet or go
+     * blank every time a rule fired.
+     */
+    private static final java.util.Map<String, ItemStack> seenPets = new java.util.HashMap<>();
+
+    /**
+     * Every equipment piece seen in a menu this session, by lower-cased name.
+     *
+     * <p>The loadout menu names its pieces but does not contain them, so this is what turns
+     * "Peony Necklace" back into something with a model to draw.
+     */
+    private static final java.util.Map<String, ItemStack> seenEquipment = new java.util.HashMap<>();
 
     /** False until the persisted equipment/pet have been restored this session. */
     private static boolean restored = false;
@@ -96,7 +180,9 @@ public final class SkyblockHud {
     public static PetInfo petInfo() {
         ItemStack p = pet();
         if (p.isEmpty()) {
-            return null;
+            // With no item there may still be an answer: Autopet announced a swap to a pet this
+            // session has never seen in a menu, so the name and level came from the message.
+            return petInfoSource == null ? petInfoCache : null;
         }
         if (petInfoCache == null || petInfoSource != p) {
             petInfoCache = parsePet(p);
@@ -261,7 +347,17 @@ public final class SkyblockHud {
             lastDumped = screen;
         }
 
-        if (title.contains(EQUIPMENT_TITLE)) {
+        // A loadout menu holds both, so it is offered to both scans rather than being a third case.
+        boolean loadout = title.contains(LOADOUT_TITLE);
+
+        // A loadout menu holds one icon per loadout rather than the gear itself, so it gets its own
+        // scan - the equipment and pet scans would find nothing in it to read.
+        if (loadout) {
+            scanLoadouts(slots, limit);
+            persist(mc);
+            return;
+        }
+        if (title.contains(EQUIPMENT_WORD)) {
             // The lock is meant to survive flipping between pages of one wardrobe, not the rest of
             // the session: without this it never let go, so changing a piece left the HUD showing
             // what you were wearing the first time you ever opened the menu.
@@ -269,11 +365,163 @@ public final class SkyblockHud {
                 lastEquipmentScreen = screen;
                 equipmentLocked = false;
             }
-            scanEquipment(slots, limit);
+            // Two different menus say "equipment". The wardrobe lists every set you have saved, so
+            // a piece in it is only yours if it is marked as the equipped one - that is what was
+            // showing pieces from sets you are not wearing. The plain equipment menu shows what you
+            // have on and nothing else, so there is nothing to pick out.
+            scanEquipment(slots, limit, !title.contains(SETS_WORD));
             persist(mc);
-        } else if (title.contains(PETS_TITLE)) {
+        }
+        if (title.contains(PETS_TITLE)) {
             scanPets(slots, limit);
             persist(mc);
+        }
+    }
+
+    /**
+     * Reads the active loadout, which names its own contents in its tooltip.
+     *
+     * <p>Only the loadout that says it is equipped is read. There is one icon per loadout and they
+     * all look alike, so picking the wrong one would swap the whole HUD - gear and pet - to a set
+     * you are not wearing. That is the same mistake the wardrobe scan used to make, and it is worse
+     * here because a loadout carries five things rather than four.
+     */
+    private static void scanLoadouts(List<Slot> slots, int limit) {
+        List<String> equipped = null;
+        int count = 0;
+        for (int i = 0; i < limit; i++) {
+            ItemStack stack = slots.get(i).getItem();
+            if (stack.isEmpty()) {
+                continue;
+            }
+            List<String> lore = loreOf(stack);
+            boolean isLoadout = false;
+            boolean offersEquip = false;
+            for (String raw : lore) {
+                String line = strip(raw);
+                if (LOADOUT_PET.matcher(line).find() || LOADOUT_PIECE.matcher(line).find()) {
+                    isLoadout = true;
+                }
+                if (LOADOUT_EQUIP_PROMPT.matcher(line).find()) {
+                    offersEquip = true;
+                }
+            }
+            if (isLoadout && !offersEquip) {
+                equipped = lore;
+                count++;
+            }
+        }
+        // Exactly one, or none of them. Only one loadout can be worn, so two candidates means the
+        // test has stopped meaning what it is assumed to mean - and applying either would swap the
+        // whole HUD, gear and pet, to something that is not on your body.
+        if (count == 1) {
+            applyLoadout(equipped);
+        }
+    }
+
+    /** Fills the equipment and pet from a loadout's tooltip, as far as the names can be resolved. */
+    private static void applyLoadout(List<String> lore) {
+        ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
+        boolean anyPiece = false;
+        for (String raw : lore) {
+            String line = strip(raw).trim();
+
+            Matcher piece = LOADOUT_PIECE.matcher(line);
+            if (piece.matches()) {
+                int cat = loadoutCategory(piece.group(1));
+                ItemStack known = seenEquipment.get(piece.group(2).trim().toLowerCase(Locale.ROOT));
+                if (cat >= 0 && known != null) {
+                    set[cat] = known;
+                    anyPiece = true;
+                }
+                continue;
+            }
+
+            Matcher p = LOADOUT_PET.matcher(line);
+            if (p.matches()) {
+                String name = p.group(2).trim();
+                ItemStack known = seenPets.get(name.toLowerCase(Locale.ROOT));
+                petInfoSource = null;
+                if (known != null) {
+                    pet = known;
+                    petInfoCache = null;
+                } else {
+                    // Named but never seen, so there is no model - the card shows the name and
+                    // level on their own rather than the pet you had before.
+                    pet = ItemStack.EMPTY;
+                    petInfoCache = new PetInfo(name, 0xFFFFFFFF, parseInt(p.group(1)), null);
+                }
+            }
+        }
+        if (anyPiece) {
+            System.arraycopy(set, 0, equipment, 0, 4);
+            equipmentLocked = true;
+        }
+    }
+
+    /** Which of the four equipment slots a loadout's label names. */
+    private static int loadoutCategory(String label) {
+        String l = label.toLowerCase(Locale.ROOT);
+        if (l.startsWith("necklace")) {
+            return 0;
+        }
+        if (l.startsWith("cloak")) {
+            return 1;
+        }
+        if (l.startsWith("belt")) {
+            return 2;
+        }
+        // "Gloves/Bracelet" - SkyBlock renamed the slot and the tooltip carries both words.
+        return l.contains("glove") || l.contains("bracelet") ? 3 : -1;
+    }
+
+    /**
+     * Notices Autopet swapping your pet, from the message it announces it with.
+     *
+     * <p>The pet menus are the only place the item itself exists, so a swap that happens while you
+     * are mining is invisible to a scan - the HUD would go on showing the pet you had when you last
+     * opened the menu, which is exactly when it is most wrong. The message names the pet, and every
+     * pet seen in a menu this session is remembered by name, so the right item is usually already
+     * in hand; when it is not, the name and level from the message are shown on their own.
+     *
+     * <p>Called from the chat pipeline. Returns true when the line was an Autopet announcement.
+     */
+    public static boolean onChat(String raw) {
+        String line = strip(raw);
+        if (DESPAWN.matcher(line).find()) {
+            pet = ItemStack.EMPTY;
+            petInfoSource = null;
+            petInfoCache = null;
+            return true;
+        }
+        Matcher m = AUTOPET.matcher(line);
+        if (!m.find()) {
+            m = SUMMON.matcher(line);
+            if (!m.find()) {
+                return false;
+            }
+        }
+        String name = m.group(2).trim();
+        ItemStack known = seenPets.get(name.toLowerCase(Locale.ROOT));
+        if (known != null && !known.isEmpty()) {
+            pet = known;
+            petInfoSource = null;   // force a re-parse against the new stack
+            petInfoCache = null;
+            return true;
+        }
+        // No item for it, so stand in with what the message itself said. The icon is dropped rather
+        // than left showing the previous pet, which would be a confident wrong answer.
+        pet = ItemStack.EMPTY;
+        petInfoSource = null;
+        petInfoCache = new PetInfo(name, 0xFFFFFFFF, parseInt(m.group(1)), null);
+        return true;
+    }
+
+    private static int parseInt(String s) {
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return -1;
         }
     }
 
@@ -293,15 +541,19 @@ public final class SkyblockHud {
     }
 
     /**
-     * The equipment wardrobe is paged and shows several saved sets. We prefer the items belonging to
-     * the <i>equipped</i> set (their lore carries {@link #EQUIPPED_MARKER}); once we've captured that
-     * set we "lock" it, so flipping to other pages doesn't overwrite it. Before we've ever seen the
-     * equipped set we show whatever pieces are visible, so something appears immediately.
+     * Reads the equipment out of whichever menu is open.
+     *
+     * <p>Two menus say "equipment" and they need opposite treatment. The plain one shows what is on
+     * your body, so everything in it is yours. The wardrobe is paged and lists every set you have
+     * saved, so it needs {@link #scanEquippedColumn} to find the one you are wearing - taking
+     * whatever is on the page gives four pieces from four different sets.
      */
-    private static void scanEquipment(List<Slot> slots, int limit) {
+    /**
+     * @param worn true when this menu shows only the equipment you have on, so every piece in it is
+     *             yours; false for the wardrobe, where only the marked set is
+     */
+    private static void scanEquipment(List<Slot> slots, int limit, boolean worn) {
         ItemStack[] any = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
-        ItemStack[] marked = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
-        boolean hasMarked = false;
         for (int i = 0; i < limit; i++) {
             ItemStack stack = slots.get(i).getItem();
             if (stack.isEmpty()) {
@@ -312,20 +564,108 @@ public final class SkyblockHud {
                 continue;
             }
             any[cat] = stack;
-            if (loreContains(stack, EQUIPPED_MARKER)) {
-                marked[cat] = stack;
-                hasMarked = true;
+            // Remembered by name whether or not it is worn: the loadout menu names its pieces
+            // instead of holding them, so this is the only place their models can come from.
+            seenEquipment.put(strip(stack.getHoverName().getString()).trim()
+                    .toLowerCase(Locale.ROOT), stack.copy());
+        }
+        if (worn) {
+            // Everything here is on your body, so there is nothing to pick out and no page to be
+            // on the wrong one of.
+            System.arraycopy(any, 0, equipment, 0, 4);
+            equipmentLocked = true;
+            return;
+        }
+        // The wardrobe proper: one saved set per column, and a marker row saying which is worn.
+        if (scanEquippedColumn(slots, limit)) {
+            equipmentLocked = true;
+            return;
+        }
+        // Nothing else is tried. Searching the page for items whose lore mentions "equipped" is
+        // what produced a set of four pieces that were never worn together, and the wardrobe is
+        // paged - so a page without your set is a page of equipment you are not wearing. Whatever
+        // was last read correctly stays until an equipped column is actually seen.
+    }
+
+    /**
+     * The equipped set, read from the wardrobe's own layout.
+     *
+     * <p>The menu is a grid: each <b>column</b> is one saved set, its four pieces stacked down it,
+     * and below them a row of markers reading {@code Slot 1: Equipped} / {@code Empty} / {@code
+     * Ready}. So the set you are wearing is the column whose marker says Equipped - which is a fact
+     * the menu states outright, rather than something to infer from an item's lore.
+     *
+     * <p>This is what was wrong before: pieces were picked by searching every slot for the word
+     * "equipped", which matches items across several different sets, so the HUD showed four pieces
+     * that were never worn together.
+     *
+     * @return whether an equipped column was found and read
+     */
+    private static boolean scanEquippedColumn(List<Slot> slots, int limit) {
+        int marker = -1;
+        for (int i = 0; i < limit; i++) {
+            ItemStack stack = slots.get(i).getItem();
+            if (!stack.isEmpty() && "equipped".equals(slotState(stack))) {
+                marker = i;
+                break;
             }
         }
-        if (hasMarked) {
-            System.arraycopy(marked, 0, equipment, 0, 4);
-            equipmentLocked = true;
-        } else if (!equipmentLocked) {
-            System.arraycopy(any, 0, equipment, 0, 4);
+        int row = marker / COLS;
+        if (marker < 0 || row == 0) {
+            return false;   // no marker, or nothing above it to read
         }
+
+        ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
+        int col = marker % COLS;
+        boolean any = false;
+        for (int r = 0; r < row && r < 4; r++) {
+            ItemStack stack = slots.get(r * COLS + col).getItem();
+            if (stack.isEmpty()) {
+                continue;
+            }
+            // The piece's own category when it declares one; otherwise its position in the column,
+            // which the wardrobe lays out in the same order the HUD draws.
+            int cat = categoryOf(stack);
+            set[cat >= 0 ? cat : r] = stack;
+            any = true;
+        }
+        if (!any) {
+            return false;
+        }
+        System.arraycopy(set, 0, equipment, 0, 4);
+        return true;
+    }
+
+    /** The state word from a {@code Slot n: ...} marker, lower case, or null if this is not one. */
+    private static String slotState(ItemStack stack) {
+        Matcher m = SLOT_STATE.matcher(strip(stack.getHoverName().getString()));
+        if (m.find()) {
+            return m.group(1).toLowerCase(Locale.ROOT);
+        }
+        for (String line : loreOf(stack)) {
+            m = SLOT_STATE.matcher(strip(line));
+            if (m.find()) {
+                return m.group(1).toLowerCase(Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
+    /** The pet's name without its {@code [Lvl n]} prefix, as Autopet's message spells it. */
+    private static String petKey(ItemStack stack) {
+        String name = strip(stack.getHoverName().getString());
+        return LEVEL.matcher(name).replaceAll("").trim().toLowerCase(Locale.ROOT);
     }
 
     private static void scanPets(List<Slot> slots, int limit) {
+        // Remember every pet on the page first, whether or not it is the active one - an Autopet
+        // swap later has no menu to read from, so this is the only chance to learn the item.
+        for (int i = 0; i < limit; i++) {
+            ItemStack stack = slots.get(i).getItem();
+            if (!stack.isEmpty() && LEVEL.matcher(stack.getHoverName().getString()).find()) {
+                seenPets.put(petKey(stack), stack.copy());
+            }
+        }
         for (int i = 0; i < limit; i++) {
             ItemStack stack = slots.get(i).getItem();
             if (!stack.isEmpty() && loreContains(stack, ACTIVE_PET_MARKER)) {

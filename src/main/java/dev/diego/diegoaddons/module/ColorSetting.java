@@ -142,9 +142,19 @@ public class ColorSetting extends Setting {
 
     // --- persistence ------------------------------------------------------------------------------
 
+    /**
+     * The three values packed as {@code mode|aarrggbb|aarrggbb}.
+     *
+     * <p>One setting, three configlib options: the mode and the two colours are declared separately
+     * (see {@code ModuleSpec}) and each persists on its own, so this string is now only how the three
+     * are held together in memory. Keeping the packed form means the parsing below - and its
+     * tolerance for a value edited into nonsense - did not have to be rewritten.
+     */
+    private String packed;
+
     /** {@code [mode, colorA, colorB]}, falling back to the defaults for anything unreadable. */
     private int[] parse() {
-        String raw = ConfigManager.moduleConfig(owner.id).texts.get(key);
+        String raw = packed;
         if (raw != null) {
             String[] parts = raw.split("\\|");
             if (parts.length == 3) {
@@ -162,8 +172,11 @@ public class ColorSetting extends Setting {
     }
 
     private void store(int mode, int a, int b) {
-        ConfigManager.moduleConfig(owner.id).texts.put(key,
-                mode + "|" + String.format("%08x", a) + "|" + String.format("%08x", b));
+        String next = mode + "|" + String.format("%08x", a) + "|" + String.format("%08x", b);
+        if (next.equals(packed)) {
+            return;
+        }
+        packed = next;
         ConfigManager.save();
     }
 }

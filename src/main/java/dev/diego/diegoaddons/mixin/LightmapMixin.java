@@ -40,9 +40,19 @@ public class LightmapMixin {
             }
             return;
         }
-        state.ambientColor = LightmapRenderStateExtractor.WHITE;
-        state.darknessEffectScale = 0f;
-        state.bossOverlayWorldDarkening = 0f;
+        // At full strength this is plain white, which is what fullbright means. Below that the
+        // world's own ambient is mixed back in, so a cave is lit but still reads as a cave.
+        float strength = mod.strength();
+        state.ambientColor = strength >= 1f
+                ? LightmapRenderStateExtractor.WHITE
+                : new org.joml.Vector3f(state.ambientColor)
+                        .lerp(LightmapRenderStateExtractor.WHITE, strength);
+        if (mod.removeDarkness()) {
+            state.darknessEffectScale = 0f;
+        }
+        if (mod.removeBossDim()) {
+            state.bossOverlayWorldDarkening = 0f;
+        }
         state.needsUpdate = true;
     }
 }

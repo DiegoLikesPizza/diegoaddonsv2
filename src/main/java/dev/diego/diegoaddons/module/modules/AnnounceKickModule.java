@@ -3,31 +3,23 @@ package dev.diego.diegoaddons.module.modules;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
-import dev.diego.diegoaddons.util.LegacyText;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.scores.DisplaySlot;
-import net.minecraft.world.scores.Objective;
-import net.minecraft.world.scores.Scoreboard;
 
 import java.util.Locale;
 
 /**
- * Announces in party chat when you get thrown back to the Hypixel lobby - a server crash or a silent
- * kick otherwise leaves your party wondering where you went. It watches the sidebar title: while in
- * SkyBlock it reads "SKYBLOCK", and the moment that stops being true (without you having left on
- * purpose is not distinguishable, so it fires on any drop to the lobby) it sends one message.
+ * Announces in party chat when Hypixel kicks you back to the lobby - a crash or a silent kick
+ * otherwise leaves your party wondering where you went.
+ *
+ * <p>Driven by the server's own kick message rather than by watching the sidebar, which is what it
+ * used to do: the sidebar losing "SKYBLOCK" means you are in a lobby, and going to a lobby on
+ * purpose is by far the commoner way for that to happen.
  */
 public class AnnounceKickModule extends Module {
     public static AnnounceKickModule INSTANCE;
 
-    /** How long SkyBlock must stay gone before this counts as a kick rather than a warp/reload. */
-    private static final int CONFIRM_TICKS = 60;
-
     private final BooleanSetting toParty =
             new BooleanSetting(this, "party", "Send to party chat", true);
-
-    private boolean wasSkyblock;
-    private int goneTicks = -1;   // ticks since SkyBlock disappeared while connected, or -1
 
     public AnnounceKickModule() {
         super("announcekick", Category.MISC, "Announce SB Kick",
@@ -36,48 +28,39 @@ public class AnnounceKickModule extends Module {
         INSTANCE = this;
     }
 
-    @Override
-    public void onClientTick(Minecraft mc) {
-        // While loading between servers the connection/scoreboard is briefly absent - don't judge
-        // anything then, or every warp to a dungeon or island reads as a kick.
-        if (mc.player == null || mc.player.connection == null) {
+    /**
+     * Hypixel's own words for it: {@code A kick occurred in your connection, so you were put in the
+     * SkyBlock lobby!}
+     *
+     * <p>Matched on the stable middle of the sentence. The game it names varies, and the wording
+     * around it has been reworded before, but "a kick occurred in your connection" is the part that
+     * has stayed put - and it is the part that actually means a kick.
+     */
+    private static final String KICK_LINE = "a kick occurred in your connection";
+
+    /**
+     * Announces a kick, from the message the server sends when one happens.
+     *
+     * <p>This used to watch the sidebar instead, and fire whenever "SKYBLOCK" stopped being on it.
+     * That is not a kick - it is every trip to a lobby, deliberate or not - so the module told your
+     * party you had been kicked each time you went to the hub yourself. There is a message for this;
+     * reading it is both simpler and actually correct.
+     */
+    public static void onMessage(String plain) {
+        AnnounceKickModule mod = INSTANCE;
+        if (mod == null || !mod.isEnabled()) {
             return;
         }
-        boolean sky = inSkyblock(mc);
-        if (sky) {
-            wasSkyblock = true;
-            goneTicks = -1;
+        if (!plain.toLowerCase(Locale.ROOT).contains(KICK_LINE)) {
             return;
         }
-        if (!wasSkyblock) {
-            return;
-        }
-        // SkyBlock is gone. A warp to another SkyBlock server brings it back within a second; only a
-        // real kick to the lobby leaves it gone. So wait before announcing.
-        if (goneTicks < 0) {
-            goneTicks = 0;
-        }
-        if (++goneTicks < CONFIRM_TICKS) {
-            return;
-        }
-        wasSkyblock = false;
-        goneTicks = -1;
-        if (toParty.get()) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mod.toParty.get() && mc.player != null && mc.player.connection != null) {
             mc.player.connection.sendCommand("pc Got kicked to lobby!");
         }
         if (mc.gui != null) {
             mc.gui.getChat().addClientSystemMessage(
                     net.minecraft.network.chat.Component.literal("§b[DiegoAddons] §fKicked to the lobby."));
         }
-    }
-
-    private static boolean inSkyblock(Minecraft mc) {
-        Scoreboard sb = mc.player.connection.scoreboard();
-        Objective obj = sb.getDisplayObjective(DisplaySlot.SIDEBAR);
-        if (obj == null) {
-            return false;
-        }
-        return LegacyText.strip(obj.getDisplayName().getString())
-                .toUpperCase(Locale.ROOT).contains("SKYBLOCK");
     }
 }

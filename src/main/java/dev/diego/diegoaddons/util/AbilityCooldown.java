@@ -87,10 +87,16 @@ public final class AbilityCooldown {
             if (left <= 0) {
                 continue;
             }
-            String text = left >= 10 ? String.valueOf((int) Math.ceil(left))
+            String text = left >= 10 || !mod.showDecimals()
+                    ? String.valueOf((int) Math.ceil(left))
                     : String.format(java.util.Locale.ROOT, "%.1f", left);
-            int color = left <= 1.0 ? 0xFFFF5555 : 0xFFFFFF55;
+            int color = mod.colorFor(left);
             int x = hotbarX + 3 + i * 20;
+            if (mod.dimSlot()) {
+                // Behind the number and over the item, so the slot reads as unavailable at a glance
+                // rather than only when you look at the digits.
+                g.fill(x - 1, y - 2, x + 17, y + 16, 0x80000000);
+            }
             int tx = x + 16 - mc.font.width(Component.literal(text));
             g.text(mc.font, Component.literal(text), tx, y + 9, color, true);
         }

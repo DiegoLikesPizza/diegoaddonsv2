@@ -48,6 +48,24 @@ public abstract class Module {
         }
     }
 
+    /**
+     * Sets the flag without running {@link #onEnable} or {@link #onDisable}.
+     *
+     * <p>For restoring a saved state: the config is read while the client is still being built, and
+     * a module waking up there may touch parts of it that do not exist yet. The flag is set now and
+     * the module woken later, in one pass - see {@code ModuleManager.applyEnabled}.
+     */
+    public final void setEnabledQuietly(boolean value) {
+        enabled = value;
+    }
+
+    /** Runs {@link #onEnable} if this module is flagged on. Paired with {@link #setEnabledQuietly}. */
+    final void wake() {
+        if (enabled) {
+            onEnable();
+        }
+    }
+
     protected void onEnable() {
     }
 

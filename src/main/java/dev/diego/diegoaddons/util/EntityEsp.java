@@ -59,7 +59,11 @@ public final class EntityEsp {
         for (Entity e : mc.level.getEntities(mc.player, area)) {
             // Bats are real entities, not name plates, so they are matched by type.
             if (doBat && e instanceof Bat) {
-                EspRender.draw(e, e.getBoundingBox().inflate(0.1), bats);
+                // Opening a door drops a crowd of bats through the doorway; boxing those buries the
+                // one bat that is actually a secret. See BatEspModule.isDoorBat.
+                if (!bats.isDoorBat(e.getDeltaMovement().y)) {
+                    EspRender.draw(e, e.getBoundingBox().inflate(0.1), bats);
+                }
                 continue;
             }
             // Real players, hiding the NPCs that share the player model.

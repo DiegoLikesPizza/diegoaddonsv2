@@ -1,72 +1,69 @@
 package dev.diego.diegoaddons.config;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import dev.diego.diegoaddons.DiegoAddonsV2Client;
-import net.fabricmc.loader.api.FabricLoader;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 /**
- * Loads and saves {@link AddonConfig} as JSON in the instance config directory. Gson is bundled with
- * Minecraft, so no extra dependency is needed.
+ * The mod's settings state, and the one place that asks for it to be written.
+ *
+ * <p>This used to own {@code config/diegoaddonsv2.json} outright - its own Gson, its own schema, a
+ * map of every module's options. configlib owns storage now: every module setting is declared to it
+ * as an option bound to the setting's own getter and setter, and everything here that is state
+ * rather than a setting is declared as a hidden option (see {@link ModuleSpec}). So there is one
+ * file, one writer, and no second copy of any value.
+ *
+ * <p>What survives is the shape callers already use. {@link #get()} still hands back the state
+ * object and {@link #save()} still means "write it", which is why neither the modules nor the
+ * commands had to change: only where the bytes end up did.
  */
 public final class ConfigManager {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path FILE =
-            FabricLoader.getInstance().getConfigDir().resolve("diegoaddonsv2.json");
 
-    private static AddonConfig config = new AddonConfig();
+    private static final AddonConfig CONFIG = new AddonConfig();
+
+    /**
+     * Set while configlib is pushing a loaded file into the settings.
+     *
+     * <p>Loading calls every setter, and a setter's job is to ask for a save - so without this the
+     * first load would write the file back sixty times while still reading it, and any setting not
+     * yet reached would be saved at its default over the value about to be loaded.
+     */
+    private static boolean loading;
 
     private ConfigManager() {
     }
 
     public static AddonConfig get() {
-        return config;
+        return CONFIG;
     }
 
-    /** Get (creating if absent) the settings block for a module id. */
-    public static ModuleConfig moduleConfig(String id) {
-        if (config.modules == null) {
-            config.modules = new java.util.LinkedHashMap<>();
-        }
-        ModuleConfig mc = config.modules.computeIfAbsent(id, k -> new ModuleConfig());
-        if (mc.numbers == null) {
-            mc.numbers = new java.util.HashMap<>();
-        }
-        if (mc.keys == null) {
-            mc.keys = new java.util.HashMap<>();
-        }
-        if (mc.options == null) {
-            mc.options = new java.util.HashMap<>();
-        }
-        return mc;
-    }
-
-    public static void load() {
-        if (Files.exists(FILE)) {
-            try {
-                String json = Files.readString(FILE);
-                AddonConfig loaded = GSON.fromJson(json, AddonConfig.class);
-                if (loaded != null) {
-                    config = loaded;
-                }
-            } catch (IOException | RuntimeException e) {
-                DiegoAddonsV2Client.LOGGER.warn("[DiegoAddons] Failed to read config, using defaults", e);
-            }
-        } else {
-            save(); // materialise defaults on first launch
-        }
-    }
-
+    /**
+     * Writes the config out.
+     *
+     * <p>A no-op before the handle exists: the settings are constructed while the module list is
+     * being built, which is necessarily before configlib has been handed the spec describing them.
+     * Nothing is lost by not writing then - the values being set are the defaults.
+     */
     public static void save() {
+        if (loading) {
+            return;
+        }
+        var handle = DiegoAddonsV2Client.CONFIG;
+        if (handle != null) {
+            handle.save();
+        }
+    }
+
+    /** Whether a load is in progress, so a setter can tell a restore from a user's choice. */
+    public static boolean isLoading() {
+        return loading;
+    }
+
+    /** Runs {@code body} with {@link #save()} disabled - see {@link #loading}. */
+    public static void whileLoading(Runnable body) {
+        loading = true;
         try {
-            Files.createDirectories(FILE.getParent());
-            Files.writeString(FILE, GSON.toJson(config));
-        } catch (IOException e) {
-            DiegoAddonsV2Client.LOGGER.warn("[DiegoAddons] Failed to write config", e);
+            body.run();
+        } finally {
+            loading = false;
         }
     }
 }

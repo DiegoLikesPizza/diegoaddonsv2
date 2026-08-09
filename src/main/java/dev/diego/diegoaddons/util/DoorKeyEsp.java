@@ -23,8 +23,11 @@ public final class DoorKeyEsp {
     private static final double EDGE = 0.05;
     private static final double KEY_RANGE = 48.0;
 
-    private static final int WITHER_DOOR = 0xFF9A6BFF;
-    private static final int BLOOD_DOOR = 0xFFFF3030;
+    // Filled rather than outlined, and in the doors' own colours: a wither door is black and a
+    // blood door is red, which is how they read in the world, so the ESP says the same thing louder
+    // rather than recolouring it into something you then have to translate.
+    private static final int WITHER_DOOR = 0x66000000;
+    private static final int BLOOD_DOOR = 0x66FF0000;
     private static final int WITHER_KEY = 0xFFE0E0E0;
     private static final int BLOOD_KEY = 0xFFFF3030;
 
@@ -76,7 +79,7 @@ public final class DoorKeyEsp {
         AABB box = horizontal
                 ? new AABB(x, DOOR_Y, z - 1, x + 1, DOOR_Y + 4, z + 2)
                 : new AABB(x - 1, DOOR_Y, z, x + 2, DOOR_Y + 4, z + 1);
-        WorldRender.thickBox(box, color, EDGE, true);
+        WorldRender.filledBox(box, color, true);
     }
 
     private static void keys(Minecraft mc, DoorKeyEspModule mod) {

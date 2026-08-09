@@ -41,8 +41,52 @@ public final class Themes {
         return GALAXY;
     }
 
+    /**
+     * The active theme, with the user's accent applied if they set one.
+     *
+     * <p>Everything that draws reads this rather than {@link #byName}, so a custom accent reaches
+     * the HUD, the toasts and the settings GUI from one place instead of each of them having to
+     * remember to check the override.
+     */
     public static Theme current() {
+        Theme base = byName(ConfigManager.get().theme);
+        if (!ConfigManager.get().customAccent) {
+            return base;
+        }
+        return base.withAccent(ConfigManager.get().accentColor);
+    }
+
+    /** The active theme's own accent, ignoring any override - for showing what a preset looks like. */
+    public static Theme preset() {
         return byName(ConfigManager.get().theme);
+    }
+
+    /** The accent in effect: the override when on, otherwise the theme's own. */
+    public static int accent() {
+        return current().accent();
+    }
+
+    /** Index of the active theme in {@link #ALL}, for the settings menu's choice row. */
+    public static int currentIndex() {
+        Theme active = preset();
+        for (int i = 0; i < ALL.size(); i++) {
+            if (ALL.get(i).name().equals(active.name())) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /** Names of every built-in theme, in order, for the settings menu's choice row. */
+    public static String[] names() {
+        return ALL.stream().map(Theme::name).toArray(String[]::new);
+    }
+
+    /** Selects by index, as the settings menu's choice row hands it back. */
+    public static void selectIndex(int index) {
+        if (index >= 0 && index < ALL.size()) {
+            select(ALL.get(index));
+        }
     }
 
     public static void select(Theme theme) {
