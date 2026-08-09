@@ -27,6 +27,29 @@ public final class ListSpecs {
                 .toList();
     }
 
+    /**
+     * The user's own sound files, with an empty first entry.
+     *
+     * <p>The empty entry is what "no custom sound" is: a picker can only offer a value, so the way
+     * back to the game's own chime has to be one of the choices rather than a second control beside
+     * it saying whether the first one counts.
+     */
+    private static java.util.List<String> customSounds() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        out.add("");
+        out.addAll(dev.diego.diegoaddons.util.CustomSounds.list());
+        return out;
+    }
+
+    /** A file name as a label: "long_beep.mp3" reads as "long beep", "" as the default. */
+    private static String prettyFile(String name) {
+        if (name == null || name.isBlank()) {
+            return "Default (game chime)";
+        }
+        int dot = name.lastIndexOf('.');
+        return (dot > 0 ? name.substring(0, dot) : name).replace('_', ' ');
+    }
+
     /** "minecraft:block.note_block.pling" reads better as "block.note block.pling". */
     private static String prettySound(String id) {
         String s = id.startsWith("minecraft:") ? id.substring("minecraft:".length()) : id;
@@ -107,6 +130,17 @@ public final class ListSpecs {
             // Every sound the game knows is thousands of entries - a dropdown cannot carry that,
             // so it is a searchable picker. Read lazily: the registry is not populated when the
             // config is declared.
+            // The same idea over a folder instead of a registry: whatever the user has dropped into
+            // config/diegoaddons/sounds/. Listed lazily, so a file added while the game is running
+            // is there the next time the picker is opened rather than after a restart.
+            case "hydration" -> b.picker("customSound", "Custom sound",
+                    "An MP3, OGG or WAV from config/diegoaddons/sounds/ - empty plays the game's chime",
+                    ListSpecs::customSounds,
+                    () -> dev.diego.diegoaddons.module.modules.HydrationReminderModule.INSTANCE.customSound(),
+                    v -> dev.diego.diegoaddons.module.modules.HydrationReminderModule.INSTANCE
+                            .setCustomSound(v),
+                    ListSpecs::prettyFile, "Pick a sound file");
+
             case "secretchime" -> b.picker("sound", "Sound", "Played when a secret is found",
                     ListSpecs::allSounds,
                     () -> dev.diego.diegoaddons.module.modules.SecretChimeModule.INSTANCE.soundId(),

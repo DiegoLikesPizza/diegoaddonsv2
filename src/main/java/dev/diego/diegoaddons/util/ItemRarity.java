@@ -51,30 +51,22 @@ public final class ItemRarity {
     }
 
     /**
-     * Draws a rarity-coloured frame around each hotbar slot. Runs in the HUD layer (on top of the
-     * hotbar), so it frames the item rather than filling behind it - which on the hotbar would sit
-     * over the item instead.
+     * Draws the backing for one hotbar slot, called from {@link
+     * dev.diego.diegoaddons.mixin.HotbarSlotRarityMixin} just before vanilla draws the item into it.
+     *
+     * <p>Position comes from vanilla rather than being worked out from the window size, so the
+     * offhand slot and any future layout change are covered without this knowing the hotbar's shape.
      */
-    public static void renderHotbar(GuiGraphicsExtractor g, net.minecraft.client.Minecraft mc) {
+    public static void renderHotbarSlot(GuiGraphicsExtractor g, int x, int y, ItemStack stack) {
         ItemRarityModule mod = ItemRarityModule.INSTANCE;
-        if (mod == null || !mod.isEnabled() || mc.player == null || mc.options.hideGui) {
+        if (mod == null || !mod.isEnabled() || stack == null || stack.isEmpty()) {
             return;
         }
-        int sw = mc.getWindow().getGuiScaledWidth();
-        int sh = mc.getWindow().getGuiScaledHeight();
-        int hotbarX = sw / 2 - 91;
-        int y = sh - 19;
-        for (int i = 0; i < 9; i++) {
-            ItemStack stack = mc.player.getInventory().getItem(i);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            int color = color(stack);
-            if (color == 0) {
-                continue;
-            }
-            paint(g, hotbarX + 3 + i * 20, y, color, mod.display());
+        int color = color(stack);
+        if (color == 0) {
+            return;
         }
+        paint(g, x, y, color, mod.display());
     }
 
     /**

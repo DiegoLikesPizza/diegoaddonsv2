@@ -2,7 +2,6 @@ package dev.diego.diegoaddons.util;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.diego.diegoaddons.DiegoAddonsV2Client;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
@@ -38,16 +37,12 @@ public final class SkinChanger {
     }
 
     public static Path folder() {
-        return FabricLoader.getInstance().getConfigDir().resolve("diegoaddons").resolve("skins");
+        return dev.diego.diegoaddons.config.ModFiles.skins();
     }
 
     /** Create the skins folder if it does not exist yet. Best-effort; safe to call repeatedly. */
     public static void ensureFolder() {
-        try {
-            Files.createDirectories(folder());
-        } catch (Exception e) {
-            DiegoAddonsV2Client.LOGGER.warn("[DiegoAddons] Could not create skins folder: {}", e.toString());
-        }
+        folder();
     }
 
     /** Forget cached textures (and misses) so added or changed PNGs are re-read on next use. */

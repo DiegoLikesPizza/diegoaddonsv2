@@ -456,7 +456,8 @@ public final class ModuleManager {
         Theme t = Themes.current();
         boolean smooth = ConfigManager.get().smoothCorners;
         Font font = mc.font;
-        dev.diego.diegoaddons.util.ItemRarity.renderHotbar(g, mc);
+        // Item Rarity is not here: its hotbar backing has to go *under* the item, so it is drawn
+        // from HotbarSlotRarityMixin rather than from this pass, which runs after the whole GUI.
         dev.diego.diegoaddons.util.AbilityCooldown.renderHotbar(g, mc);
         dev.diego.diegoaddons.util.EspDraw.renderHud(g, mc);
         // The mining ability and hydration reminders, which are shouted across the middle of the

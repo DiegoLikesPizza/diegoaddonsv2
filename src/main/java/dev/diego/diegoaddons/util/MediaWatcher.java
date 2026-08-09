@@ -1,7 +1,6 @@
 package dev.diego.diegoaddons.util;
 
 import dev.diego.diegoaddons.DiegoAddonsV2Client;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -216,9 +215,7 @@ public final class MediaWatcher {
      * always ships an updated script.
      */
     private static Path writeScript() throws Exception {
-        Path dir = FabricLoader.getInstance().getConfigDir().resolve("diegoaddons");
-        Files.createDirectories(dir);
-        Path script = dir.resolve("smtc.ps1");
+        Path script = dev.diego.diegoaddons.config.ModFiles.dir().resolve("smtc.ps1");
         Files.writeString(script, SCRIPT, StandardCharsets.UTF_8);
         return script;
     }

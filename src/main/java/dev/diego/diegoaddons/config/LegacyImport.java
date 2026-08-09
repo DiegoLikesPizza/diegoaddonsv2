@@ -13,7 +13,6 @@ import dev.diego.diegoaddons.module.NumberSetting;
 import dev.diego.diegoaddons.module.Setting;
 import dev.diego.diegoaddons.module.StringSetting;
 import dev.diego.diegoaddons.module.modules.PlayerHudModule;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -41,8 +40,11 @@ import java.util.Set;
 public final class LegacyImport {
 
     private static final Gson GSON = new Gson();
-    private static final Path FILE =
-            FabricLoader.getInstance().getConfigDir().resolve("diegoaddonsv2.json");
+    // Resolved per call rather than once: ModFiles moves this file into config/diegoaddons/ at
+    // startup, and a field initialised at class-load could be looking at where it used to be.
+    private static Path file() {
+        return ModFiles.legacyConfig();
+    }
 
     private LegacyImport() {
     }
@@ -70,13 +72,13 @@ public final class LegacyImport {
     /** Imports the old config if there is one and it has not been imported already. */
     public static void run(ConfigHandle<?> handle) {
         AddonConfig live = ConfigManager.get();
-        if (live.legacyImported || !Files.isRegularFile(FILE)) {
+        if (live.legacyImported || !Files.isRegularFile(file())) {
             return;
         }
 
         Legacy old;
         try {
-            old = GSON.fromJson(Files.readString(FILE), Legacy.class);
+            old = GSON.fromJson(Files.readString(file()), Legacy.class);
         } catch (IOException | RuntimeException e) {
             DiegoAddonsV2Client.LOGGER.warn(
                     "[DiegoAddons] Could not read the old config to import it; starting fresh", e);
@@ -105,7 +107,7 @@ public final class LegacyImport {
         archive();
         DiegoAddonsV2Client.LOGGER.info(
                 "[DiegoAddons] Imported the old config into configlib's; the old file is now {}.imported",
-                FILE.getFileName());
+                file().getFileName());
     }
 
     private static void copyState(Legacy old, AddonConfig live) {
@@ -241,7 +243,8 @@ public final class LegacyImport {
      */
     private static void archive() {
         try {
-            Files.move(FILE, FILE.resolveSibling(FILE.getFileName() + ".imported"),
+            Path f = file();
+            Files.move(f, f.resolveSibling(f.getFileName() + ".imported"),
                     StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             DiegoAddonsV2Client.LOGGER.warn("[DiegoAddons] Imported the old config but could not "

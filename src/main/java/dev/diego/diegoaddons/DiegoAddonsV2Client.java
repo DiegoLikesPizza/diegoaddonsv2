@@ -32,7 +32,13 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // Before anything opens a file: everything the mod owns lives in config/diegoaddons/ now,
+        // and the two files that used to sit loose in config/ are moved in here.
+        dev.diego.diegoaddons.config.ModFiles.migrate();
         SkinChanger.ensureFolder();
+        // Made whether or not anything is in it: a folder you can see is one you can drop a file
+        // into, and one that only appears after you have already found the setting is not.
+        dev.diego.diegoaddons.config.ModFiles.sounds();
         ModuleManager.init();
         // After ModuleManager.init(), because the spec describes what is actually registered.
         //
@@ -50,8 +56,7 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
                                 .getModContainer(MOD_ID)
                                 .map(c -> "v" + c.getMetadata().getVersion().getFriendlyString())
                                 .orElse(""))
-                        .file(net.fabricmc.loader.api.FabricLoader.getInstance()
-                                .getConfigDir().resolve("diegoaddonsv2-configlib.json"))
+                        .file(dev.diego.diegoaddons.config.ModFiles.config())
                         .register());
         // A config written by 2.4.1 or earlier, carried over once. Does nothing if there is none,
         // or if configlib's own file already has settings in it.

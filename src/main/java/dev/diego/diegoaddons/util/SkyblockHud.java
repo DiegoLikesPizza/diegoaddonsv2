@@ -91,9 +91,11 @@ public final class SkyblockHud {
      *   Pet: [Lvl 189] Rose Dragon
      * </pre>
      *
-     * <p>Names rather than items, which is the catch: a loadout menu holds one icon per loadout, not
-     * the equipment itself, so these are resolved against the pieces and pets seen in their own
-     * menus. Anything never seen there cannot be drawn - a name is not an item model.
+     * <p>Names rather than items, which is the catch: they are resolved against the pieces and pets
+     * seen in their own menus, and anything never seen there cannot be drawn - a name is not an item
+     * model. So this is the fallback. The menu lays each loadout out as a row with its gear beside
+     * the icon, and {@link #scanLoadoutRow} reads those items directly; the tooltip is what answers
+     * for the pet, and for a layout where the row turns out to hold nothing.
      */
     private static final Pattern LOADOUT_PIECE =
             Pattern.compile("(Necklace|Cloak|Belt|Gloves/Bracelet|Gloves|Bracelet)\\s*:\\s*(.+)");
@@ -114,9 +116,6 @@ public final class SkyblockHud {
             Pattern.compile("(?i)click\\s+to\\s+equip");
 
     private static final ItemStack[] equipment = new ItemStack[4];
-    private static boolean equipmentLocked = false;   // true once the *equipped* set has been captured
-    /** The wardrobe screen the lock belongs to; a new one starts the reading again. */
-    private static Object lastEquipmentScreen;
     private static ItemStack pet = ItemStack.EMPTY;
 
     /**
@@ -299,13 +298,31 @@ public final class SkyblockHud {
         }
     }
 
-    /** Write the current cache to the config so it outlives this session. */
+    /**
+     * Write the current cache to the config so it outlives this session.
+     *
+     * <p>Only when something actually changed. The scans run every tick a matching menu is open, and
+     * this used to write the file on each of them - twenty encodes and a disk write per second for
+     * as long as you stood in your wardrobe, to save what was already saved.
+     */
     private static void persist(Minecraft mc) {
+        String[] saved = ConfigManager.get().savedEquipment;
+        boolean changed = false;
         for (int i = 0; i < 4; i++) {
-            ConfigManager.get().savedEquipment[i] = encode(mc, equipment[i]);
+            String encoded = encode(mc, equipment[i]);
+            if (!java.util.Objects.equals(saved[i], encoded)) {
+                saved[i] = encoded;
+                changed = true;
+            }
         }
-        ConfigManager.get().savedPet = encode(mc, pet);
-        ConfigManager.save();
+        String petJson = encode(mc, pet);
+        if (!java.util.Objects.equals(ConfigManager.get().savedPet, petJson)) {
+            ConfigManager.get().savedPet = petJson;
+            changed = true;
+        }
+        if (changed) {
+            ConfigManager.save();
+        }
     }
 
     /** Load what the last session saw, so the HUD shows something before any menu is opened. */
@@ -358,13 +375,6 @@ public final class SkyblockHud {
             return;
         }
         if (title.contains(EQUIPMENT_WORD)) {
-            // The lock is meant to survive flipping between pages of one wardrobe, not the rest of
-            // the session: without this it never let go, so changing a piece left the HUD showing
-            // what you were wearing the first time you ever opened the menu.
-            if (screen != lastEquipmentScreen) {
-                lastEquipmentScreen = screen;
-                equipmentLocked = false;
-            }
             // Two different menus say "equipment". The wardrobe lists every set you have saved, so
             // a piece in it is only yours if it is marked as the equipped one - that is what was
             // showing pieces from sets you are not wearing. The plain equipment menu shows what you
@@ -388,6 +398,7 @@ public final class SkyblockHud {
      */
     private static void scanLoadouts(List<Slot> slots, int limit) {
         List<String> equipped = null;
+        int equippedAt = -1;
         int count = 0;
         for (int i = 0; i < limit; i++) {
             ItemStack stack = slots.get(i).getItem();
@@ -408,26 +419,84 @@ public final class SkyblockHud {
             }
             if (isLoadout && !offersEquip) {
                 equipped = lore;
+                equippedAt = i;
                 count++;
             }
         }
         // Exactly one, or none of them. Only one loadout can be worn, so two candidates means the
         // test has stopped meaning what it is assumed to mean - and applying either would swap the
         // whole HUD, gear and pet, to something that is not on your body.
-        if (count == 1) {
-            applyLoadout(equipped);
+        if (count != 1) {
+            return;
         }
+        // The pieces themselves, when the menu is showing them: the loadout's own row holds the
+        // real items, so they can be read rather than resolved by name. That is what makes a swap
+        // show up at once - the Loadouts menu stays open when you change a piece in it, and the
+        // tooltip route could only ever draw a piece this session had already seen somewhere else.
+        boolean read = scanLoadoutRow(slots, limit, equippedAt);
+        // The tooltip still carries the pet, and names the pieces this did not find.
+        applyLoadout(equipped, !read);
     }
 
-    /** Fills the equipment and pet from a loadout's tooltip, as far as the names can be resolved. */
-    private static void applyLoadout(List<String> lore) {
+    /**
+     * Reads the equipment out of one loadout's row.
+     *
+     * <p>The menu is a row per loadout: its icon on the left, then the gear it holds - equipment
+     * and armour - laid out beside it. So the pieces belonging to the worn loadout are the ones on
+     * the same row as the icon that says it is worn, which is a fact of the layout rather than
+     * something inferred from an item.
+     *
+     * <p>Only the equipment is taken. Armour is on the row too, but your armour is in your real
+     * inventory and the HUD reads it from there, live - caching a copy from a menu could only ever
+     * make it wrong, by holding a helmet you have since taken off.
+     *
+     * @return whether any piece was found, i.e. whether this row actually held the gear
+     */
+    private static boolean scanLoadoutRow(List<Slot> slots, int limit, int iconSlot) {
+        if (iconSlot < 0) {
+            return false;
+        }
+        int start = (iconSlot / COLS) * COLS;
+        int end = Math.min(start + COLS, limit);
+        ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
+        boolean any = false;
+        for (int i = start; i < end; i++) {
+            ItemStack stack = slots.get(i).getItem();
+            if (stack.isEmpty()) {
+                continue;
+            }
+            int cat = categoryOf(stack);
+            if (cat < 0) {
+                continue;
+            }
+            set[cat] = stack;
+            any = true;
+            // Worth remembering by name as well: a loadout that only names its pieces still needs
+            // an item to draw, and this is one of the few menus that holds them.
+            seenEquipment.put(strip(stack.getHoverName().getString()).trim()
+                    .toLowerCase(Locale.ROOT), stack.copy());
+        }
+        if (any) {
+            System.arraycopy(set, 0, equipment, 0, 4);
+        }
+        return any;
+    }
+
+    /**
+     * Fills the pet, and the equipment, from a loadout's tooltip.
+     *
+     * @param pieces whether to take the equipment from here too. False when the row itself has
+     *               already been read - the items in it are the same gear said properly, and a name
+     *               resolved against a piece seen earlier in the session is the weaker of the two
+     */
+    private static void applyLoadout(List<String> lore, boolean pieces) {
         ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
         boolean anyPiece = false;
         for (String raw : lore) {
             String line = strip(raw).trim();
 
             Matcher piece = LOADOUT_PIECE.matcher(line);
-            if (piece.matches()) {
+            if (pieces && piece.matches()) {
                 int cat = loadoutCategory(piece.group(1));
                 ItemStack known = seenEquipment.get(piece.group(2).trim().toLowerCase(Locale.ROOT));
                 if (cat >= 0 && known != null) {
@@ -455,7 +524,6 @@ public final class SkyblockHud {
         }
         if (anyPiece) {
             System.arraycopy(set, 0, equipment, 0, 4);
-            equipmentLocked = true;
         }
     }
 
@@ -573,12 +641,10 @@ public final class SkyblockHud {
             // Everything here is on your body, so there is nothing to pick out and no page to be
             // on the wrong one of.
             System.arraycopy(any, 0, equipment, 0, 4);
-            equipmentLocked = true;
             return;
         }
         // The wardrobe proper: one saved set per column, and a marker row saying which is worn.
         if (scanEquippedColumn(slots, limit)) {
-            equipmentLocked = true;
             return;
         }
         // Nothing else is tried. Searching the page for items whose lore mentions "equipped" is
@@ -711,7 +777,6 @@ public final class SkyblockHud {
     /** Clear the cache when leaving a server (a different profile has different pet/equipment). */
     public static void reset() {
         Arrays.fill(equipment, ItemStack.EMPTY);
-        equipmentLocked = false;
         pet = ItemStack.EMPTY;
         petInfoSource = null;
         petInfoCache = null;

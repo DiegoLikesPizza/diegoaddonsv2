@@ -16,7 +16,8 @@ loom {
 
 repositories {
     // Loom adds the essential maven repositories automatically, and configlib comes from the
-    // composite build in settings.gradle - so there is nothing else to declare here.
+    // composite build in settings.gradle. Central is here for JLayer alone, below.
+    mavenCentral()
 }
 
 dependencies {
@@ -33,6 +34,12 @@ dependencies {
     // from the composite build in settings.gradle, so this coordinate is the local working copy.
     implementation(include("dev.diego:configlib:1.0.0"))
     implementation(include("dev.diego:configlib-menu:1.0.0"))
+
+    // JLayer, an MP3 decoder (LGPL 2.1, ~100 KB). The game cannot play MP3 at all: its own sound
+    // engine takes only OGG Vorbis out of resource packs, and Java's audio system takes only
+    // WAV/AIFF/AU. A file the user drags into config/diegoaddons/sounds/ is an MP3 far more often
+    // than anything else, so the decoder is bundled rather than the format refused - see CustomSounds.
+    implementation(include("javazoom:jlayer:1.0.1"))
 }
 
 processResources {

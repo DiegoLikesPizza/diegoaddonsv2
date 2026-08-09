@@ -73,6 +73,11 @@ contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is 
       a repo nobody could open.
 
 ### 5. Smaller open items
+- [ ] **The settings scroll bar should be draggable** (configlib) — deliberately **not** in 2.5.2;
+      Diego asked for it as the next thing after it. Today the bar is an indicator you scroll past
+      with the wheel, not a control: grabbing it does nothing. Wants a press on the thumb to capture
+      the drag, map the pointer to a scroll offset, and keep the capture until release even when the
+      pointer leaves the track.
 - [ ] **Shade behind the title-screen wordmark** (configlib `:menu`) — a slider for a dark scrim
       behind the mod name and subtitle on the custom main menu, so the text stays readable over a
       bright wallpaper. Distinct from the existing `MenuSettings.dim()`, which dims the whole
@@ -100,6 +105,13 @@ Worth a pass before trusting any of it:
 - [ ] List editors (blocked players, words, hotkeys, GFS, routes) — add / reorder / delete
 - [ ] Player HUD "Section order" screen
 - [ ] Sound picker for Secret Chime
+- [ ] **Custom sounds** (2.5.2) — an MP3 in `config/diegoaddons/sounds/` picked on the Hydration
+      Reminder card and actually heard, at the volume the slider says. Written blind: nothing here
+      has been played once. If it is silent, the log carries the reason (`could not decode`,
+      `could not play`) rather than failing quietly.
+- [ ] **The config move** (2.5.2) — start once with an existing
+      `config/diegoaddonsv2-configlib.json`: it should end up as `config/diegoaddons/config.json`
+      with every setting intact, and the log should say it was moved.
 - [ ] HUD editor: ten draggable elements, and a position that survives a restart
 - [ ] Chat search (Ctrl+F) — jump and copy
 - [x] Intro screen on a fresh instance — **seen twice, wrong both times.** 2.5.1 fixed the doubled
@@ -176,6 +188,45 @@ preview path is the fastest way to check most of them, since it draws without li
 
 ## Done
 
+- **Everything the mod owns lives in `config/diegoaddons/`** (2.5.2) — the settings file and the
+  pre-2.4.2 config used to sit loose in `config/` while the skins and the media script were already
+  in a folder, so where a file belonged depended on which year the feature was written. `ModFiles`
+  is the one place that answers that now, and `ModFiles.migrate()` moves the two old paths in at
+  startup, before configlib is handed its path — otherwise the settings would be written out fresh
+  at their defaults beside a file nobody reads again. A move that fails is logged and left alone.
+  `config/diegoaddonsv2-configlib.json` is now `config/diegoaddons/config.json`. The only file still
+  outside is the staged update jar, which is in the game directory on purpose — it is a jar waiting
+  for the mods folder, not config.
+- **Custom sounds for the Hydration Reminder** (2.5.2) — drop an **MP3**, OGG, WAV, AIFF or AU into
+  `config/diegoaddons/sounds/` and pick it on the card; the picker lists the folder lazily, so a file
+  added while the game is running is there the next time it is opened. Plus a volume slider, which
+  the game's own chime now follows too.
+  The game cannot play any of this: its sound engine takes OGG Vorbis out of loaded resource packs
+  and nothing else, so a file would need a pack and a resource reload before it could be heard.
+  `CustomSounds` decodes to PCM and plays through Java's audio output instead — **JLayer** (bundled,
+  LGPL, ~100 KB) for MP3, which neither the game nor Java can read; `javax.sound` for WAV/AIFF/AU;
+  STB Vorbis, which ships with the game's LWJGL, for OGG. Decoding and playing are on a daemon
+  thread, volume is applied to the samples rather than through the line's optional gain control, and
+  it is multiplied by the game's master slider so turning the game down turns this down.
+- **Item Rarity drew over the items in the hotbar** (2.5.2) — Diego: with the inventory open it looks
+  right, on the hotbar the colours are on top of the items. It was drawn from the mod's HUD pass,
+  which runs after the whole vanilla GUI, so "Filled" and "Circle" landed on the item rather than
+  behind it while the same two were correct in an inventory. It now draws from
+  `HotbarSlotRarityMixin`, at the head of vanilla's `Gui.extractSlot` — the one method handed a
+  slot's position and its stack just before the item is submitted, so there is no ordering left to
+  guess. Position comes from vanilla rather than being worked out from the window size, which also
+  gets the offhand slot for free.
+- **A loadout swap now shows on the HUD at once** (2.5.2) — the Loadouts menu lays each loadout out
+  as a row: its icon on the left, its gear beside it. The scan only ever read the icon's *tooltip*,
+  which names the pieces rather than holding them, so a piece could only be drawn if this session
+  had already seen it in some other menu — and the menu stays open when you swap, so nothing else
+  came along to correct it. `scanLoadoutRow` reads the real items out of the equipped loadout's own
+  row; the tooltip is still what answers for the pet, and for a layout where the row holds nothing.
+  Armour is deliberately **not** cached from that row — yours is in your real inventory and the HUD
+  reads it live, so a copy could only ever be wrong by a helmet you had since taken off.
+  Two things fell out of this: `equipmentLocked` was written in four places and read in none, so it
+  is gone; and `persist` wrote the config on every tick a matching menu was open — twenty encodes
+  and a disk write per second, to save what was already saved — so it now writes only on a change.
 - **The welcome screen was tiny, and two of its lines drew through each other** (2.5.2) — with the
   hi-res fix from 2.5.1 in place the panel was finally the size it had always asked for, and that
   size was wrong: 620×420 units against the settings panel's 1320, so it read as a small box in the

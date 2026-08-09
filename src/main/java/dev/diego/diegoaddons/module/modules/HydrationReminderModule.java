@@ -25,6 +25,13 @@ public class HydrationReminderModule extends Module {
             new NumberSetting(this, "minutes", "Every (minutes)", 30, 15, 60, 5);
     private final BooleanSetting sound =
             new BooleanSetting(this, "sound", "Play a sound", true);
+    private final NumberSetting volume =
+            new NumberSetting(this, "volume", "Volume", 60, 0, 100, 5);
+    // The file to play instead of the game's chime, empty for the chime. Not added to `settings`:
+    // it is declared to configlib as a picker over the sounds folder (see ListSpecs), and adding it
+    // here as well would put the same value on the card twice - the same arrangement Secret Chime has.
+    private final dev.diego.diegoaddons.module.StringSetting customSound =
+            new dev.diego.diegoaddons.module.StringSetting(this, "customSound", "Custom sound", "", null);
 
     private long nextAt;
     private long showingUntil;
@@ -34,7 +41,17 @@ public class HydrationReminderModule extends Module {
                 "A reminder to drink something, every so often.");
         settings.add(minutes);
         settings.add(sound);
+        settings.add(volume);
         INSTANCE = this;
+    }
+
+    /** The chosen file name inside {@code config/diegoaddons/sounds/}, or empty for the game chime. */
+    public String customSound() {
+        return customSound.get();
+    }
+
+    public void setCustomSound(String name) {
+        customSound.set(name == null ? "" : name);
     }
 
     @Override
@@ -69,7 +86,23 @@ public class HydrationReminderModule extends Module {
         nextAt = now + interval();
         showingUntil = now + SHOW_MS;
         if (sound.get()) {
-            mc.player.playSound(SoundEvents.NOTE_BLOCK_CHIME.value(), 0.6f, 1.4f);
+            playSound(mc);
         }
+    }
+
+    /**
+     * The reminder's sound: whichever file was picked, or the game's chime when none was.
+     *
+     * <p>A file that has been deleted or renamed since it was picked falls back to the chime rather
+     * than going quiet - the reminder is the point, and a silent one has failed at it.
+     */
+    private void playSound(Minecraft mc) {
+        String file = customSound.get();
+        if (dev.diego.diegoaddons.util.CustomSounds.exists(file)) {
+            dev.diego.diegoaddons.util.CustomSounds.play(file, (float) (volume.get() / 100.0));
+            return;
+        }
+        mc.player.playSound(SoundEvents.NOTE_BLOCK_CHIME.value(),
+                (float) (volume.get() / 100.0), 1.4f);
     }
 }
