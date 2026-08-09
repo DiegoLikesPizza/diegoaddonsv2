@@ -50,24 +50,23 @@ Force Nametag, Grotto Finder, Hide Effects, Item Rarity, Mining Routes, Title Sc
 every ESP a style and a colour, and `HudModule` now gives every HUD element four appearance rows.
 Count what a module *inherits* before deciding it is bare.
 
-### 4. Auto Update needs a release to point at — the one blocker on 2.5
-The Auto Update module (2.5.0) reads
-`https://api.github.com/repos/DiegoLikesPizza/diegoaddonsv2/releases`. Right now that answers **404**:
-the repo has no public releases, and no tags at all. Until that changes the module works, checks,
-and correctly reports "the release list is not public (HTTP 404)" — which is honest but useless.
+### 4. Auto Update — every future version now needs a GitHub release
+The repository is **public** as of 2.5.0 and carries a release tagged `v2.5.0` with
+`diegoaddonsv2-2.5.0.jar` attached. The feed, the asset name, the redirect and the jar's own
+metadata were all checked against the live endpoint, so the check and download paths are known good.
 
-To make it live:
-- [ ] **Make the repo public, or accept the module only works for you** — an anonymous client cannot
-      read a private repo's releases, and shipping a token in the jar is not an option.
-- [ ] **Publish a release per version**, tagged `v2.5.0` (a leading `v` is stripped), with the built
-      `diegoaddonsv2-<version>.jar` attached as an asset. The tag is what the version compare reads;
-      the asset is what gets downloaded. Assets whose names contain `-sources` or `-dev` are skipped,
-      so attaching the whole `build/libs` folder is safe.
-- [ ] **Check the install path on a real update** — it is the one part that cannot be tested without
-      two published versions. Expect: game closes, `apply-update.bat` appears in
+**This is now a standing part of shipping a version:** tag `vX.Y.Z` (the leading `v` is stripped) and
+attach the built `diegoaddonsv2-<version>.jar`. Without a release, an updating client simply never
+sees the new version — it fails quiet, which is the failure mode to remember. Assets whose names
+contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is safe.
+
+- [ ] **Watch one real update happen** — the one part that could not be tested with a single release.
+      Expect: game closes, `apply-update.bat` appears in
       `<instance>/minecraft/diegoaddons-updates/`, runs, and the mods folder ends up with the new jar
-      plus `diegoaddonsv2-previous.jar.bak`. If it goes wrong, the old jar is still there and the
+      plus `diegoaddonsv2-previous.jar.bak`. If it goes wrong the old jar is still there, so the
       worst case is that nothing updated.
+- [ ] **Now that the repo is public**, the README is the first thing anyone sees. It was written for
+      a repo nobody could open.
 
 ### 2. Smaller open items
 - [ ] **Shade behind the title-screen wordmark** (configlib `:menu`) — a slider for a dark scrim
@@ -174,7 +173,8 @@ preview path is the fastest way to check most of them, since it draws without li
   than retrying forever: a failed update means you are still on the old version, which is the right
   way to fail. A downloaded jar is verified before any of that — it must open as a zip and its
   `fabric.mod.json` must name this mod and a newer version — and it is only fetched from a GitHub
-  host. See the open item above: none of it does anything until there are public releases.
+  host. The repo was made public and `v2.5.0` published to give it something to read; see the open
+  item above for what that now obliges every release to do.
 - **Theming, and the start of the per-feature sweep** (2.4.3 / 2.4.4) — there was **no theme picker
   at all**: `Themes.select(...)` had zero callers, so the five themes drove the whole HUD while being
   unreachable except by hand-editing the file. There is now an **Appearance** category (declared
