@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.0.** RenderLib is gone; the mod runs on
+**Current version: 2.5.1.** RenderLib is gone; the mod runs on
 [diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
 `includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
@@ -55,8 +55,8 @@ every ESP a style and a colour, and `HudModule` now gives every HUD element four
 Count what a module *inherits* before deciding it is bare.
 
 ### 4. Auto Update — every future version now needs a GitHub release
-The repository is **public** as of 2.5.0 and carries a release tagged `v2.5.0` with
-`diegoaddonsv2-2.5.0.jar` attached. The feed, the asset name, the redirect and the jar's own
+The repository is **public** as of 2.5.0 and carries a release tagged `v2.5.1` with
+`diegoaddonsv2-2.5.1.jar` attached. The feed, the asset name, the redirect and the jar's own
 metadata were all checked against the live endpoint, so the check and download paths are known good.
 
 **This is now a standing part of shipping a version:** tag `vX.Y.Z` (the leading `v` is stripped) and
@@ -102,8 +102,12 @@ Worth a pass before trusting any of it:
 - [ ] Sound picker for Secret Chime
 - [ ] HUD editor: ten draggable elements, and a position that survives a restart
 - [ ] Chat search (Ctrl+F) — jump and copy
-- [ ] Intro screen on a fresh instance
+- [x] Intro screen on a fresh instance — **seen, and it was wrong.** It drew at twice its size, so
+      only its top-left quarter was on screen, down in the bottom-right. Fixed in 2.5.1; the fixed
+      version has not been looked at yet. To see it again, set `introShown` back to false in
+      `config/diegoaddonsv2-configlib.json`.
 - [ ] Custom title screen, the Join Hypixel button on both title screens, and the DiegoAddons button
+      — **now the default** (2.5.1), so a fresh instance lands on it rather than the vanilla screen
 - [ ] Chat: scroll no longer jumps, separators no longer compacted
 
 ### Auto Update (2.5.0) — never seen, and the only module that writes to the mods folder
@@ -170,6 +174,17 @@ preview path is the fastest way to check most of them, since it draws without li
 
 ## Done
 
+- **The welcome screen drew at double size, and the custom menu is the default** (2.5.1) —
+  `IntroScreen` positions and draws in configlib units, where one unit is half a screen pixel, but
+  it never entered hi-res drawing: every unit coordinate was taken as a screen pixel, so the panel
+  came out twice as large from twice its centre offset and only its top-left quarter was on screen.
+  One `beginHiRes`/`endHiRes` pair, which `ChatSearchScreen` — the same kind of screen, drawn the
+  same way — has always had. **If another hand-positioned screen ever looks like this, that is the
+  first thing to check.**
+  The custom main menu now defaults on, which would have broken the welcome a second and quieter
+  way: configlib's menu is a plain `Screen`, not a `TitleScreen`, and it can take over before the
+  intro check runs, so keying on the vanilla class alone meant the welcome never appeared for
+  anyone using the custom menu. `DiegoAddonsV2Client.atTitleScreen` now accepts either.
 - **Auto Update** (2.5.0) — a Misc module, off by default, that asks GitHub for the newest release
   and can carry it all the way in. Three modes on one card, because "download and run code for me"
   is not one decision: *Notify only*, *Download* (into `<game>/diegoaddons-updates/`, outside the
@@ -185,7 +200,7 @@ preview path is the fastest way to check most of them, since it draws without li
   than retrying forever: a failed update means you are still on the old version, which is the right
   way to fail. A downloaded jar is verified before any of that — it must open as a zip and its
   `fabric.mod.json` must name this mod and a newer version — and it is only fetched from a GitHub
-  host. The repo was made public and `v2.5.0` published to give it something to read; see the open
+  host. The repo was made public and a release published to give it something to read; see the open
   item above for what that now obliges every release to do.
 - **Theming, and the start of the per-feature sweep** (2.4.3 / 2.4.4) — there was **no theme picker
   at all**: `Themes.select(...)` had zero callers, so the five themes drove the whole HUD while being
