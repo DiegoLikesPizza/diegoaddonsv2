@@ -1,115 +1,139 @@
 # DiegoAddons V2
 
-A client-side Fabric mod for **Minecraft 26.1.2** providing a modern, web-app-style GUI toolkit
-with a **custom font**, **smooth rounded components**, **5 themes**, a **live module system**, and a
-**first-run introduction screen** with a round loading spinner.
+A client-side Fabric mod for **Hypixel SkyBlock** on **Minecraft 26.1.2**. 57 features across seven
+categories, a settings menu that is searchable rather than a wall of switches, a HUD you place from
+one screen, and dungeon and mining tooling that draws in the world.
 
-![preview](preview.png)
+Client-side only. Nothing here needs a server-side counterpart, and nothing is sent anywhere except
+the two places noted under [Network](#network).
 
-*(The preview above is a high-fidelity mock rendered with the actual bundled font and the same
-drawing primitives the mod uses.)*
+## Install
 
-## Features
+1. Install **Fabric Loader 0.19.3+** for **Minecraft 26.1.2**, and **Fabric API**.
+2. Download `diegoaddonsv2-<version>.jar` from the [latest release][releases] and drop it in `mods/`.
+3. Launch, and press `\` (backslash) to open the settings. Rebind under *Options › Controls*.
 
-- **Three-column ClickGUI** — a custom-drawn module menu in the style of module clients:
-  **groups** (left) → **features** of the selected group (middle) → **feature-specific settings**
-  (right, appears when you **right-click** a feature). Left-click a feature to toggle it. A theme
-  switcher and the HUD Editor live in the header.
-- **HUD editor** — a full-screen editor (from the ClickGUI header) to **drag your HUD elements**
-  anywhere on screen, with a **reference grid**, optional grid-snapping, arrow-key nudging, and a
-  Reset. Each element's position persists per-module.
-- **Supersampled, high-res UI** — the ClickGUI and intro are drawn inside a pose scaled by
-  `1/UiRender.SS` and laid out in "units" (1 unit = 1/SS screen pixel), so every corner, stroke and
-  glyph resolves at **SS× the GUI-scale resolution**. The result is genuinely high-res — no chunky
-  Minecraft-pixel blocks. The mod draws its own components (cards, gradient buttons, pill toggles,
-  accent glows, soft drop shadows, a round loading spinner) instead of vanilla widgets, and rounded
-  corners use **true 2-D distance anti-aliasing** on top of the supersampling for razor-smooth edges.
-- **Custom font (not the Minecraft font)** — bundles **Poppins** (Regular / Medium / SemiBold /
-  Bold, SIL Open Font License) as a TTF font provider in two families: a small **HUD family** for
-  in-game chips, and a large **menu family** rasterised at SS× its visual size for the supersampled
-  screens. All text renders as a clean, antialiased modern sans instead of the default bitmap font.
-- **Grouped modules with settings** — HUD group: FPS Display, Coordinates, Direction, Real-Time
-  Clock (each with *Accent colour* / *Show label* settings). Render group: **CustomF5** (with a
-  *Skip front view* setting that skips the F5 front-facing camera).
-- **5 themes** — Galaxy, Midnight, Mint, Crimson, Light (elevation-based palettes with a two-stop
-  accent gradient). Cycle live from the ClickGUI header; the choice is saved instantly.
-- **First-run intro screen** — shown once per instance (tracked by `introShown`).
-- **Keybind** — press `\` (backslash) in-game to open the ClickGUI. Rebind under *Options › Controls*.
+Requires **Java 25**, which is what MC 26.x runs on.
 
-## Architecture
+There is an **Auto Update** module on the *Client* page that watches this repository's releases. It
+is off by default, and its three modes are separate decisions: notify only, download to
+`diegoaddons-updates/` for you to move by hand, or download and install. See
+[Updating itself](#updating-itself).
 
-Each feature is a `module.Module` in a `module.Category`, with an `onEnable()` / `onDisable()`
-lifecycle and an optional `onClientTick()`. `HudModule` subclasses supply a label + live value and
-are drawn as themed HUD chips. Modules can expose `module.Setting`s (currently `BooleanSetting`),
-rendered live in the ClickGUI's third column and persisted under `modules.<id>.options` in the config.
+[releases]: https://github.com/DiegoLikesPizza/diegoaddonsv2/releases/latest
 
-`ModuleManager` registers **exactly one** client-tick listener and **one** HUD element
-(`HudElementRegistry.addLast`) at startup; these always-on hooks dispatch to the currently enabled
-modules, so toggling a module is fully live (no registry churn). Note: this only applies to
-*enabling/disabling* modules and changing their settings/positions/theme at runtime — adding or
-editing module **code** still requires a rebuild and game restart.
+## What is in it
 
-## How it works on 26.1.2
+**Dungeons** — Dungeon Map, Puzzle Solvers (Creeper Beams, Boulder, Ice Fill, Water Board, Quiz),
+Secret Chime, Bat / Door & Key / Miniboss / Starred Mob ESP, Leap Overlay, Auto Requeue, Auto Close
+Chests, Mimic and Prince messages, Show Hidden Mobs.
 
-The GUI pipeline changed in the 26.x "year" versions. Key facts this mod relies on:
+**Mining** — Crystal Hollows Map, Chest Solver, Grotto Finder, Structure Finder, Mining Routes,
+Mining Ability Reminder.
 
-- Screens render through the new **extract pipeline**: override
-  `extractRenderState(GuiGraphicsExtractor, int mouseX, int mouseY, float partialTick)` instead of
-  the old `render(GuiGraphics, ...)`. `GuiGraphicsExtractor` is the new `GuiGraphics` and exposes
-  `fill`, `fillGradient`, `outline`, `text`/`centeredText`/`textWithWordWrap`, `pose()`, scissors, etc.
-- Input events are records: `mouseClicked(MouseButtonEvent, boolean)` (with `.x() .y() .button()`)
-  and `keyPressed(KeyEvent)` (with `.key() .scancode() .modifiers()`).
-- Key mappings use the renamed Fabric module **`fabric-key-mapping-api-v1`** →
-  `net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper.registerKeyMapping(...)`, and
-  `KeyMapping` now takes a `KeyMapping.Category` (e.g. `KeyMapping.Category.MISC`) instead of a
-  String category.
-- The HUD uses `HudElementRegistry.addLast(Identifier, HudElement)` (fabric-rendering-v1); a
-  `HudElement` is `extractRenderState(GuiGraphicsExtractor, DeltaTracker)`.
-- Custom fonts: `Style.withFont` now takes a `FontDescription`, so text is styled with
-  `Style.EMPTY.withFont(new FontDescription.Resource(Identifier.of("diegoaddonsv2","ui")))`. The
-  fonts are registered via `assets/diegoaddonsv2/font/*.json` (`{"type":"ttf", ...}` providers)
-  pointing at the bundled Poppins TTFs. Two families exist: the small **HUD family** (`ui`,
-  `ui_medium`, `ui_title`, `ui_small`) and the large **menu family** (`uih_*`) whose sizes are the
-  visual size × `UiRender.SS`, so they stay crisp when the menu is drawn in the supersampled pose.
+**Slayer** — Voidgloom Slayer, Boss Highlight, Miniboss ESP. **Fishing** — Rare Sea Creature Alert.
 
-Rounded corners (`gui/UiRender.java`) are drawn as three straight bands plus four quarter-circle
-corners filled one scan-line at a time; with smoothing on, the boundary pixel of each row is redrawn
-at fractional alpha for a clean anti-aliased edge. `fillRoundedGradient`, `dropShadow`, `glow`,
-`circle`, and `spinner` build on the same idea. The whole menu is then rendered **supersampled** via
-`UiRender.beginHiRes`/`endHiRes` (a `pose().scale(1/SS)`), so the anti-aliasing works at sub-pixel
-resolution and the UI never shows chunky GUI-scale pixels.
+**HUD** — Player HUD (armour, your character, and your SkyBlock equipment), Inventory HUD, Pet HUD,
+Custom Scoreboard, Music Display, Performance HUD, Real-Time Clock.
 
-Config is stored per-instance at `config/diegoaddonsv2.json` (Gson, bundled with the game).
+**Render** — Custom ESP, Player ESP, Fullbright, CustomF5, Animations, Armor Hider, Force Nametag,
+Hide Effects, Skin Changer, Party Finder, Borderless Fullscreen, Title Screen.
 
-## Font licensing
+**Misc** — Chat (compacting, filters, search), Replace Words, Better Ignore List, Command Hotkeys,
+Party Commands, Auto GFS, Auto Sprint, Slot Lock, Item Rarity, Ability Cooldown, Etherwarp Helper,
+Old Master Stars, Hydration Reminder, Announce SB Kick, Auto Update.
 
-The bundled font is **Poppins** (Indian Type Foundry & contributors), licensed under the
-**SIL Open Font License 1.1** — free to use, embed, and redistribute, including in a public release
-of this mod. The TTFs live at `assets/diegoaddonsv2/font/poppins_*.ttf`.
+Every module's own settings live on its card. ESP modules all share a style and a colour; HUD
+elements all share four appearance rows, plus a per-element override.
 
-## Credits
+## The settings menu
 
-**Puzzle Solvers** takes its quiz answer table and the Three Weirdos line lists from
-[Odin](https://github.com/odtheking/Odin) (BSD-3-Clause, © odtheking and contributors), whose licence
-permits reuse with attribution. The solver code itself is written for this mod.
+Press `\`. Categories down the left, one card per module, and the switch is **on** the card — you
+turn something on without opening it. Clicking a card opens its settings in a drawer beside it.
+The search box at the top matches modules by name and description.
 
-**Inventory Buttons** is an independent implementation of an idea popularised by
-[NotEnoughUpdates](https://github.com/NotEnoughUpdates/NotEnoughUpdates) and its Fabric port
-[Inventory-Buttons](https://github.com/afranz29/Inventory-Buttons). No code or artwork is taken from
-either — both are LGPLv3, and NEU's button textures belong to its contributors, so the feature here
-is written from scratch against this mod's own themed renderer and uses plain item icons.
+- **HUD editor** — drag every element where you want it. Elements that are switched off are drawn in
+  red and labelled *(hidden)*, so you can place something before turning it on. Positions are a
+  screen fraction plus an anchor, so an element pinned to an edge stays pinned at any window size.
+- **Client page** — five themes (Galaxy, Midnight, Mint, Crimson, Light), an optional custom accent
+  colour that the HUD, the menu and the toasts all follow live, smooth corners, and Auto Update.
+- **List editors** — blocked players, replaced words, command hotkeys, Auto GFS items and mining
+  routes each get the same add / reorder / delete screen.
+- Both scroll bars can be dragged, or you can use the wheel.
+
+Commands: `/da` for everything (`/da help`, `/da hud`, `/da update`, `/da esp`, `/da route`,
+`/da words`, `/da hotkeys`, `/da blocked`).
+
+## Files
+
+Everything the mod owns is under `config/diegoaddons/`:
+
+| Path | What it is |
+| --- | --- |
+| `config.json` | every setting, HUD placement and saved list |
+| `sounds/` | your own `.mp3` / `.ogg` / `.wav` / `.aiff` / `.au` files, offered to the sound pickers |
+| `skins/` | PNGs the Skin Changer reads, by name |
+| `smtc.ps1` | the Windows media bridge the Music Display uses (rewritten each launch) |
+
+Older versions kept the config loose in `config/`. Those files are moved in on the first start of
+2.5.2 or later; nothing needs doing by hand and nothing is deleted.
+
+## Updating itself
+
+Auto Update asks GitHub for this repository's newest release, checks it, and can carry it all the
+way in. What it will not do is surprise you: the default is off, and *Notify only* is a separate
+mode from *Download* and *Download & install*.
+
+A downloaded jar is staged in `diegoaddons-updates/` — outside `mods/`, because two jars with the
+same mod id in there is a crash rather than a choice — and it is verified before anything else
+happens: it must open as a zip, its `fabric.mod.json` must name this mod and a **newer** version,
+and it must have come from a GitHub host. The install itself waits for the game to exit, since the
+running jar is locked on Windows; the old jar becomes `diegoaddonsv2-previous.jar.bak` (Fabric only
+scans `.jar`, so it is inert, and it is the way back). If any step fails you are still on the old
+version, which is the right way for an updater to fail.
+
+## Network
+
+Two requests, both only when you have asked for them:
+
+- **Auto Update** talks to `api.github.com` and `github.com` for the release list and the jar.
+- **Music Display**, with *Album cover* switched on, sends the track title to the iTunes search API
+  for cover art. That setting is off by default for exactly that reason.
+
+Nothing else leaves your machine. The mod reads Hypixel's own menus, scoreboard and chat, and
+everything it learns from them stays in your config.
 
 ## Build
 
-Requires **JDK 25** (MC 26.x ships de-obfuscated, so Loom needs no `mappings` line).
+configlib — the settings GUI, the HUD manager and the custom title screen — is consumed as a
+**composite build**, so a clone needs `diegos-config-lib` checked out **beside** this repository.
+It is not published yet, so building from a fresh clone is not possible for anyone but me at the
+moment:
+
+```
+parent/
+├── diegoaddonsv2/
+└── diegos-config-lib/
+```
+
+Then, with **JDK 25** (MC 26.x ships de-obfuscated, so Loom needs no `mappings` line):
 
 ```bash
 JAVA_HOME=/path/to/jdk-25 ./gradlew build
 ```
 
-Output: `build/libs/diegoaddonsv2-1.0.0.jar`. Requires Fabric Loader + Fabric API.
+Output: `build/libs/diegoaddonsv2-<version>.jar`, with configlib and JLayer bundled inside it.
 
-## Testing
+## Licensing and credits
 
-A dedicated Prism instance **"DiegoAddonsV2 Test"** (MC 26.1.2, Fabric 0.19.3, Fabric API) is set up
-with this jar. Launch it, dismiss the intro, then press `\` in a world to open the menu.
+The mod is **MIT**. Three things in the jar are not ours:
+
+- **Poppins** (Indian Type Foundry & contributors), the mod's typeface, under the
+  **SIL Open Font License 1.1** — free to use, embed and redistribute. The TTFs are at
+  `assets/diegoaddonsv2/font/poppins_*.ttf`.
+- **JLayer** (JavaZOOM), **LGPL 2.1**, bundled unmodified as a jar-in-jar. It decodes MP3, which
+  neither Minecraft nor Java can: the game's sound engine reads OGG Vorbis out of resource packs and
+  nothing else, so a file you drop into `sounds/` would otherwise be unplayable.
+- **Puzzle Solvers** takes its quiz answer table and the Three Weirdos line lists from
+  [Odin](https://github.com/odtheking/Odin) (BSD-3-Clause, © odtheking and contributors), whose
+  licence permits reuse with attribution. The solver code itself is written for this mod.

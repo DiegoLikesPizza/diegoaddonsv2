@@ -69,8 +69,15 @@ contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is 
       `<instance>/minecraft/diegoaddons-updates/`, runs, and the mods folder ends up with the new jar
       plus `diegoaddonsv2-previous.jar.bak`. If it goes wrong the old jar is still there, so the
       worst case is that nothing updated.
-- [ ] **Now that the repo is public**, the README is the first thing anyone sees. It was written for
-      a repo nobody could open.
+- [x] **Now that the repo is public**, the README is the first thing anyone sees — rewritten in
+      2.5.2. It had described the pre-2.0 three-column ClickGUI, modules that no longer exist (FPS
+      Display, Coordinates, Direction), `UiRender`, and a config path two moves out of date.
+      It now covers installing, what the 57 modules are, the menu, the file layout, what Auto Update
+      does and does not do, what leaves the machine, and building against the composite configlib.
+- [ ] **The README has no screenshot.** `preview.png` was deleted with the rewrite — it was a mock of
+      the old three-column menu, so it advertised a mod that no longer exists. A real screenshot of
+      the settings menu and one of the HUD would be worth more than the mock ever was; they have to
+      be taken in game, so they are Diego's to grab.
 
 ### 5. Smaller open items
 - [ ] **Shade behind the title-screen wordmark** (configlib `:menu`) — a slider for a dark scrim
