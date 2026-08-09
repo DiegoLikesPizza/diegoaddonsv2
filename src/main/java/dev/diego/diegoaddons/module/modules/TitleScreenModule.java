@@ -22,12 +22,17 @@ public class TitleScreenModule extends Module {
     /**
      * Swap Minecraft's title screen for configlib's own.
      *
-     * <p>Off by default: it replaces the whole screen rather than adjusting it, which is a bigger
-     * change than the Hypixel button makes. It can also be turned on and off from the DiegoAddons
-     * button on the title screen itself, which is where you are standing when you want to.
+     * <p>On by default since 2.5.1: the custom menu is the face of the mod, and an instance with
+     * DiegoAddons installed should look like it from the first screen. It can be turned on and off
+     * from the DiegoAddons button on the title screen itself, which is where you are standing when
+     * you want to.
+     *
+     * <p>Note for anyone changing this back: the custom menu is a plain {@code Screen}, not a
+     * {@code TitleScreen}, so anything keyed on "are we at the title screen" has to know about both.
+     * The first-run welcome is the one that does - see {@code DiegoAddonsV2Client}.
      */
     private final BooleanSetting customMenu =
-            new BooleanSetting(this, "custommenu", "Custom main menu", false);
+            new BooleanSetting(this, "custommenu", "Custom main menu", true);
 
     public TitleScreenModule() {
         super("titlescreen", Category.RENDER, "Title Screen",

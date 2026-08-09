@@ -74,12 +74,18 @@ public final class IntroScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partial) {
+        // The vanilla background first, at screen scale - it is not ours and is not in units.
         super.extractRenderState(g, mouseX, mouseY, partial);
         Theme t = DiegoAddonsV2Client.CONFIG.theme();
         int mx = Ui.u(mouseX);
         int my = Ui.u(mouseY);
         int inner = PANEL_W - PAD * 2;
 
+        // Everything below is in units, where one unit is half a screen pixel. Without this the
+        // panel drew at twice its size from twice its offset, which put its top-left quarter in the
+        // bottom-right of the screen and the rest of it past the edge - see ChatSearchScreen, which
+        // is the same kind of screen and has always done this.
+        Ui.beginHiRes(g);
         Ui.roundRect(g, panelX, panelY, PANEL_W, PANEL_H, 20, t.surface());
         Ui.roundOutline(g, panelX, panelY, PANEL_W, PANEL_H, 20, 1, t.stroke());
 
@@ -111,6 +117,7 @@ public final class IntroScreen extends Screen {
 
         button(g, t, primaryX(), buttonY(), 190, "Open settings", mx, my, true);
         button(g, t, primaryX() - 108, buttonY(), 100, "Not now", mx, my, false);
+        Ui.endHiRes(g);
     }
 
     private void button(GuiGraphicsExtractor g, Theme t, int x, int y, int w, String label,

@@ -95,8 +95,11 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
             syncCustomMenu();
 
             // The one-time welcome, the first time the title screen shows up in this instance.
-            if (!ConfigManager.get().introShown
-                    && client.screen instanceof net.minecraft.client.gui.screens.TitleScreen) {
+            // Either title screen counts: configlib's own is a plain Screen rather than a
+            // TitleScreen, and it may well have taken over before this runs - so keying on the
+            // vanilla one alone means the welcome never appears for anyone using the custom menu,
+            // which is now the default.
+            if (!ConfigManager.get().introShown && atTitleScreen(client.screen)) {
                 client.setScreen(new dev.diego.diegoaddons.gui.IntroScreen(client.screen));
             }
 
@@ -109,6 +112,12 @@ public class DiegoAddonsV2Client implements ClientModInitializer {
         });
 
         LOGGER.info("[DiegoAddons V2] Initialised for Minecraft 26.1.2 - press '\\' to open the menu");
+    }
+
+    /** Whether this screen is a main menu - the vanilla one, or configlib's standing in for it. */
+    private static boolean atTitleScreen(net.minecraft.client.gui.screens.Screen screen) {
+        return screen instanceof net.minecraft.client.gui.screens.TitleScreen
+                || screen instanceof dev.diego.configlib.menu.MainMenuScreen;
     }
 
     /**
