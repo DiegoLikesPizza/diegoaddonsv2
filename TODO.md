@@ -7,6 +7,10 @@
 [diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
 `includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
+**The repository is public** as of 2.5.0, and the mod updates itself from its releases. Two things
+follow from that and are easy to forget: a shipped version needs a GitHub release or no client will
+ever see it (§4), and anything committed here is now readable by anyone.
+
 ---
 
 ## Open — in the order worth doing
@@ -68,7 +72,7 @@ contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is 
 - [ ] **Now that the repo is public**, the README is the first thing anyone sees. It was written for
       a repo nobody could open.
 
-### 2. Smaller open items
+### 5. Smaller open items
 - [ ] **Shade behind the title-screen wordmark** (configlib `:menu`) — a slider for a dark scrim
       behind the mod name and subtitle on the custom main menu, so the text stays readable over a
       bright wallpaper. Distinct from the existing `MenuSettings.dim()`, which dims the whole
@@ -90,7 +94,7 @@ contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is 
 Everything below compiles, boots and registers, but was written without being able to click it.
 Worth a pass before trusting any of it:
 
-- [ ] Settings menu: seven categories, 56 module cards, switches **on** the cards
+- [ ] Settings menu: seven categories, 57 module cards, switches **on** the cards
 - [ ] Sliders drag; dropdowns stay open; text boxes and keybind capture keep focus
 - [ ] Colour picker: the hex field accepts a pasted value
 - [ ] List editors (blocked players, words, hotkeys, GFS, routes) — add / reorder / delete
@@ -101,6 +105,14 @@ Worth a pass before trusting any of it:
 - [ ] Intro screen on a fresh instance
 - [ ] Custom title screen, the Join Hypixel button on both title screens, and the DiegoAddons button
 - [ ] Chat: scroll no longer jumps, separators no longer compacted
+
+### Auto Update (2.5.0) — never seen, and the only module that writes to the mods folder
+- [ ] **The card** — mode dropdown, the interval slider, and "Check now". Pressing the button on an
+      up-to-date install should say so in chat rather than looking like it did nothing; that is what
+      the verbose path exists for.
+- [ ] **`/da update`** with the module switched off — it should report and never download.
+- [ ] **A real update, end to end** — see §4. The safest way to force one is to publish a release
+      one patch above whatever you are running, with that jar attached.
 
 ### Appearance (2.4.3 / 2.4.4) — never seen
 - [ ] The Appearance page: theme picker changes the HUD, the toasts **and** the menu's accent live,
