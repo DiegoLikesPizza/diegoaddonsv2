@@ -174,6 +174,31 @@ preview path is the fastest way to check most of them, since it draws without li
 
 ## Done
 
+- **The music overlay is a card** (2.5.1) — cover on the left, title over artist, a progress bar
+  under them with the time right-aligned beneath it, off a mockup Diego drew. It was a stack of
+  equal text lines with a bar the width of the longest one; the hierarchy is the point, so the title
+  is the theme's plain text and the artist its muted shade rather than both taking the accent, which
+  the bar keeps. Switching the per-element override on hands the title back to the chosen colour.
+  The card has a **fixed width** (a setting, default 130) rather than sizing to its text: the bar and
+  the time lay out against a width, and a card that resized per track title would jump around the
+  HUD as songs changed. Long titles are truncated with an ellipsis instead.
+  Progress bar and time now default **on**, since they are most of the card. The album cover still
+  defaults **off** — it sends the track title to iTunes, and that stays an opt-in.
+- **The HUD editor showed every element as visible** (2.5.1, configlib) — Diego: "why can i move
+  every HUD Element in HUD Editor even when theyre not even toggled on". Showing the disabled ones
+  is deliberate — that is how you place an element before switching it on, and they are meant to be
+  drawn in red, labelled "(hidden)", with the side panel saying so. None of that ever appeared:
+  `HudEditorScreen` read `HudPos.enabled`, but this mod backs every element's on/off with the
+  module's own flag through `HudNode.bindEnabled`, which leaves `pos.enabled` a field nobody writes,
+  sitting at its default of true. So every element drew as visible whatever its module said, and
+  Enter toggled that dead field instead of the module. The editor now goes through
+  `enabledFlag()` / `setEnabledFlag()` everywhere, which is what the click toggle and the snapping
+  already did — those two were right, which is why it was only the *look* that lied.
+- **The last of RenderLib** (2.5.1) — `CoverArt.artworkUrl` and the URL map behind it existed only
+  because RenderLib's image component loaded a URL rather than a texture; nothing had called them
+  since the element was rebuilt. Same for `MusicDisplayModule`'s `showCover` / `showProgress` /
+  `customLayout`. All gone. What remains of RenderLib in the source is two comments that explain why
+  code looks the way it does, which is history worth keeping, not a dependency.
 - **The welcome screen drew at double size, and the custom menu is the default** (2.5.1) —
   `IntroScreen` positions and draws in configlib units, where one unit is half a screen pixel, but
   it never entered hi-res drawing: every unit coordinate was taken as a screen pixel, so the panel

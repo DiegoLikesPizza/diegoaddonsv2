@@ -6,6 +6,7 @@ import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.HudModule;
+import dev.diego.diegoaddons.module.NumberSetting;
 import dev.diego.diegoaddons.util.CoverArt;
 import dev.diego.diegoaddons.util.MediaWatcher;
 import net.minecraft.client.Minecraft;
@@ -28,10 +29,24 @@ import java.util.List;
  * stays the plain themed text chip every other HUD module uses.
  */
 public class MusicDisplayModule extends HudModule {
-    private static final int PAD = 5;
-    private static final int LINE_H = Fonts.BODY_H;
     private static final int BAR_H = 3;
-    private static final int GAP = 4;
+
+    // --- the card layout (cover / title / artist / bar / time) ----------------------------------
+    /** Breathing room around the card's contents. Wider than the chip's, which is what makes it a card. */
+    private static final int CARD_PAD = 6;
+    /** Between the cover and the text column. */
+    private static final int CARD_GAP = 7;
+    private static final int TITLE_H = Fonts.BODY_H;
+    private static final int ARTIST_H = Fonts.SMALL_H;
+    private static final int TIME_H = Fonts.SMALL_H;
+    /** Above the bar, and between the bar and the time under it. */
+    private static final int BAR_GAP = 4;
+    private static final int TIME_GAP = 3;
+    private static final int CARD_RADIUS = 8;
+    private static final int COVER_RADIUS = 4;
+
+    private static final String SAMPLE_TITLE = "Pretty Girl";
+    private static final String SAMPLE_ARTIST = "Clairo";
 
     private final BooleanSetting showArtist =
             new BooleanSetting(this, "artist", "Show artist", true);
@@ -40,14 +55,24 @@ public class MusicDisplayModule extends HudModule {
     private final BooleanSetting twoLines =
             new BooleanSetting(this, "twoLines", "Two lines", false);
     private final BooleanSetting showTime =
-            new BooleanSetting(this, "time", "Show time", false);
+            new BooleanSetting(this, "time", "Show time", true);
     private final BooleanSetting hideWhenPaused =
             new BooleanSetting(this, "hidePaused", "Hide when paused", false);
     private final BooleanSetting progress =
-            new BooleanSetting(this, "progress", "Progress bar", false);
+            new BooleanSetting(this, "progress", "Progress bar", true);
     /** Off by default on purpose: this one sends the track title to an online service. */
     private final BooleanSetting cover =
             new BooleanSetting(this, "cover", "Album cover (online)", false);
+    /**
+     * How wide the text column is, in pixels.
+     *
+     * <p>The card cannot size itself to its text the way the chip does: the bar and the time are
+     * laid out against a width, and a card that grew and shrank with every track title would jump
+     * about on the HUD as songs changed. A fixed column is what makes it hold still - anything too
+     * long for it is truncated.
+     */
+    private final NumberSetting width =
+            new NumberSetting(this, "width", "Card width", 130, 70, 260, 5);
 
     public MusicDisplayModule() {
         super("music", "Music Display", "Shows the track playing on your PC.");
@@ -58,6 +83,7 @@ public class MusicDisplayModule extends HudModule {
         settings.add(hideWhenPaused);
         settings.add(progress);
         settings.add(cover);
+        settings.add(width);
         // The shared text chip offers these; this element lays its own rows out and names itself
         // in them, so both were switches wired to nothing.
         settings.remove(centered);
@@ -138,72 +164,73 @@ public class MusicDisplayModule extends HudModule {
         return out;
     }
 
-    // --- custom drawing, only once the bar or the cover is on ------------------------------------
+    // --- the card ------------------------------------------------------------------------------
 
-    /** Whether this element needs the custom layout rather than the shared text chip. */
-    private boolean custom() {
-        return progress.get() || cover.get();
-    }
-
-    /** Height of the text block plus the bar beneath it. */
-    private int contentH(Minecraft mc, boolean editor) {
-        int lines = Math.max(1, (editor ? editorLines(mc) : hudLines(mc)).size());
-        return lines * LINE_H + (progress.get() ? GAP + BAR_H : 0);
-    }
-
-    private int textW(Font font, Minecraft mc, boolean editor) {
-        int w = 0;
-        for (String line : (editor ? editorLines(mc) : hudLines(mc))) {
-            w = Math.max(w, font.width(Fonts.t(line, Fonts.MEDIUM)));
+    /**
+     * Height of the text column: the title, then whichever of artist, bar and time are on.
+     *
+     * <p>This is also the cover's side. The artwork is square and fills the column's height, which
+     * is what keeps the card looking like one block rather than a picture with text loose beside it.
+     */
+    private int contentH() {
+        int h = TITLE_H;
+        if (showArtist.get()) {
+            h += ARTIST_H;
         }
-        return w;
+        if (progress.get()) {
+            h += BAR_GAP + BAR_H;
+        }
+        if (showTime.get()) {
+            h += TIME_GAP + TIME_H;
+        }
+        return h;
     }
 
-    /** Whether the cover art is on; read by the RenderLib element. */
-    public boolean showCover() {
-        return cover.get();
+    private int textW() {
+        return (int) width.get();
     }
 
-    /** Whether the progress bar is on; read by the RenderLib element. */
-    public boolean showProgress() {
-        return progress.get();
-    }
-
-    /** Whether this element needs the cover/bar layout rather than the shared text chip. */
-    public boolean customLayout() {
-        return custom();
+    /** Trims a line to the column, with an ellipsis, so a long title cannot widen the card. */
+    private static String clip(Font font, String text, net.minecraft.network.chat.Style style, int max) {
+        if (text == null || text.isEmpty() || Fonts.width(font, text, style) <= max) {
+            return text == null ? "" : text;
+        }
+        int ellipsis = Fonts.width(font, "…", style);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.length(); i++) {
+            sb.append(text.charAt(i));
+            if (Fonts.width(font, sb.toString(), style) + ellipsis > max) {
+                sb.setLength(Math.max(0, sb.length() - 1));
+                break;
+            }
+        }
+        return sb + "…";
     }
 
     // --- the HUD element ------------------------------------------------------------------------
 
     /**
-     * Cover art beside the track rows, with a progress bar under them.
+     * The card: cover, title, artist, bar, time.
      *
-     * <p>The cover and the bar are settings, so this one element has to cover both shapes: the widget
-     * is built once at registration and cannot be swapped later. With both off it is simply the rows
-     * on their panel, which is what the shared text chip drew anyway.
+     * <p>Every part of it is a setting, and the widget is built once at registration and cannot be
+     * swapped later - so this one element has to draw every combination rather than there being a
+     * shape per arrangement. Turning them all off leaves the title on its plate, which is the floor
+     * this degrades to.
      *
-     * <p>The artwork is a texture id from {@link CoverArt} rather than a URL. RenderLib needed the URL
-     * because its image component only loaded pack assets; drawing the texture directly is what the
-     * texture manager was always for, and it drops the remote-load path out of the render entirely.
+     * <p>The artwork is a texture id from {@link CoverArt}, blitted straight from the texture
+     * manager - there is no URL anywhere in the render path.
      */
     @Override
     public HudWidget hudWidget() {
         return new HudWidget() {
             @Override
             public int width() {
-                Minecraft mc = Minecraft.getInstance();
-                Font font = mc.font;
-                if (font == null) {
-                    return 1;
-                }
-                return PAD * 2 + textW(font, mc, false)
-                        + (cover.get() ? contentH(mc, false) + GAP : 0);
+                return CARD_PAD * 2 + textW() + (cover.get() ? contentH() + CARD_GAP : 0);
             }
 
             @Override
             public int height() {
-                return PAD * 2 + contentH(Minecraft.getInstance(), false);
+                return CARD_PAD * 2 + contentH();
             }
 
             @Override
@@ -224,60 +251,93 @@ public class MusicDisplayModule extends HudModule {
         };
     }
 
+    /**
+     * The card: cover on the left, title over artist, a progress bar under them with the time
+     * right-aligned beneath it.
+     *
+     * <p><b>On the colours.</b> The title is the theme's plain text and the artist its muted shade,
+     * rather than both taking the element's accent - a song and the person who made it are not the
+     * same kind of thing, and drawing them in one colour flattened that. The bar keeps the accent,
+     * which is where the eye should land. Switching the per-element override on hands the title back
+     * to whatever colour was chosen, because that choice was made about this element specifically.
+     */
     private void paint(GuiGraphicsExtractor g, boolean editor) {
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
         if (font == null) {
             return;
         }
-        List<String> lines = editor ? editorLines(mc) : hudLines(mc);
-        if (lines.isEmpty()) {
-            return;
-        }
         Theme t = dev.diego.diegoaddons.gui.Themes.current();
-        int colour = style().textColor();
+        // Nothing is playing in the editor, so the card is drawn against a sample track.
+        boolean live = !editor && visible();
+        String title = live ? MediaWatcher.title() : SAMPLE_TITLE;
+        String artist = live ? MediaWatcher.artist() : SAMPLE_ARTIST;
+        if (title == null || title.isEmpty()) {
+            title = SAMPLE_TITLE;
+        }
 
-        int contentH = contentH(mc, editor);
-        int textW = textW(font, mc, editor);
+        int accent = style().accentColor();
+        int titleColour = customStyleOn() ? style().textColor() : t.text();
+        int artistColour = t.textMuted();
+
+        int contentH = contentH();
+        int textW = textW();
         boolean wantCover = cover.get();
-        int coverW = wantCover ? contentH + GAP : 0;
-        int w = PAD * 2 + textW + coverW;
-        int h = PAD * 2 + contentH;
+        int coverW = wantCover ? contentH + CARD_GAP : 0;
+        int w = CARD_PAD * 2 + textW + coverW;
+        int h = CARD_PAD * 2 + contentH;
+        boolean smooth = dev.diego.diegoaddons.config.ConfigManager.get().smoothCorners;
 
-        dev.diego.diegoaddons.hud.HudElements.panel(g, this, w, h, 7,
-                dev.diego.diegoaddons.config.ConfigManager.get().smoothCorners);
+        dev.diego.diegoaddons.hud.HudElements.panel(g, this, w, h, CARD_RADIUS, smooth);
 
         if (wantCover) {
             // The box is drawn whether or not the artwork has landed: its tint is what stands in
             // while the lookup is still out, so the layout does not jump when the cover arrives.
-            UiRender.fillRounded(g, PAD, PAD, contentH, contentH, 3,
-                    Theme.withAlpha(t.textFaint(), 0.25f), true);
-            Identifier art = CoverArt.get(MediaWatcher.artist(), MediaWatcher.title());
+            UiRender.fillRounded(g, CARD_PAD, CARD_PAD, contentH, contentH, COVER_RADIUS,
+                    Theme.withAlpha(t.textFaint(), 0.25f), smooth);
+            Identifier art = live ? CoverArt.get(artist, title) : null;
             if (art != null) {
                 // Region and texture sizes given as one square: the uv range then covers the whole
                 // image whatever its real pixel size, which we do not know and do not need to.
-                g.blit(RenderPipelines.GUI_TEXTURED, art, PAD, PAD, 0f, 0f,
+                g.blit(RenderPipelines.GUI_TEXTURED, art, CARD_PAD, CARD_PAD, 0f, 0f,
                         contentH, contentH, contentH, contentH, contentH, contentH, 0xFFFFFFFF);
             }
         }
 
-        int x = PAD + coverW;
-        int y = PAD;
-        for (String line : lines) {
-            UiRender.text(g, font, line, Fonts.MEDIUM, x, y, colour);
-            y += LINE_H;
+        int x = CARD_PAD + coverW;
+        int y = CARD_PAD;
+        UiRender.text(g, font, clip(font, title, Fonts.MEDIUM, textW), Fonts.MEDIUM, x, y, titleColour);
+        y += TITLE_H;
+        if (showArtist.get()) {
+            UiRender.text(g, font, clip(font, artist, Fonts.SMALL, textW), Fonts.SMALL,
+                    x, y, artistColour);
+            y += ARTIST_H;
         }
 
         if (progress.get()) {
-            int by = PAD + lines.size() * LINE_H + GAP;
-            UiRender.fillRounded(g, x, by, textW, BAR_H, BAR_H / 2,
-                    Theme.withAlpha(t.textFaint(), 0.35f), true);
-            int duration = MediaWatcher.duration();
-            float f = duration > 0 ? Math.min(1f, MediaWatcher.position() / (float) duration) : 0f;
-            int filled = Math.round(textW * f);
+            y += BAR_GAP;
+            UiRender.fillRounded(g, x, y, textW, BAR_H, BAR_H / 2,
+                    Theme.withAlpha(t.textFaint(), 0.35f), smooth);
+            int filled = Math.round(textW * fraction(live));
             if (filled > 0) {
-                UiRender.fillRounded(g, x, by, filled, BAR_H, BAR_H / 2, colour, true);
+                UiRender.fillRounded(g, x, y, filled, BAR_H, BAR_H / 2, accent, smooth);
             }
+            y += BAR_H;
         }
+
+        if (showTime.get()) {
+            y += TIME_GAP;
+            String time = live ? time() : "0:26 / 2:58";
+            UiRender.textRight(g, font, time, Fonts.SMALL, x + textW, y, artistColour);
+        }
+    }
+
+    /** How far through the track we are, 0-1. The sample sits partway along so the bar reads as one. */
+    private float fraction(boolean live) {
+        if (!live) {
+            return 0.15f;
+        }
+        int duration = MediaWatcher.duration();
+        return duration > 0 ? Math.min(1f, MediaWatcher.position() / (float) duration) : 0f;
     }
 }
