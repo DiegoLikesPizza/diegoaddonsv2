@@ -73,11 +73,6 @@ contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is 
       a repo nobody could open.
 
 ### 5. Smaller open items
-- [ ] **The settings scroll bar should be draggable** (configlib) — deliberately **not** in 2.5.2;
-      Diego asked for it as the next thing after it. Today the bar is an indicator you scroll past
-      with the wheel, not a control: grabbing it does nothing. Wants a press on the thumb to capture
-      the drag, map the pointer to a scroll offset, and keep the capture until release even when the
-      pointer leaves the track.
 - [ ] **Shade behind the title-screen wordmark** (configlib `:menu`) — a slider for a dark scrim
       behind the mod name and subtitle on the custom main menu, so the text stays readable over a
       bright wallpaper. Distinct from the existing `MenuSettings.dim()`, which dims the whole
@@ -109,6 +104,10 @@ Worth a pass before trusting any of it:
       Reminder card and actually heard, at the volume the slider says. Written blind: nothing here
       has been played once. If it is silent, the log carries the reason (`could not decode`,
       `could not play`) rather than failing quietly.
+- [ ] **Dragging both scroll bars** (2.5.2) — the card grid's and the drawer's: grab the thumb, click
+      the empty track, and drag off sideways without losing it.
+- [ ] **Auto Update on the Client page** (2.5.2) — that it is there at all, and that a mode and
+      interval set before the move came across rather than resetting.
 - [ ] **The config move** (2.5.2) — start once with an existing
       `config/diegoaddonsv2-configlib.json`: it should end up as `config/diegoaddons/config.json`
       with every setting intact, and the log should say it was moved.
@@ -188,6 +187,31 @@ preview path is the fastest way to check most of them, since it draws without li
 
 ## Done
 
+- **Both scroll bars are draggable** (2.5.2, configlib) — the card grid's and the drawer's. Each was
+  an indicator that happened to look like a control: the drawer's bar is drawn just *outside* the
+  list's own bounds, so the hit test that covered the rows could never reach it, and the grid's sat
+  over the cards, where a press would have landed on whichever card was under it. Both are now
+  grabbed before their own content is tested.
+  The grab area is wider than the bar (4px and 6px are not hand-sized), a press on the empty track
+  jumps the thumb to the cursor and drags on from there, the grab offset inside the thumb is kept so
+  it does not snap under your hand on the first pixel, and the drag survives the pointer leaving the
+  track — a bar you lose when your hand drifts sideways is worse than one that never moved. The
+  scroll animation is snapped while dragging: the easing exists to soften a wheel step, and against
+  a drag it only reads as the bar trailing your hand. Geometry is behind shared
+  `trackX`/`thumbH`/`thumbY` helpers, since drawing and grabbing disagreeing is exactly how a bar
+  ends up not being where it looks like it is.
+- **Appearance is now Client, and Auto Update lives in it** (2.5.2) — the page is what the mod does
+  to itself rather than to the game, so keeping itself current belongs there. Two things stay put on
+  purpose: the category **id** is still `appearance`, because every option id carries the category
+  it was declared in and renaming it would hand everyone their theme back at the default; and Auto
+  Update is still registered under `Category.MISC`, which is where the code and `/da` list it — only
+  its card moved, via `ModuleSpec.IN_CLIENT`.
+  Moving the card does re-key its settings, so `ModFiles.rekey` renames them in the file *before*
+  configlib reads it — after the read the defaults are already in the settings and writing them back
+  is what would make the loss permanent. It renames the bare `misc.autoupdate` as well as
+  `misc.autoupdate.*`: a module's on/off state is saved under the bare id, so matching only the
+  dotted form would have carried the settings across and left the switch behind, silently turning
+  the module off. Verified against a copy of a real config before shipping.
 - **Everything the mod owns lives in `config/diegoaddons/`** (2.5.2) — the settings file and the
   pre-2.4.2 config used to sit loose in `config/` while the skins and the media script were already
   in a folder, so where a file belonged depended on which year the feature was written. `ModFiles`

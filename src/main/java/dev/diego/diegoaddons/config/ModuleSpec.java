@@ -37,6 +37,15 @@ import java.util.Set;
  */
 public final class ModuleSpec {
 
+    /**
+     * Modules drawn in the Client category rather than the one they are registered under.
+     *
+     * <p>A module's {@link Category} is where it lives in the code and what the commands list it
+     * under; this is only about which page it is drawn on. Kept as ids so the two never have to be
+     * kept in step - a module named here that no longer exists costs nothing.
+     */
+    private static final java.util.Set<String> IN_CLIENT = java.util.Set.of("autoupdate");
+
     private ModuleSpec() {
     }
 
@@ -52,7 +61,11 @@ public final class ModuleSpec {
         for (Category c : ModuleManager.categories()) {
             b.category(c.name().toLowerCase(java.util.Locale.ROOT), c.display, "");
             for (Module m : ModuleManager.modulesIn(c)) {
-                module(b, m);
+                // Auto Update is registered under Misc but drawn in Client, beside the rest of what
+                // the mod does to itself rather than to the game - see appearance().
+                if (!IN_CLIENT.contains(m.id)) {
+                    module(b, m);
+                }
             }
         }
         return b.build();
@@ -113,15 +126,20 @@ public final class ModuleSpec {
     }
 
     /**
-     * The look of the mod itself - its own category, because it is not a feature you switch on.
+     * The mod itself rather than what it does - how it looks, and how it keeps itself up to date.
      *
      * <p>Declared before the module categories so it leads the sidebar: it is the first thing
      * anyone opening a settings menu goes looking for, and it was until now not reachable at all -
      * the five themes existed and drove the whole HUD, but nothing anywhere could select one.
+     *
+     * <p>Its id stays {@code appearance} although it is now called Client. The builder qualifies
+     * every option id with the category it was declared in, so renaming the id would re-key every
+     * setting under it and hand everyone their theme back at the default. The name is what is shown;
+     * the id is storage, and storage has no reason to change because a label did.
      */
     private static void appearance(SpecBuilder b) {
         AddonConfig c = ConfigManager.get();
-        b.category("appearance", "Appearance", "How the mod looks");
+        b.category("appearance", "Client", "The mod itself");
 
         b.section("Theme", "The palette the HUD, the menu and the toasts all draw from", 0);
         b.choice("theme", "Theme", "",
@@ -143,6 +161,15 @@ public final class ModuleSpec {
                     c.smoothCorners = v;
                     ConfigManager.save();
                 });
+
+        // Keeping the mod current is the mod acting on itself, which is what this page is for. It
+        // is still a module - it ticks, it has a switch, /da lists it under Misc - only its card is
+        // here. ModFiles.migrate() carries its saved settings across from the old key.
+        for (Module m : ModuleManager.all()) {
+            if (IN_CLIENT.contains(m.id)) {
+                module(b, m);
+            }
+        }
     }
 
     /**
