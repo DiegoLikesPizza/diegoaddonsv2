@@ -38,6 +38,12 @@ public final class DiegoCommands {
             new Help("", "Open the DiegoAddons menu"),
             new Help("help", "Show this list"),
             new Help("hud", "Open the HUD editor"),
+            new Help("play <player> [ttt|c4|bj|bs]",
+                    "Challenge a DiegoAddons user - noughts and crosses, connect four, blackjack, battleships"),
+            new Help("accept", "Accept the game you were invited to"),
+            new Help("decline", "Decline the invitation"),
+            new Help("resign", "Give up the running game"),
+            new Help("game", "Reopen the board"),
             new Help("update", "Check for a new version of the mod"),
             new Help("words", "Open the word replacement list"),
             new Help("hotkeys", "Open the command hotkey list"),
@@ -73,6 +79,28 @@ public final class DiegoCommands {
                         .executes(c -> help(c.getSource(), name)))
                 .then(ClientCommands.literal("hud")
                         .executes(c -> run(() -> DiegoAddonsV2Client.CONFIG.openHudEditor())))
+                .then(ClientCommands.literal("play")
+                        .then(ClientCommands.argument("player", StringArgumentType.word())
+                                .executes(c -> run(() -> dev.diego.diegoaddons.util.Minigames.invite(
+                                        StringArgumentType.getString(c, "player"), null)))
+                                .then(ClientCommands.argument("game", StringArgumentType.word())
+                                        .suggests((c, b) -> {
+                                            dev.diego.diegoaddons.util.Minigames.GAMES.keySet()
+                                                    .forEach(b::suggest);
+                                            return b.buildFuture();
+                                        })
+                                        .executes(c -> run(() ->
+                                                dev.diego.diegoaddons.util.Minigames.invite(
+                                                        StringArgumentType.getString(c, "player"),
+                                                        StringArgumentType.getString(c, "game")))))))
+                .then(ClientCommands.literal("accept")
+                        .executes(c -> run(dev.diego.diegoaddons.util.Minigames::accept)))
+                .then(ClientCommands.literal("decline")
+                        .executes(c -> run(dev.diego.diegoaddons.util.Minigames::decline)))
+                .then(ClientCommands.literal("resign")
+                        .executes(c -> run(dev.diego.diegoaddons.util.Minigames::resign)))
+                .then(ClientCommands.literal("game")
+                        .executes(c -> run(dev.diego.diegoaddons.gui.GameScreen::open)))
                 .then(ClientCommands.literal("update")
                         .executes(c -> update(c.getSource())))
                 .then(ClientCommands.literal("words")

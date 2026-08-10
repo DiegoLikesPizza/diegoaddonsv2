@@ -26,9 +26,11 @@
     "ItemPickupMixin",
     "LightmapMixin",
     "LivingEntitySwingMixin",
+    "NoCursorResetMixin",
     "PauseIfInactiveMixin",
     "PlayerDropMixin",
     "ScoreboardSidebarMixin",
+    "StorageOverlayMixin",
     "TitleScreenMixin"
   ],
   "injectors": {

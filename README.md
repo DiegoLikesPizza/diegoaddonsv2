@@ -1,6 +1,6 @@
 # DiegoAddons V2
 
-A client-side Fabric mod for **Hypixel SkyBlock** on **Minecraft 26.1.2**. 57 features across seven
+A client-side Fabric mod for **Hypixel SkyBlock** on **Minecraft 26.1.2**. 60 features across seven
 categories, a settings menu that is searchable rather than a wall of switches, a HUD you place from
 one screen, and dungeon and mining tooling that draws in the world.
 
@@ -41,7 +41,7 @@ Hide Effects, Skin Changer, Party Finder, Borderless Fullscreen, Title Screen.
 
 **Misc** — Chat (compacting, filters, search), Replace Words, Better Ignore List, Command Hotkeys,
 Party Commands, Auto GFS, Auto Sprint, Slot Lock, Item Rarity, Ability Cooldown, Etherwarp Helper,
-Old Master Stars, Hydration Reminder, Announce SB Kick, Auto Update.
+Old Master Stars, Hydration Reminder, Announce SB Kick, Storage Overlay, No Cursor Reset, Minigames, Auto Update.
 
 Every module's own settings live on its card. ESP modules all share a style and a colour; HUD
 elements all share four appearance rows, plus a per-element override.

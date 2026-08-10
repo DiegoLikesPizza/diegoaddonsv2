@@ -24,20 +24,44 @@ public final class ItemRarity {
     private ItemRarity() {
     }
 
-    /** Draws the rarity backing for every filled slot of the open container. */
+    /**
+     * Draws the rarity backing for the slots of the open container that are worth colouring.
+     *
+     * <p>Which those are depends on whose items they hold. The <b>player inventory</b> - the last 36
+     * slots of any menu, and in the inventory screen every slot including the armour - is yours, so
+     * it is coloured wherever it appears rather than only when the inventory screen is the thing on
+     * screen. That was the old behaviour, and it meant your own gear lost its colours the moment any
+     * SkyBlock menu was open on top of it.
+     *
+     * <p>A <b>server menu's</b> own slots are left alone, because most of a SkyBlock menu is filler -
+     * panes, close buttons, cosmetic heads - and colouring that is confetti rather than information.
+     * The accessory bag is the exception worth making: every slot in it is an accessory you own.
+     */
     public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g) {
         ItemRarityModule mod = ItemRarityModule.INSTANCE;
         if (mod == null || !mod.isEnabled()) {
             return;
         }
-        // Only your own inventory, not chest/SkyBlock menus - the rarity backings there just clutter
-        // pages of filler items.
-        if (!(screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen)) {
+        boolean inventoryScreen =
+                screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen;
+        boolean accessories = mod.accessoryBag() && isAccessoryBag(screen);
+        if (!inventoryScreen && !accessories && !mod.everywhere()) {
             return;
         }
+
         int left = ((AbstractContainerScreenAccessor) screen).diego$leftPos();
         int top = ((AbstractContainerScreenAccessor) screen).diego$topPos();
-        for (Slot slot : screen.getMenu().slots) {
+        List<Slot> slots = screen.getMenu().slots;
+        // Your own slots are the last 36 of any menu. In the inventory screen the armour and the
+        // offhand are yours too, so there the line is drawn at the start.
+        int mine = inventoryScreen ? 0 : Math.max(0, slots.size() - PLAYER_SLOTS);
+
+        for (int i = 0; i < slots.size(); i++) {
+            boolean yours = i >= mine;
+            if (!(yours ? inventoryScreen || mod.everywhere() : accessories)) {
+                continue;
+            }
+            Slot slot = slots.get(i);
             ItemStack stack = slot.getItem();
             if (stack.isEmpty()) {
                 continue;
@@ -48,6 +72,21 @@ public final class ItemRarity {
             }
             paint(g, left + slot.x, top + slot.y, color, mod.display());
         }
+    }
+
+    /** The last 36 slots of any container menu are the player's own inventory. */
+    private static final int PLAYER_SLOTS = 36;
+
+    /**
+     * Whether this is the accessory bag.
+     *
+     * <p>Matched on the title, which is how every SkyBlock menu has to be told apart. The paged
+     * form carries a page number ("Accessory Bag (1/3)"), so this looks for the words rather than
+     * for the whole title.
+     */
+    private static boolean isAccessoryBag(AbstractContainerScreen<?> screen) {
+        return LegacyText.strip(screen.getTitle().getString())
+                .toLowerCase(java.util.Locale.ROOT).contains("accessory bag");
     }
 
     /**

@@ -120,4 +120,22 @@ public final class SkyblockLocation {
         }
         return "";
     }
+
+    /**
+     * The SkyBlock profile you are on (e.g. "Zucchini") from the tab list's {@code Profile:} line,
+     * or "" if it is not there yet.
+     *
+     * <p>Anything cached per profile - your storage, your bank - has to be keyed on this rather than
+     * on the account, because swapping profile swaps the items without any disconnect to notice. The
+     * line takes a few seconds to appear after joining, so "" means "not known yet" and never
+     * "no profile".
+     */
+    public static String profile(Minecraft mc) {
+        for (String line : tabLines(mc)) {
+            if (line.startsWith("Profile: ")) {
+                return line.substring("Profile: ".length()).trim();
+            }
+        }
+        return "";
+    }
 }

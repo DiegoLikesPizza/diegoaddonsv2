@@ -38,8 +38,20 @@ import java.util.regex.Pattern;
  * a menu that gains a border row or shifts a column along keeps working.
  */
 public final class SkyblockHud {
-    // Equipment categories as they appear on the last lore line ("LEGENDARY NECKLACE", ...).
-    private static final String[] CATEGORIES = {"NECKLACE", "CLOAK", "BELT", "GLOVES"};
+    /**
+     * Equipment categories as they appear on the last lore line ("LEGENDARY NECKLACE", ...).
+     *
+     * <p>One slot, more than one word. The fourth is the glove slot, and SkyBlock does not call
+     * everything in it gloves: the Lotus Bracelet ends "RARE BRACELET", so matching only "GLOVES"
+     * left that slot empty on the HUD for anyone wearing one. Each entry is therefore the list of
+     * words that slot answers to, and a new one is a word added here rather than a new slot.
+     */
+    private static final String[][] CATEGORIES = {
+            {"NECKLACE"},
+            {"CLOAK"},
+            {"BELT"},
+            {"GLOVES", "BRACELET"},
+    };
     /** The armour categories, in the order they are worn and drawn: head down to feet. */
     private static final String[] ARMOUR_CATEGORIES = {"HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"};
     // Menu titles are like "(1/2) Equipment Sets" and "(1/2) Pets" - match the stable part.
@@ -831,8 +843,10 @@ public final class SkyblockHud {
     private static int categoryOf(ItemStack stack) {
         String last = lastLoreLine(stack);
         for (int c = 0; c < CATEGORIES.length; c++) {
-            if (last.endsWith(CATEGORIES[c])) {
-                return c;
+            for (String word : CATEGORIES[c]) {
+                if (last.endsWith(word)) {
+                    return c;
+                }
             }
         }
         return -1;

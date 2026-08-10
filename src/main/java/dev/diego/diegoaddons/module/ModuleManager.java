@@ -59,6 +59,9 @@ import dev.diego.diegoaddons.module.modules.PetHudModule;
 import dev.diego.diegoaddons.module.modules.PlayerEspModule;
 import dev.diego.diegoaddons.module.modules.ShowHiddenMobsModule;
 import dev.diego.diegoaddons.module.modules.SlotLockModule;
+import dev.diego.diegoaddons.module.modules.MinigamesModule;
+import dev.diego.diegoaddons.module.modules.NoCursorResetModule;
+import dev.diego.diegoaddons.module.modules.StorageOverlayModule;
 import dev.diego.diegoaddons.module.modules.TitleScreenModule;
 import dev.diego.diegoaddons.module.modules.SlayerBossHighlightModule;
 import dev.diego.diegoaddons.module.modules.SlayerMinibossEspModule;
@@ -170,6 +173,9 @@ public final class ModuleManager {
         register(new PlayerEspModule(), false);
         register(new CustomScoreboardModule(), false);
         register(new SlotLockModule(), false);
+        register(new StorageOverlayModule(), false);
+        register(new NoCursorResetModule(), false);
+        register(new MinigamesModule(), false);
         // Off by default like everything else, and for one more reason: it reaches the network and
         // replaces the mod's own jar, which is nobody's default.
         register(new AutoUpdateModule(), false);
@@ -259,6 +265,16 @@ public final class ModuleManager {
             return color != 0 ? Component.literal(plain).withColor(color) : message;
         });
 
+        // A game's own whispers are read here and kept out of the chat, before anything else sees
+        // them. Returning false hides the line - see GameLink, which decides whether it was ours.
+        ClientReceiveMessageEvents.ALLOW_GAME.register((message, overlay) -> {
+            if (overlay) {
+                return true;
+            }
+            return !dev.diego.diegoaddons.util.GameLink.receive(
+                    LegacyText.strip(message.getString()).trim());
+        });
+
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (!overlay) {
                 String plain = LegacyText.strip(message.getString());
@@ -299,12 +315,46 @@ public final class ModuleManager {
                 // Deny the click to the menu when it lands on a locked slot. Our own buttons are
                 // absent here on purpose: they are real widgets now, and a widget
                 // consumes its own press, so the click never reaches the menu and needs no veto.
-                ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) ->
-                        !dev.diego.diegoaddons.util.SlotLocks.locksClick(
-                                (AbstractContainerScreen<?>) scr, ev.x(), ev.y()));
-                // Deny hotbar-swap / drop keys that would move a locked slot's item.
-                ScreenKeyboardEvents.allowKeyPress(screen).register((scr, event) ->
-                        !dev.diego.diegoaddons.util.SlotLocks.locksKey((AbstractContainerScreen<?>) scr, event));
+                //
+                // The storage sheet goes first and takes every click while it is up: it is standing
+                // in for the menu, and a press reaching the menu underneath would land on whatever
+                // Hypixel happens to have at those coordinates rather than on what you can see.
+                ScreenMouseEvents.allowMouseClick(screen).register((scr, ev) -> {
+                    AbstractContainerScreen<?> container = (AbstractContainerScreen<?>) scr;
+                    boolean shift = (ev.modifiers() & org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT) != 0;
+                    if (dev.diego.diegoaddons.gui.StorageOverlay.mouseClicked(
+                            container, ev.x(), ev.y(), ev.button(), shift)) {
+                        return false;
+                    }
+                    return !dev.diego.diegoaddons.util.SlotLocks.locksClick(container, ev.x(), ev.y());
+                });
+                ScreenMouseEvents.allowMouseScroll(screen).register((scr, mx, my, hs, vs) ->
+                        !dev.diego.diegoaddons.gui.StorageOverlay.mouseScrolled(
+                                (AbstractContainerScreen<?>) scr, vs));
+                // Typing goes to the sheet's search box while it is up, which is also why the keys
+                // that would otherwise close the menu have to be asked about first.
+                ScreenKeyboardEvents.allowCharType(screen).register((scr, event) ->
+                        !dev.diego.diegoaddons.gui.StorageOverlay.charTyped(
+                                (AbstractContainerScreen<?>) scr, (char) event.codepoint()));
+                // Which storage icon was clicked, so the backpack menu that follows can be
+                // attributed to the slot it came from. After the click rather than before: this
+                // only observes, and the click itself is what opens the backpack.
+                ScreenMouseEvents.afterMouseClick(screen).register((scr, ev, consumed) -> {
+                    dev.diego.diegoaddons.util.StorageScanner.onContainerClick(
+                            (AbstractContainerScreen<?>) scr, ev.x(), ev.y());
+                    return false;
+                });
+                // Deny hotbar-swap / drop keys that would move a locked slot's item, and let the
+                // storage sheet have the keys first - a letter typed into its search box must not
+                // also be a hotbar swap.
+                ScreenKeyboardEvents.allowKeyPress(screen).register((scr, event) -> {
+                    AbstractContainerScreen<?> container = (AbstractContainerScreen<?>) scr;
+                    if (dev.diego.diegoaddons.gui.StorageOverlay.keyPressed(
+                            container, event.key(), event.modifiers())) {
+                        return false;
+                    }
+                    return !dev.diego.diegoaddons.util.SlotLocks.locksKey(container, event);
+                });
             }
         });
 
@@ -313,6 +363,12 @@ public final class ModuleManager {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             TpsTracker.reset();
             dev.diego.diegoaddons.util.SkyblockHud.reset();
+            // Writes out anything the last menus added, then forgets the profile - the next login
+            // may well be a different one, and storage is per profile.
+            dev.diego.diegoaddons.util.StorageData.reset();
+            // A game cannot survive the connection that carried it, and there is nobody left to
+            // tell - so it is dropped rather than resigned.
+            dev.diego.diegoaddons.util.Minigames.reset();
             dev.diego.diegoaddons.util.ChatCompactor.reset();
             PuzzleSolvers.reset();
             dev.diego.diegoaddons.util.BlazeSolver.reset();

@@ -21,6 +21,13 @@ import net.minecraft.resources.Identifier;
  *       unit = 1/{@code SS} screen pixel). Because glyphs are rasterised at {@code SS}x their visual
  *       size and shrunk by the pose, text stays razor-sharp instead of snapping to GUI-scale pixels.</li>
  * </ul>
+ *
+ * <p><b>Every one of these font definitions ends with the vanilla fallbacks</b>
+ * ({@code minecraft:include/default} then {@code minecraft:include/unifont}), and they have to stay
+ * there. Poppins covers Latin and little else, and a font whose only provider is the TTF draws a
+ * blank square for anything it is missing - which is exactly what SkyBlock's symbols are
+ * ({@code ⏣ ✦ ❤ ☠ ♲ ⸎}). Providers are searched in order and the first one holding the glyph wins,
+ * so the fallbacks only ever answer for characters Poppins does not have.
  */
 public final class Fonts {
     private static FontDescription face(String path) {

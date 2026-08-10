@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.2.** RenderLib is gone; the mod runs on
+**Current version: 2.5.3.** RenderLib is gone; the mod runs on
 [diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
 `includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
@@ -16,6 +16,9 @@ ever see it (§4), and anything committed here is now readable by anyone.
 ## Open — in the order worth doing
 
 ### 1. Dungeon Map — needs a rework, not a fix
+**Parked** (2.5.3) at Diego's call — "we leave it for now". Do not pick this up unsolicited; it needs
+his specifics before it is worth any time at all.
+
 Diego, on 2.4.5: "looks weird (thats nothing new)". Long-standing, and the one item on his bug list
 that is not a defect with a cause — the map draws what it was told to draw. Get specifics before
 touching it: which part reads wrong (tile colours, room sizes, the seams, the stats block, the
@@ -26,9 +29,10 @@ sound and unchanged since before RenderLib, so this is a design pass rather than
 - [ ] **Door bats** — there is no flag saying which bats came from a door, so 2.4.6 goes on
       downward velocity, exposed as "Ignore door bats" plus a threshold on the Bat ESP card. If real
       secret bats vanish, raise the threshold; if the door crowd still shows, lower it.
-- [ ] **Autopet / loadouts** — the chat pattern and the `"loadout"` menu-title match are best-effort
-      against Hypixel's documented wording, never seen firing. Inventory HUD → "Debug scan (log)"
-      dumps every slot's name and lore; that output is what to tune the constants against.
+- [x] **Autopet / loadouts** — **confirmed working in game** (2.5.3): Diego, "loadouts and pet is
+      working". The 2.5.2 `scanEquippedPanel` rewrite is therefore good, and the pet read that came
+      with it holds too. If either goes stale again, Inventory HUD → "Debug scan (log)" dumps every
+      slot's name and lore, which is what to tune the constants against.
 - [ ] **World labels** (2.4.6) — solver timers and waypoint names were never drawing: the boxes from
       the same loop appeared, so submission was fine and only the text was lost. They now render
       into their own buffer, flushed on the spot. If they are still missing, the log now carries one
@@ -48,7 +52,7 @@ Still bare (no settings of their own, and not covered by a base class):
 - [ ] **Old Master Stars** — the star colour is hard-coded in `util/OldMasterStars`
 
 One setting only, worth a second look: Announce Kick, Borderless Fullscreen, Chest Solver,
-Force Nametag, Grotto Finder, Hide Effects, Item Rarity, Mining Routes, Title Screen.
+Force Nametag, Grotto Finder, Hide Effects, Mining Routes, Title Screen.
 
 **Note on ESP and HUD modules:** their apparent "no settings" is misleading — `EspModule` gives
 every ESP a style and a colour, and `HudModule` now gives every HUD element four appearance rows.
@@ -64,11 +68,9 @@ attach the built `diegoaddonsv2-<version>.jar`. Without a release, an updating c
 sees the new version — it fails quiet, which is the failure mode to remember. Assets whose names
 contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is safe.
 
-- [ ] **Watch one real update happen** — the one part that could not be tested with a single release.
-      Expect: game closes, `apply-update.bat` appears in
-      `<instance>/minecraft/diegoaddons-updates/`, runs, and the mods folder ends up with the new jar
-      plus `diegoaddonsv2-previous.jar.bak`. If it goes wrong the old jar is still there, so the
-      worst case is that nothing updated.
+- [x] **Watch one real update happen** — **confirmed working in game** (2.5.3): Diego, "auto update
+      works good!". The whole path is therefore proven end to end, staged jar through to the swap;
+      it was the one part a single release could not test.
 - [x] **Now that the repo is public**, the README is the first thing anyone sees — rewritten in
       2.5.2. It had described the pre-2.0 three-column ClickGUI, modules that no longer exist (FPS
       Display, Coordinates, Direction), `UiRender`, and a config path two moves out of date.
@@ -98,10 +100,86 @@ contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is 
 
 ## Needs eyes on it — built and deployed, never actually seen
 
+### Minigames (2.5.3) — needs two people to test at all
+Tic Tac Toe, Vier gewinnt, Blackjack and Schiffe versenken against another DiegoAddons user, over
+whispers: `/da play <name> [ttt|c4|bj|bs]`. **This cannot be tested alone**: two accounts, both with
+the module on, both on the same server.
+
+- [ ] **Blackjack's deck.** No card is ever sent — both clients shuffle the same 52 from the same
+      seed, which the inviter picks and puts in the invitation, and draw in a fixed order. If the
+      two hands ever disagree, the seed did not arrive or the draw order diverged, and that is the
+      first thing to print.
+- [ ] **Battleships trusts the answer.** Your fleet never leaves your machine, so the other client
+      reports hit or miss for its own squares. There is no way around that without a server. Watch
+      the "hit keeps the turn" rule especially — it is the part where both sides have to agree who
+      is shooting next.
+- [ ] **Rematch is two verbs** (`re` offer, `ra` accept) and the accepting side moves first. Check
+      it does not restart at one end only.
+
+- [ ] **The whisper format.** `GameLink.FROM` expects `From [MVP+] Name: text` with the colour codes
+      stripped. If nothing ever arrives, that pattern against a real Hypixel whisper is the first
+      thing to check — turn "Protokollzeilen ausblenden" **off** and the raw lines become visible,
+      which is the whole diagnosis.
+- [ ] **Hypixel's chat limits.** Every line carries a nonce so no two are identical ("You cannot say
+      the same message twice"), and the outbox sends at most one line per 400 ms. Watch for a move
+      that never lands, and for any warning from the server.
+- [ ] **The invitation buttons** — `[Annehmen]` / `[Ablehnen]` are chat components running
+      `/da accept` and `/da decline`.
+- [ ] **Both boards agreeing.** Every move is validated at both ends (your turn, empty square, game
+      not over) and dropped otherwise. If the two boards ever disagree, that is the bug that matters.
+- [ ] **Rematch** swaps who starts, so nobody has the first move twice.
+- [ ] Timeouts: an invitation dies after a minute, a silent opponent ends the game after two.
+
+### Storage Overlay (2.5.3) — the whole feature is written blind
+The NEU sheet: open `/storage` and the overlay draws over that menu — every ender chest page and
+backpack side by side, your own inventory under them, a search box at the bottom. It exists **only**
+over the storage menu (Diego's call), so there is no keybind and no `/da storage`.
+Written without a SkyBlock session, and the parts that read Hypixel's menus are guesses at strings.
+**Turn on "Debug scan (log)" on the Storage Overlay card first**: it dumps each menu's title and
+every slot's item name once per menu, which is what the patterns have to be tuned against.
+
+- [ ] **Does the sheet appear at all**, i.e. does the storage menu's title start with "Storage"?
+      That one string is what raises it. `StorageScanner` also keys pages on titles containing
+      "backpack" and "ender chest".
+- [ ] **Live clicks.** The page you are actually in is outlined in the accent and its slots are the
+      menu's own — left click picks up, right click halves, shift moves to your inventory, and your
+      inventory at the bottom is always live. This is the half that touches your items: **check it
+      on a page of junk first.**
+- [ ] **Navigation.** Clicking a slot on any *other* page sends that page's command and waits for
+      the menu to actually be that page before doing anything; shift-clicking additionally
+      quick-moves that slot once it arrives. Watch for: the wrong page opening, or the follow-up
+      quick-move landing on the wrong slot.
+- [ ] **Refusal while carrying.** Clicking another page with something on the cursor is refused with
+      a toast, because changing container hands the item back. Check the refusal actually fires
+      rather than the item being silently returned.
+- [ ] **Which backpack is which.** A backpack's own menu may not say what slot it came from, so the
+      index is taken from "(Slot #N)" in the title, else from the storage-menu icon that was clicked
+      to get there, else from a unique name match — and if none answers, the scan is *skipped*
+      rather than filed under a guess. Watch for a backpack that stays "unread" after being opened.
+- [ ] **The three commands are guesses**, which is why they are text boxes on the card rather than
+      constants: `/ec %d`, `/backpack %d`, `/storage`. `%d` is where the page number goes. These are
+      now load-bearing — navigation is built on them, not just convenience.
+- [ ] **Locked storage slots.** Icons offering to *buy* a slot are skipped by their lore ("click to
+      purchase", "cost:", "locked", "unlock"). If unbought slots show up as empty backpacks, that
+      list is what to extend.
+- [ ] **The search box takes focus on open**, so number keys type instead of swapping hotbar slots
+      while the sheet is up. Escape closes. Worth a second opinion on that trade.
+- [ ] **Is it still slow?** The first cut ran at a crawl; see the Done entry for what was doing it.
+      If it is still heavy, the next thing to look at is the item models themselves — a thousand of
+      them is a thousand model submissions, and the only lever left is drawing fewer (a smaller
+      sheet, or icons below some size).
+- [ ] **Is one navigation row right?** "Navigation rows to hide" defaults to 1, so the top nine
+      slots of every page are dropped from the sheet and from its click mapping. If a page looks
+      shifted by a row, or its last row is missing, that setting is the first thing to move.
+- [ ] **The cache file** — `config/diegoaddons/storage/<account>-<profile>.json`, written at most
+      every three seconds and once more on disconnect. Check a second session shows the same items
+      before any page is opened, and that swapping profile swaps the contents rather than merging.
+
+
 Everything below compiles, boots and registers, but was written without being able to click it.
 Worth a pass before trusting any of it:
 
-- [ ] Settings menu: seven categories, 57 module cards, switches **on** the cards
+- [ ] Settings menu: seven categories, 60 module cards, switches **on** the cards
 - [ ] Sliders drag; dropdowns stay open; text boxes and keybind capture keep focus
 - [ ] Colour picker: the hex field accepts a pasted value
 - [ ] List editors (blocked players, words, hotkeys, GFS, routes) — add / reorder / delete
@@ -130,13 +208,11 @@ Worth a pass before trusting any of it:
       — **now the default** (2.5.1), so a fresh instance lands on it rather than the vanilla screen
 - [ ] Chat: scroll no longer jumps, separators no longer compacted
 
-### Auto Update (2.5.0) — never seen, and the only module that writes to the mods folder
-- [ ] **The card** — mode dropdown, the interval slider, and "Check now". Pressing the button on an
-      up-to-date install should say so in chat rather than looking like it did nothing; that is what
-      the verbose path exists for.
-- [ ] **`/da update`** with the module switched off — it should report and never download.
-- [ ] **A real update, end to end** — see §4. The safest way to force one is to publish a release
-      one patch above whatever you are running, with that jar attached.
+### Auto Update (2.5.0) — a real update has now been seen
+- [x] **A real update, end to end** — **works** (2.5.3), per Diego. The download, the staged jar and
+      the swap are all proven; this module is no longer the risky one.
+- [ ] **`/da update`** with the module switched off — it should report and never download. The one
+      path the working update did not exercise.
 
 ### Appearance (2.4.3 / 2.4.4) — never seen
 - [ ] The Appearance page: theme picker changes the HUD, the toasts **and** the menu's accent live,
@@ -194,6 +270,112 @@ preview path is the fastest way to check most of them, since it draws without li
 
 ## Done
 
+- **A module with no settings had no card at all** (2.5.3, configlib) — Diego, on the new No Cursor
+  Reset module: "ich kann die setting zu no cursor reset nicht finden. Sie ist nicht da". It was
+  registered, it was in the jar, and it still could not be turned on from the menu.
+  `PanelLayout.rebuildCards` draws a card only where `SectionGroup.visibleCount() > 0`, and that
+  count walked the section's **options** while a module's on/off switch is its section *toggle* —
+  drawn on the card rather than as a row in it. So a module whose only content is its switch counted
+  as zero and was dropped. `CategoryNode.options()` had always counted the toggle, with a note
+  saying why ("leaving it out would mean a switch that cannot be found, reset, or counted"); the
+  count simply never got the same treatment. It does now.
+  **This was not only the new module.** Auto Close Chests, Leap Overlay and Old Master Stars have no
+  settings and no base class adding any, so all three have been invisible in the settings menu -
+  unreachable except through `/da` - since the menu was rebuilt. They are the same three §3 lists as
+  "still bare"; nobody noticed bare had quietly become absent. ESP and HUD modules were never
+  affected, since their base classes declare rows for them.
+- **Item Rarity: your own items everywhere, and the accessory bag** (2.5.3) — Diego asked for the
+  rarity colours to always show in his own inventory, and for the accessories in the accessory bag.
+  The old rule was one line - draw only if the screen *is* the inventory screen - so the colours went
+  away the instant any SkyBlock menu was open on top of it, which is most of the game. Your own
+  slots are now coloured in every menu: they are the last 36 of any container, and in the inventory
+  screen the armour and offhand are yours too, so the line moves to the start there.
+  A server menu's own slots are still left alone, and that is not laziness - most of a SkyBlock menu
+  is filler (panes, close buttons, cosmetic heads) and colouring it is confetti rather than
+  information. The accessory bag is the exception worth making, since every slot in it is something
+  you own; matched on the title containing "accessory bag", so the paged form ("(1/3)") counts too.
+  Both are toggles on the card, on by default, which also takes Item Rarity off the "one setting
+  only" list in §3.
+- **The storage sheet was unusably slow, and drew the navigation row** (2.5.3) — Diego, on the first
+  cut: "why it so laggy" and "top row is not needed since its the navigation row". Four things, all
+  of them per-slot work at a thousand slots:
+  **Rounded corners.** Every slot plate was a rounded rect, which costs a fill per scanline of each
+  corner — about twenty-five fills for a 4-unit radius, doubled by the rarity tint on top. At the
+  slots one sheet shows that was roughly fifty thousand fills a frame, for corners two units across
+  that nobody can see at that size. Slots are flat rects now (one fill), and their outlines are four.
+  The panel and the page blocks are still rounded: there are a dozen of those, not a thousand.
+  **Search text and rarity, per slot per frame.** Matching a query meant stripping the colour codes
+  out of a full SkyBlock lore for every visible item, sixty times a second, and the rarity colour
+  walked the lore again. Both are now derived once per page, when the page is read, and the sheet
+  draws every block — including the open one — from that.
+  **A capture every tick.** The scan re-copied and re-derived the open page twenty times a second to
+  save what was already saved. The menu hands out the same stack objects until the server sends new
+  ones, so identity now says whether anything happened, and nineteen ticks in twenty do nothing.
+  **Re-sorting the page list** on every one of the several calls per frame that needed it, and
+  re-counting every item for the header. Both are held until something changes them.
+  The navigation row is gone from the sheet: SkyBlock puts close, back and the page arrows along the
+  top of a page, so "Navigation rows to hide" (default 1) drops them. It is an **offset**, not a
+  trim — the cached array still holds the whole container, because a click has to go back to the
+  menu as the slot number the menu itself uses, and trimming would make every index in the overlay a
+  lie that had to be undone at exactly one place, correctly.
+- **No Cursor Reset** (2.5.3) — a Misc module: the mouse stays where it was when one menu closes and
+  the next opens. SkyBlock is played through chest menus, and moving between them passes through a
+  frame with no screen at all, where the game grabs the mouse for gameplay and then releases it —
+  and a release puts the cursor in the middle of the window. So every click on a menu that opens
+  another one threw your hand back to the centre.
+  Both halves are in vanilla's own two methods: `grabMouse` overwrites `xpos`/`ypos` with the centre,
+  and `releaseMouse` moves the real cursor to whatever they say. The position is therefore taken at
+  the head of `grabMouse`, before it can be lost, and put back in `releaseMouse` in place of the
+  centre. It is clamped to the window in case it was resized while the mouse was held, and with
+  nothing yet remembered vanilla is left to do exactly what it always did.
+  **The first cut did not work**, and the reason is worth keeping: it restored the position through
+  `InputConstants.grabOrReleaseMouse`, which sets the cursor position *first* and the input mode
+  second. Leaving `GLFW_CURSOR_DISABLED` is exactly when GLFW puts the cursor back where it was when
+  the cursor was disabled — the centre, since vanilla had just put it there — so the restore went in
+  and was overwritten one line later. The bug the module exists to fix, reproduced faithfully inside
+  the fix. It now sets the mode first and the position second, so GLFW does its restore and ours
+  lands last.
+- **Storage Overlay** (2.5.3) — the NEU sheet: open `/storage` and every ender chest page and
+  backpack is drawn at once, three across, your own inventory beneath them and a search across all
+  of it. A Misc module, off by default.
+  **It takes over the menu rather than replacing it.** `StorageOverlayMixin` cancels the container
+  screen's drawing and nothing else, so the menu stays exactly as the server believes it to be —
+  which is what makes the clicks real. The page you are standing in is **live**: its slots *are* the
+  menu's slots, so a click is `handleContainerInput` on that slot and items move the way they always
+  did. Your inventory is live too, in every menu, since those 36 slots are always the last 36.
+  Clicking a slot on any other page sends that page's command and **waits for the title to say it
+  arrived** before doing anything else — a delay-then-click would eventually click whatever happened
+  to be under the cursor on some other menu. Shift-clicking a cached slot queues a quick-move for
+  when it lands, which is the one-click "get this out of storage". Navigation is refused outright
+  while something is on the cursor: changing container returns the carried item, and doing that
+  silently looks exactly like the overlay eating it.
+  What is not live comes from a **cache with a date on it**, per profile in
+  `config/diegoaddons/storage/<account>-<profile>.json` through `ItemStack.CODEC` — the same route
+  the pet cache uses, so enchants, skull textures and SkyBlock's lore survive a restart rather than
+  being flattened to a name and a count. Keyed on account *and* profile, because either alone shows
+  somebody else's ender chest, and the registry view is held past the disconnect on purpose since
+  the last write happens when there is no connection left to ask. A page never opened is drawn as
+  "unread" rather than as an empty grid: confusing "I have not looked" with "there is nothing there"
+  is the one way a storage overlay actively lies to you.
+  Search veils what does not match instead of removing it — the sheet is a map of where your things
+  are, and a map that reflows as you type is not one.
+  Input goes through Fabric's screen events rather than more injections; only the drawing needs a
+  mixin, because nothing else can cancel it.
+- **The scoreboard drew a blank square for SkyBlock's symbols** (2.5.3) — Diego: the custom
+  scoreboard "doesnt recognize some icons and just defaults to a square". Not a scoreboard bug: it
+  refaces every sidebar line into Poppins (`Fonts.reface`), and each of the mod's ten font
+  definitions listed **only** its `ttf` provider. Poppins covers Latin and little else, so every
+  character it lacks — which is exactly SkyBlock's `⏣ ✦ ❤ ☠ ♲ ⸎` — had nothing to fall through to
+  and came out as the missing-glyph box.
+  Every `assets/diegoaddonsv2/font/*.json` now ends with the vanilla fallbacks,
+  `minecraft:include/default` then `minecraft:include/unifont`, which is the same layout vanilla's
+  own `default.json` uses. `FontSet.computeGlyphInfo` walks the providers in order and takes the
+  first that holds the glyph, so Poppins still wins for everything it has and the fallbacks only
+  answer for what it does not — checked in the 26.1.2 bytecode before shipping rather than assumed,
+  since the opposite priority would have replaced the whole typeface with unifont.
+  Two knock-ons: symbols now render in the vanilla pixel font beside Poppins text, which is the
+  usual look for a SkyBlock mod but is a visible mix; and on the supersampled menu faces
+  (`uih_*`, 22-38 units) a fallback glyph draws small rather than boxed.
 - **Both scroll bars are draggable** (2.5.2, configlib) — the card grid's and the drawer's. Each was
   an indicator that happened to look like a control: the drawer's bar is drawn just *outside* the
   list's own bounds, so the hit test that covered the rows could never reach it, and the grid's sat
