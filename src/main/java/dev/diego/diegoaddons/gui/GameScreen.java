@@ -83,9 +83,26 @@ public final class GameScreen extends Screen {
         return panelY() + panelH() - PAD - BUTTON_H;
     }
 
-    /** Every button on the row: the game's own, then the two that are always there. */
+    /**
+     * How long the other side may say nothing before the nudge is offered.
+     *
+     * <p>Long enough that it is not offered to somebody who is simply thinking, short enough that a
+     * game which has actually stopped does not have to be given up on.
+     */
+    private static final long NUDGE_AFTER_MS = 15_000L;
+
+    /** Whether the game looks stuck: not your move, nothing said for a while, something to repeat. */
+    private static boolean stuck(MiniGame game) {
+        return !game.over() && !game.yourTurn() && game.canResend()
+                && Minigames.silence() > NUDGE_AFTER_MS;
+    }
+
+    /** Every button on the row: the game's own, the nudge when it is warranted, then the two constants. */
     private List<String> buttons(MiniGame game) {
         List<String> out = new java.util.ArrayList<>(game.actions());
+        if (stuck(game)) {
+            out.add("Send again");
+        }
         out.add(game.over() ? (game.rematchPending() ? "Accept" : "Again") : "Give up");
         out.add("Close");
         return out;
@@ -171,6 +188,10 @@ public final class GameScreen extends Screen {
         } else if (game.rematchOffered()) {
             Fonts.drawCentered(g, font, "Rematch offered", x + w / 2, y + 116,
                     Fonts.UI_SMALL, t.textFaint());
+        } else if (stuck(game)) {
+            // Said plainly rather than left as a board that has simply gone quiet.
+            Fonts.drawCentered(g, font, "Nothing for a while - a move may have gone missing",
+                    x + w / 2, y + 116, Fonts.UI_SMALL, t.danger());
         }
     }
 
@@ -398,6 +419,10 @@ public final class GameScreen extends Screen {
             int bx = panelX() + PAD + i * (bw + BUTTON_GAP);
             if (!Ui.hovered(mx, my, bx, by, bw, BUTTON_H)) {
                 continue;
+            }
+            if (stuck(game) && i == labels.size() - 3) {
+                game.resend();
+                return true;
             }
             if (i < labels.size() - 2) {
                 game.act(i);

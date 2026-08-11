@@ -17,6 +17,7 @@
     "EffectsInInventoryMixin",
     "EntityInvisibilityMixin",
     "EtherwarpSoundMixin",
+    "FontGlyphAccessor",
     "FontMixin",
     "ForceNametagMixin",
     "HotbarSlotRarityMixin",

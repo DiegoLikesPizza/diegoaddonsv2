@@ -1,20 +1,24 @@
 package dev.diego.diegoaddons.module.modules;
 
 import dev.diego.configlib.hud.HudWidget;
+import dev.diego.diegoaddons.DiegoAddonsV2Client;
 import dev.diego.diegoaddons.config.ConfigManager;
 import dev.diego.diegoaddons.gui.Fonts;
 import dev.diego.diegoaddons.gui.Theme;
 import dev.diego.diegoaddons.gui.Themes;
 import dev.diego.diegoaddons.gui.UiRender;
+import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.HudModule;
 import dev.diego.diegoaddons.module.StringSetting;
 import dev.diego.diegoaddons.util.CustomScoreboard;
+import dev.diego.diegoaddons.util.GlyphProbe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +45,9 @@ public class CustomScoreboardModule extends HudModule {
             new StringSetting(this, "top", "Text at the top", "", null);
     private final StringSetting bottom =
             new StringSetting(this, "bottom", "Text at the bottom", "", null);
+    private final ActionSetting symbolReport =
+            new ActionSetting(this, "symbols", "Symbol report (log)", "Log",
+                    CustomScoreboardModule::logSymbols);
 
     public CustomScoreboardModule() {
         super("customscoreboard", Category.RENDER, "Custom Scoreboard",
@@ -53,6 +60,7 @@ public class CustomScoreboardModule extends HudModule {
         settings.add(title);
         settings.add(top);
         settings.add(bottom);
+        settings.add(symbolReport);
         INSTANCE = this;
     }
 
@@ -96,6 +104,72 @@ public class CustomScoreboardModule extends HudModule {
             return true;
         }
         return !bottomText().isBlank() && index == total - 1;
+    }
+
+    /**
+     * Dumps the sidebar a character at a time, and for every character that is not plain ASCII says
+     * whether the mod's face has it and whether the game's own face has it.
+     *
+     * <p>2.5.3 gave every one of the mod's font definitions the vanilla fallbacks, which should mean
+     * its coverage is exactly the game's. Symbols that still come out as a box are therefore one of
+     * two things, and they need opposite fixes: <b>missing here but not in vanilla</b> is a fallback
+     * that did not take, ours to fix; <b>missing in both</b> is a character the game does not have at
+     * all, which no font definition can conjure - it needs the resource pack that ships it.
+     */
+    private static void logSymbols() {
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc.font;
+        if (font == null) {
+            return;
+        }
+        Component title = CustomScoreboard.title(mc);
+        List<Component> lines = CustomScoreboard.lines(mc);
+        if (title == null && lines.isEmpty()) {
+            report(mc, "No sidebar to read - stand on SkyBlock and try again.");
+            return;
+        }
+
+        Logger log = DiegoAddonsV2Client.LOGGER;
+        log.info("[scoreboard symbols] --- report ---");
+        List<Component> all = new ArrayList<>();
+        if (title != null) {
+            all.add(title);
+        }
+        all.addAll(lines);
+
+        int ours = 0;
+        int both = 0;
+        for (Component c : all) {
+            String plain = c.getString();
+            log.info("[scoreboard symbols] line: {}", plain);
+            for (int i = 0; i < plain.length(); ) {
+                int cp = plain.codePointAt(i);
+                i += Character.charCount(cp);
+                // ASCII is what Poppins is for; a box there would be a different bug entirely.
+                if (cp < 0x80 || cp == '§') {
+                    continue;
+                }
+                boolean missingHere = GlyphProbe.missing(font, Fonts.MEDIUM_FACE, cp);
+                boolean missingVanilla = GlyphProbe.missingInVanilla(font, cp);
+                if (missingHere && missingVanilla) {
+                    both++;
+                } else if (missingHere) {
+                    ours++;
+                }
+                log.info("[scoreboard symbols]   U+{} '{}' mod={} vanilla={}",
+                        String.format("%04X", cp), new String(Character.toChars(cp)),
+                        missingHere ? "MISSING" : "ok", missingVanilla ? "MISSING" : "ok");
+            }
+        }
+        log.info("[scoreboard symbols] --- {} missing here only, {} missing everywhere ---", ours, both);
+        report(mc, "Symbol report in the log: " + ours + " missing in the mod's font only, "
+                + both + " missing in the game's font too.");
+    }
+
+    private static void report(Minecraft mc, String text) {
+        if (mc.gui != null) {
+            mc.gui.getChat().addClientSystemMessage(Component.literal("§b[DiegoAddons] §f" + text));
+        }
     }
 
     @Override

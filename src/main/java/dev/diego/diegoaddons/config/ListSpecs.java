@@ -94,11 +94,20 @@ public final class ListSpecs {
                             .field("Find", w -> w.from, (w, v) -> w.from = v, "Text to replace")
                             .field("Replace with", w -> w.to, (w, v) -> w.to = v, "Replacement"));
 
-            // The key itself is captured by pressing it in-game, so only the command is text.
+            // The key is a key field: pressed rather than typed, which is new in configlib and is
+            // what this list had been missing - the command was editable and the key was not, so a
+            // hotkey added from the menu could never actually fire.
             case "commandhotkeys" -> b.list("hotkeys", "Command hotkeys",
                     "Commands bound to a key", () -> ConfigManager.get().commandHotkeys,
                     CommandHotkey::new, f -> f.itemName("hotkey")
-                            .field("Command", h -> h.command, (h, v) -> h.command = v, "/warp hub"));
+                            .field("Command", h -> h.command, (h, v) -> h.command = v, "/warp hub")
+                            .key("Key", h -> h.key, (h, v) -> h.key = v));
+
+            case "loadoutkeys" -> b.list("loadouts", "Loadout keybinds",
+                    "Loadouts bound to a key", () -> ConfigManager.get().loadoutKeys,
+                    dev.diego.diegoaddons.config.LoadoutKey::new, f -> f.itemName("loadout")
+                            .field("Loadout name", l -> l.name, (l, v) -> l.name = v, "Mining")
+                            .key("Key", l -> l.key, (l, v) -> l.key = v));
 
             // Threshold stays where it was; a number field is not something the shared editor does.
             case "autogfs" -> b.list("gfs", "Auto GFS items",

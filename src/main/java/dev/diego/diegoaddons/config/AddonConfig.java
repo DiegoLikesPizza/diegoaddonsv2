@@ -72,6 +72,28 @@ public class AddonConfig {
     /** Commands bound to keys (see the Command Hotkeys module). */
     public List<CommandHotkey> commandHotkeys = new ArrayList<>();
 
+    // The Harvest Feast reading, kept between sessions: it comes from Feast Chef Ted's menu, and
+    // without it the HUD would be blank every login until you walked back to the Hub.
+    /** The four in-season crops, comma separated, as Ted named them. */
+    public String feastCrops = "";
+    /** Seasoning in the communal stew at the last reading, plus anything counted from chat since. */
+    public int feastSeasoning;
+    /** Whether the last reading was the Grand Feast, which has nine milestones rather than five. */
+    public boolean feastGrand;
+    /** When Ted's menu was last read, in epoch millis, or 0 for never. */
+    public long feastReadAt;
+    /** When the four crops rotate out, if Ted's lore said so; 0 falls back to the calendar. */
+    public long feastSeasonEnd;
+
+    // What the sacks held when one was last opened, so the visitor helper can say what you already
+    // own. Keyed on the profile it was read from - the other profile's sacks are somebody else's.
+    public java.util.Map<String, Integer> sackCounts = new java.util.HashMap<>();
+    public String sackProfile = "";
+    public long sacksReadAt;
+
+    /** SkyBlock loadouts bound to keys (see the Loadout Keybinds module). */
+    public List<LoadoutKey> loadoutKeys = new ArrayList<>();
+
     /** User-recorded mining routes, and the one currently being drawn (see the Mining Routes module). */
     public List<MiningRoute> miningRoutes = new ArrayList<>();
 

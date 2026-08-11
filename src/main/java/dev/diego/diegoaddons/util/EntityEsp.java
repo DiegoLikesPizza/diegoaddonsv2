@@ -3,6 +3,7 @@ package dev.diego.diegoaddons.util;
 import dev.diego.diegoaddons.module.modules.BatEspModule;
 import dev.diego.diegoaddons.module.modules.CustomEspModule;
 import dev.diego.diegoaddons.module.modules.DungeonMinibossEspModule;
+import dev.diego.diegoaddons.module.modules.PestEspModule;
 import dev.diego.diegoaddons.module.modules.PlayerEspModule;
 import dev.diego.diegoaddons.module.modules.StarredMobEspModule;
 import net.minecraft.client.Minecraft;
@@ -46,7 +47,9 @@ public final class EntityEsp {
         boolean doBat = bats != null && bats.isEnabled() && inDungeons;
         boolean doMiniboss = miniboss != null && miniboss.isEnabled() && inDungeons;
         boolean doPlayer = players != null && players.isEnabled();
-        if (!doStarred && !doCustom && !doBat && !doMiniboss && !doPlayer
+        PestEspModule pests = PestEspModule.INSTANCE;
+        boolean doPest = pests != null && pests.isEnabled() && Pests.inGarden() && pests.shouldDraw(mc);
+        if (!doStarred && !doCustom && !doBat && !doMiniboss && !doPlayer && !doPest
                 || mc.player == null || mc.level == null) {
             return;
         }
@@ -86,6 +89,8 @@ public final class EntityEsp {
                 if (!remember(mc, stand)) {
                     box(stand, miniboss);
                 }
+            } else if (doPest && Pests.pestOnPlate(name) != null) {
+                boxPest(stand, pests);
             } else if (doCustom) {
                 String match = CustomEsp.match(name);
                 if (match != null) {
@@ -165,6 +170,26 @@ public final class EntityEsp {
             return false;
         }
         return mc.getConnection() != null && mc.getConnection().getPlayerInfo(p.getUUID()) != null;
+    }
+
+    /**
+     * A pest, boxed from its own body rather than from a guess below the plate.
+     *
+     * <p>The fixed drop {@link #box} uses is right for a player-sized dungeon mob and wrong for a
+     * fly: pests come in every size from a mite to a field mouse, so a box sized for one of them
+     * floats off every other. The body carries its own bounding box, so when it can be found that is
+     * what gets drawn; the drop below the plate is only the fallback for when it cannot.
+     */
+    private static void boxPest(ArmorStand stand, dev.diego.diegoaddons.module.EspModule module) {
+        Entity body = stand.getVehicle();
+        if (body != null) {
+            EspRender.draw(body, body.getBoundingBox().inflate(0.1), module);
+            return;
+        }
+        AABB box = new AABB(
+                stand.getX() - 0.4, stand.getY() - 1.2, stand.getZ() - 0.4,
+                stand.getX() + 0.4, stand.getY() - 0.2, stand.getZ() + 0.4);
+        EspRender.draw(null, box, module);
     }
 
     /** The plate floats above its mob, so the box is placed on the body below it. */

@@ -147,8 +147,68 @@ public abstract class MiniGame {
         return false;
     }
 
-    /** Sends a line for this game to the opponent. */
+    /**
+     * Line numbering, so a lost line can be sent again without being applied twice.
+     *
+     * <p>Chat is not a reliable transport: a whisper can be swallowed by a filter, a rate limit or a
+     * client that was not listening yet, and a turn-based game with one message per move has no way
+     * to notice. Every line therefore carries a number, the receiver ignores one it has already
+     * applied, and that is what makes {@link #resend()} safe - the fix for a game that has stopped
+     * is to say the same thing again, and it either lands or was already there.
+     *
+     * <p>The numbers do not reset for a rematch. They identify a line within this conversation, and
+     * starting over at one after a restart is how a stale line gets applied to a fresh board.
+     */
+    private int outSeq;
+    private int inSeq;
+    private String[] lastLine;
+
+    /** Sends a line for this game to the opponent, numbered. */
     protected void send(String... parts) {
-        Minigames.sendTo(id(), parts);
+        String[] numbered = new String[parts.length + 1];
+        numbered[0] = parts[0];
+        numbered[1] = Integer.toString(++outSeq);
+        System.arraycopy(parts, 1, numbered, 2, parts.length - 1);
+        lastLine = numbered;
+        Minigames.sendTo(id(), numbered);
+    }
+
+    /**
+     * Hands an incoming line to the game, once.
+     *
+     * <p>A repeat - which is what a nudge produces when nothing was actually lost - is dropped here
+     * rather than being applied a second time, which for blackjack would mean drawing another card
+     * and for battleships a second free shot.
+     */
+    void deliver(String[] parts) {
+        if (parts.length < 2) {
+            return;
+        }
+        int seq;
+        try {
+            seq = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (seq <= inSeq) {
+            return;
+        }
+        inSeq = seq;
+        String[] stripped = new String[parts.length - 1];
+        stripped[0] = parts[0];
+        System.arraycopy(parts, 2, stripped, 1, parts.length - 2);
+        receive(stripped);
+    }
+
+    /** Whether there is anything to say again. */
+    public boolean canResend() {
+        return lastLine != null;
+    }
+
+    /** Says the last line again, for a game that has stopped because one went missing. */
+    public void resend() {
+        if (lastLine != null) {
+            Minigames.sendTo(id(), lastLine);
+        }
     }
 }

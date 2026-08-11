@@ -209,7 +209,7 @@ public final class Minigames {
                 // the opponent, and only for the game actually being played.
                 if (playing() && from.equalsIgnoreCase(opponent) && gameId.equals(game.id())) {
                     lastHeard = System.currentTimeMillis();
-                    game.receive(parts);
+                    game.deliver(parts);
                 }
             }
         }
@@ -290,6 +290,11 @@ public final class Minigames {
 
     static void heard() {
         lastHeard = System.currentTimeMillis();
+    }
+
+    /** Milliseconds since anything arrived from the opponent, for spotting a game that has stopped. */
+    public static long silence() {
+        return playing() ? System.currentTimeMillis() - lastHeard : 0L;
     }
 
     private static void tell(String message) {

@@ -115,8 +115,10 @@ public final class Blackjack extends MiniGame {
             return;
         }
         yours.add(draw());
-        send("h");
-        if (total(yours) > 21) {
+        boolean bust = total(yours) > 21;
+        // The turn is *stated*, not left to be worked out at the other end - see receive().
+        send("h", bust ? "1" : "0");
+        if (bust) {
             // Busting ends your turn whether you like it or not, and settles the game if they are
             // already done.
             youStood = true;
@@ -135,19 +137,33 @@ public final class Blackjack extends MiniGame {
         settleOrPass();
     }
 
+    /**
+     * A line from the other side.
+     *
+     * <p>Whether they are finished is <b>read from the message</b> rather than worked out by adding
+     * up their hand here. That was the original design and it deadlocked: their hand is only known
+     * to us through our own copy of the deck, so one card of disagreement meant we decided they had
+     * busted while they were still playing. We took the turn, their next line arrived while we
+     * thought it was ours, the old guard dropped it as out of turn - and both sides sat waiting for
+     * the other. Nobody was to move, and nothing could ever make it move again.
+     *
+     * <p>So the only thing that decides whose turn it is now is the player whose turn it just was.
+     * The hand is still tracked for the display, and a disagreement there is now a cosmetic bug
+     * rather than a stuck game.
+     */
     @Override
     public void receive(String[] parts) {
         if (rematchVerb(parts)) {
             return;
         }
-        if (over() || yourTurn) {
-            // Not their turn: a hit arriving now would take a card that is not theirs to take.
+        if (over()) {
             return;
         }
         switch (parts[0]) {
             case "h" -> {
                 theirs.add(draw());
-                if (total(theirs) > 21) {
+                // "1" means that card finished them - they busted and said so.
+                if (parts.length >= 2 && "1".equals(parts[1])) {
                     theyStood = true;
                     yourTurn = true;
                     settleOrPass();

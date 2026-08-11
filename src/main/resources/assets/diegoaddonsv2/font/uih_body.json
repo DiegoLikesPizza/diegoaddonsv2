@@ -2,6 +2,7 @@
   "providers": [
     { "type": "ttf", "file": "diegoaddonsv2:poppins_regular.ttf", "size": 22.0, "oversample": 3.0 },
     { "type": "reference", "id": "minecraft:include/default", "filter": { "uniform": false } },
-    { "type": "reference", "id": "minecraft:include/unifont" }
+    { "type": "reference", "id": "minecraft:include/unifont" },
+    { "type": "reference", "id": "minecraft:include/space" }
   ]
 }

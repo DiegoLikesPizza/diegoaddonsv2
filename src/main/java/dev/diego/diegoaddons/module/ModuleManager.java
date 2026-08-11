@@ -176,6 +176,16 @@ public final class ModuleManager {
         register(new StorageOverlayModule(), false);
         register(new NoCursorResetModule(), false);
         register(new MinigamesModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.PestTimerModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.PestEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.PlotBordersModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.SprayTimerModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.PestTrapsModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.JacobContestModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.VisitorHelperModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.FeastHudModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.FarmingSessionModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.LoadoutKeybindModule(), false);
         // Off by default like everything else, and for one more reason: it reaches the network and
         // replaces the mod's own jar, which is nobody's default.
         register(new AutoUpdateModule(), false);
@@ -197,6 +207,14 @@ public final class ModuleManager {
         net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register(
                 (stack, context, flag, lines) -> PartyFinder.appendTooltip(stack, lines));
 
+        // What a visitor's offer is worth, under the offer's own lore.
+        net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register(
+                (stack, context, flag, lines) -> {
+                    if (Minecraft.getInstance().screen instanceof AbstractContainerScreen<?> screen) {
+                        dev.diego.diegoaddons.util.Visitors.appendTooltip(screen, stack, lines);
+                    }
+                });
+
         // Always-on dispatch hooks.
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             // The scoreboard and tab list are read from all over the mod, several times per tick.
@@ -208,6 +226,13 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.DungeonRun.tick(mc);
             dev.diego.diegoaddons.util.SlayerState.tick(mc);
             dev.diego.diegoaddons.util.CrystalHollows.tick(mc);
+            // The pest cooldown is read from the tab list, so it has to be read before the modules
+            // that warn off it - and once, not once per Garden feature.
+            dev.diego.diegoaddons.util.Pests.tick(mc);
+            // After Pests: the plot borders follow its list of infested plots.
+            dev.diego.diegoaddons.util.Garden.tick(mc);
+            // Sacks are read from whatever menu is open, so this runs wherever you are.
+            dev.diego.diegoaddons.util.Sacks.tick(mc);
             // Room detection is shared by every dungeon solver and the map, so it ticks here once -
             // not off the back of one solver, which left the others blind whenever it was disabled.
             dev.diego.diegoaddons.util.DungeonRooms.tick(mc);
@@ -284,6 +309,10 @@ public final class ModuleManager {
                 dev.diego.diegoaddons.util.MiningAbility.onMessage(plain);
                 dev.diego.diegoaddons.util.DungeonState.onMessage(plain);
                 dev.diego.diegoaddons.util.FishingAlerts.onMessage(plain);
+                dev.diego.diegoaddons.util.Pests.onMessage(plain);
+                dev.diego.diegoaddons.util.Garden.onMessage(plain);
+                dev.diego.diegoaddons.util.HarvestFeast.onMessage(plain);
+                dev.diego.diegoaddons.util.FarmingSession.onMessage(plain);
                 PrinceMessageModule.onMessage(plain);
                 AutoRequeueModule.onMessage(plain);
                 AnnounceKickModule.onMessage(plain);
@@ -369,6 +398,7 @@ public final class ModuleManager {
             // A game cannot survive the connection that carried it, and there is nobody left to
             // tell - so it is dropped rather than resigned.
             dev.diego.diegoaddons.util.Minigames.reset();
+            dev.diego.diegoaddons.util.IgnoreList.reset();
             dev.diego.diegoaddons.util.ChatCompactor.reset();
             PuzzleSolvers.reset();
             dev.diego.diegoaddons.util.BlazeSolver.reset();

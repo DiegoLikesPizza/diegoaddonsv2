@@ -7,6 +7,7 @@ public enum Category {
     DUNGEONS("Dungeons"),
     MINING("Mining"),
     FORAGING("Foraging"),
+    GARDEN("Garden"),
     FISHING("Fishing"),
     SLAYER("Slayer"),
     MISC("Misc");

@@ -262,12 +262,63 @@ public final class Updater {
     }
 
     /**
-     * Compares two dotted versions numerically, longest wins on a tie ({@code 2.5.1} beats
-     * {@code 2.5}). Anything that is not a digit is a separator, so {@code 2.5.0-rc1} orders by its
-     * numbers alone - close enough for deciding "is there something newer", and it never throws on a
-     * tag someone typed by hand.
+     * Compares two versions: the dotted numbers first, longest wins on a tie ({@code 2.5.1} beats
+     * {@code 2.5}), and <b>a pre-release ranks below the release it leads to</b> - {@code 2.5.5}
+     * beats {@code 2.5.5-beta.1}, which is the semver rule and the one thing this has to get right
+     * for betas to work at all.
+     *
+     * <p>It used to split on every non-digit, which made {@code 2.5.5-beta.1} parse as
+     * {@code 2.5.5.1} and therefore <i>newer</i> than the finished {@code 2.5.5}. Two failures came
+     * out of that, and both are the kind you only notice weeks later: a tester on the beta would
+     * never be offered the release, and anyone on the release with pre-releases switched on would be
+     * offered the beta as an upgrade, forever.
+     *
+     * <p>Anything after the first hyphen is the pre-release part, compared by its own numbers so
+     * {@code beta.2} beats {@code beta.1}, then by text so {@code rc} beats {@code beta}. It never
+     * throws on a tag someone typed by hand, which is still the point.
      */
     static int compare(String a, String b) {
+        String coreA = core(a);
+        String coreB = core(b);
+        int byCore = compareNumbers(coreA, coreB);
+        if (byCore != 0) {
+            return byCore;
+        }
+        String preA = pre(a);
+        String preB = pre(b);
+        if (preA.isEmpty() && preB.isEmpty()) {
+            return 0;
+        }
+        // A release outranks any pre-release of the same numbers.
+        if (preA.isEmpty()) {
+            return 1;
+        }
+        if (preB.isEmpty()) {
+            return -1;
+        }
+        // The word before the number decides first: "rc.1" is later than "beta.9", and comparing the
+        // numbers first would call that backwards. Same word, then the number: beta.2 after beta.1.
+        String labelA = preA.replaceAll("[^A-Za-z]", "");
+        String labelB = preB.replaceAll("[^A-Za-z]", "");
+        if (!labelA.equalsIgnoreCase(labelB)) {
+            return labelA.compareToIgnoreCase(labelB);
+        }
+        return compareNumbers(preA, preB);
+    }
+
+    /** The numbers before any pre-release suffix: "2.5.5-beta.1" is "2.5.5". */
+    private static String core(String version) {
+        int dash = version.indexOf('-');
+        return dash < 0 ? version : version.substring(0, dash);
+    }
+
+    /** Everything after the first hyphen, or "" for a plain release. */
+    private static String pre(String version) {
+        int dash = version.indexOf('-');
+        return dash < 0 ? "" : version.substring(dash + 1);
+    }
+
+    private static int compareNumbers(String a, String b) {
         String[] left = a.split("[^0-9]+");
         String[] right = b.split("[^0-9]+");
         int n = Math.max(left.length, right.length);

@@ -3,7 +3,10 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.3.** RenderLib is gone; the mod runs on
+**Current version: 2.5.4-b-1** — the first beta build, `mod_version` in `gradle.properties`. Fabric
+parses it as a pre-release (`b-1`) and orders it below `2.5.4`, checked against the loader itself, so
+a later `2.5.4` release supersedes it on every instance whether or not pre-releases are switched on.
+2.5.3 is released (tag `v2.5.3`, jar attached). RenderLib is gone; the mod runs on
 [diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
 `includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
@@ -38,6 +41,30 @@ sound and unchanged since before RenderLib, so this is a design pass rather than
       into their own buffer, flushed on the spot. If they are still missing, the log now carries one
       `World labels failed to draw` line with the cause.
 
+### 2b. Scoreboard symbols — the 2.5.3 fix only half took
+Diego, on 2.5.4: "der fix für symbole im scoreboard funktioniert nur so halb" — some symbols still
+draw as a box. The 2.5.3 fix (vanilla fallbacks in every `assets/diegoaddonsv2/font/*.json`) was
+checked against the game's own assets afterwards, and the mod's coverage now **equals vanilla's**:
+`include/default` + `include/unifont` is exactly what `minecraft:default` references, unifont's
+`unifont_all_no_pua-17.0.01.hex` holds all 114,432 codepoints including every SkyBlock symbol
+looked up (⏣ ✦ ❤ ☠ ♲ ⸎ ⚔ 🎣 🔮 …), and nothing in vanilla reaches the PUA at all. So a remaining box
+should not be possible from the font definitions alone — which is why 2.5.4 measures instead of
+guessing again.
+
+- [ ] **Run the report**: Custom Scoreboard card → **"Symbol report (log)"**, standing on SkyBlock
+      with the sidebar visible. It logs every non-ASCII character as
+      `U+XXXX '<char>' mod=ok|MISSING vanilla=ok|MISSING`, and the two columns mean opposite things:
+      **mod=MISSING, vanilla=ok** is ours — a fallback that did not take, fixable here.
+      **both MISSING** is a character the game itself does not have; only the resource pack that
+      ships it can draw it, and no font definition can conjure it. The chat line gives the counts.
+- [ ] **Cross-check by eye**: switch the module off and look at the vanilla sidebar. A symbol that
+      boxes there too was never ours to fix.
+- 2.5.4 also added `minecraft:include/space` as a last fallback to all ten definitions — the one
+      provider vanilla has and the mod did not (U+0020, already covered by Poppins, and U+200C).
+- The probe is `util/GlyphProbe` on top of `mixin/FontGlyphAccessor`, which opens the private
+      `Font.getGlyphSource`. A baked missing glyph keeps `SpecialGlyphs.MISSING` as its `GlyphInfo`,
+      so the answer is the game's own, not a guess about pixels.
+
 ### 3. More customization, everywhere — per-feature settings
 Theming is done (see Done). What is left is the second half of Diego's ask: **as much customization
 as possible on every feature.** A pass has been made over the barest modules; the rest are listed
@@ -57,6 +84,28 @@ Force Nametag, Grotto Finder, Hide Effects, Mining Routes, Title Screen.
 **Note on ESP and HUD modules:** their apparent "no settings" is misleading — `EspModule` gives
 every ESP a style and a colour, and `HudModule` now gives every HUD element four appearance rows.
 Count what a module *inherits* before deciding it is bare.
+
+### 3b. Beta releases — the switch exists, the ordering did not
+Diego's idea (2.5.4): ship betas so he can test without copying jars by hand. **The toggle was
+already there** — "Include pre-releases" on the Auto Update card, off by default, and `Updater`
+skips drafts always and pre-releases unless it is on. What was missing was the comparison.
+
+`compare` split on every non-digit, so `2.5.5-beta.1` parsed as `2.5.5.1` and outranked the finished
+`2.5.5`. Two silent failures fell out of that: a tester on the beta would **never** be offered the
+release, and anyone on the release with pre-releases on would be offered the beta as an upgrade
+forever. Fixed in 2.5.4 — a pre-release now ranks below the release it leads to, `beta.2` after
+`beta.1`, and `rc` after `beta` (the word decides before the number). Checked against nine cases
+including the two that were broken.
+
+The scheme to follow, once Diego agrees:
+- Beta: tag `vX.Y.Z-beta.N`, **tick "This is a pre-release"** on GitHub, attach
+  `diegoaddonsv2-X.Y.Z-beta.N.jar`, and set `mod_version` in `gradle.properties` to match.
+- Final: tag `vX.Y.Z` as a normal release. A beta tester is then offered it, because the ordering
+  now says so.
+- Instances split by the toggle: pre-releases **on** in the test instance, **off** on the daily
+  driver. That is per-instance config, so one switch per instance and no jar copying either way.
+- [ ] **Never cut a release without asking** (standing rule) — the scheme above is written down, not
+      acted on.
 
 ### 4. Auto Update — every future version now needs a GitHub release
 The repository is **public** as of 2.5.0 and carries a release tagged `v2.5.1` with
@@ -130,6 +179,135 @@ the module on, both on the same server.
 - [ ] **Rematch** swaps who starts, so nobody has the first move twice.
 - [ ] Timeouts: an invitation dies after a minute, a silent opponent ends the game after two.
 
+### Garden (2.5.4) — six modules, all written without a Garden to stand in
+A new **Garden** category holds them: Pest ESP, Pest Timer, Plot Borders, Sprayonator Timer,
+Pest Traps, Jacob's Contest. Four of the six read the tab list, so **the widgets have to be on in
+`/widget`** — Pests, Pest Traps and Jacob's Contest. Every one of them says so on the HUD when the
+widget is missing rather than showing a zero.
+
+- [ ] **Plot Borders.** The grid is arithmetic, not discovery: 5×5 plots of 96 blocks from -240 to
+      240, Barn in the middle, ids spiralling out (`Garden.PLOT_MAP`). Check a border actually lands
+      on the plot edge — if the whole grid is off by half a plot, that map or the ±48 offset is why.
+      Bands at player height rather than full-height walls, infested plots marked through walls with
+      a beam on the nearest one.
+- [ ] **Sprayonator Timer.** 30 minutes, started from the chat line `SPRAYONATOR! You sprayed Plot -
+      6 with Compost!` and corrected by the tab list's `Spray: Compost (12m)` — which is only ever
+      about the plot you are standing on, so every other plot's timer is ours to keep. A **renamed
+      plot is skipped entirely** rather than filed under a guess. Check a spray on a far plot still
+      counts down, and that walking onto it does not jump the timer.
+- [ ] **Pest Traps.** `Pest Traps: 2/3`, `Full Traps: #1, #2`, `No Bait: #3`. Both bad states are
+      silent in game, so each is announced once when it starts and re-armed when it clears. Watch for
+      a warning repeating.
+- [ ] **Jacob's Contest.** Deliberately the widget's own lines, header plus the three crops. The
+      crop lines are how the widget's extent is found at all — the tab list arrives here flat with
+      the blank separators already dropped, so a line under the header that names one of the ten
+      contest crops is part of it and the first that does not ends it. If the crops are missing or a
+      foreign line is picked up, that rule is the place to look.
+### Feast HUD (2.5.4) — testable right now, it is Autumn
+Seasoning towards the next milestone plus the four in-season crops, shown **only while the event is
+running**. Diego is on Autumn 19th, so this is the one Garden feature that can be checked today.
+
+- [ ] **Open Feast Chef Ted once**, with "Debug scan (log)" on. The seasoning total and the
+      milestone ladder are read from that menu and nowhere else — the tab list only says whether the
+      event is on. The dump is what the two patterns (`HarvestFeast.PROGRESS` / `TOTAL`) have to be
+      tuned against; until then the HUD says "open Feast Chef Ted" rather than showing a zero.
+- [ ] **Are the crops in slots 11, 12, 14 and 15?** That is SkyHanni's reading of Ted's menu. All
+      four or none are taken — a partial read means the layout is different, and half a season list
+      is worse than none.
+- [ ] **Does the chat line for a seasoning drop match?** It is a 1-in-2,500 drop that never becomes
+      an item, so chat is the only way the total moves between visits to Ted. `HarvestFeast.GAINED`
+      is a guess; if the number never climbs while farming, that is why.
+- [ ] **Milestone thresholds.** Only the last tier of each ladder is on the wiki (250 normal, 750
+      Grand), so the intermediate ones are read from the menu when it spells them out and fall back
+      to a guessed ladder otherwise. A wrong "next milestone" with a right seasoning count means the
+      fallback is in use.
+- [ ] **Stale crops are labelled, not hidden** — they rotate every SkyBlock month (10h20m real), and
+      the row says "old - reopen Ted" instead of a countdown rather than presenting last month's
+      four as now.
+- [ ] **The crops are item icons with a countdown beside them** (SkyHanni's shape, Diego's ask), so
+      the element draws its own widget rather than being a text chip. Vanilla items stand in for the
+      crops — they are what you break and every client has them; an unrecognised crop still gets a
+      slot (wheat seeds) so four icons stay four.
+- [ ] **Where the countdown comes from, in order:** Ted's own lore if it states the remaining season
+      (`SEASON_LEFT`, a guess — the debug dump will say), otherwise the SkyBlock calendar off the
+      scoreboard: a day is 20 real minutes, a month is 31 of them, so the time to the month's end is
+      exact arithmetic. **What is assumed is that the crops rotate on that boundary.** If the
+      countdown is consistently off by a fixed amount, that assumption is the cause and the lore
+      pattern is the fix — not the maths.
+
+### Garden, third pass (2.5.4) — Sacks, auto swap, session tracker
+- [ ] **Sacks feed the Visitor Helper.** Open any sack once (title ends in "Sack"); each item's lore
+      carries `Stored: 28,183/60.5k`, and that is the whole reading. The tooltip then says
+      "18 in sacks, 6 short" under the price. Counts are a **floor** — they only improve when you
+      open a sack again — and are keyed per profile, since the other profile's sacks are somebody
+      else's. Shortened numbers ("60.5k") are rounded by Hypixel, so this is "roughly enough",
+      not an inventory.
+- [ ] **Auto swap** on the Pest Timer card, off by default: pest loadout when the warning fires,
+      farming loadout back once a pest has actually spawned. Needs the **Loadout Keybinds** module
+      on, since it owns the command and the clicking.
+- [ ] **The safety rule that matters:** farming means holding the attack button, and a menu opening
+      under a held button takes that as a click on a real slot. The swap therefore waits for both
+      mouse buttons to be up, no other screen to be open, no swap already in flight, and the Garden.
+      **Test it while holding left-click through a whole warning** — that is the case it exists for.
+- [ ] **Farming Session.** Crops, coins, copper, pests, seasoning, with per-hour rates. Measured as
+      deltas of Hypixel's own tab counters rather than counted here — a client-side tally misses
+      Sprayonator breaks and drifts over an hour. The counter re-bases when it resets or the crop
+      changes, so a milestone should never read as a negative harvest. Rates are withheld under a
+      minute of session, where a single crop reads as thousands an hour. Reset button on the card.
+- [ ] **Check `Counter:` and `Copper:` really are those tab lines** — both are visible in Diego's
+      screenshot, but the crop-name line under "Crop Milestones" is the shakiest parse here, and a
+      wrong crop name means the coins figure prices the wrong thing.
+
+### Garden, second pass (2.5.4) — Visitor Helper, Bazaar, Loadout keybinds
+- [x] **Spray durations are no longer 30 minutes for everything** — 30 / 45 / 60 for the plain,
+      Juicy and Salty Sprayonator. The chat line names the *spray*, not the sprayer, so the duration
+      comes from the item in hand at the moment the message arrives. Unreadable falls back to 30,
+      the one that under-counts: an early timer sends you to a plot that is still sprayed, a late
+      one tells you a plot is covered when it is not.
+- [ ] **Bazaar prices** (`util/Bazaar.java`) — `api.hypixel.net/v2/skyblock/bazaar`, keyless, no
+      player data in the request. Refreshed every 5 min on a daemon thread, only while a feature is
+      reading it. Check the log says "Bazaar prices loaded (N products)" once on entering the Garden
+      with the helper on. Item ids are the display name upcased (`Enchanted Carrot` →
+      `ENCHANTED_CARROT`), which is exact for farming items and a miss - not a wrong price -
+      elsewhere.
+- [ ] **Visitor Helper.** Menu found by shape, not title: the middle item's lore ends with "Offers
+      Accepted:", accept is slot 29, refuse 33. **The lore parsing is the guess** - turn on "Debug
+      scan (log)" at the first visitor and tune `Visitors.ITEM` / `COPPER` against what it dumps.
+- [ ] **Auto-decline, the part that cannot be taken back.** Three guards are code, not settings:
+      never decline a profitable offer, never decline one that cannot be priced, never act on prices
+      older than 20 minutes. Test with the mode Off first and read the tooltip numbers for a few
+      visitors before letting it click anything.
+- [ ] **Is copper valued right?** One copper = Green Thumb I price / 1500, the community's proxy.
+      If the numbers look wrong by a constant factor, that is the line to check.
+- [ ] **Loadout Keybinds** (Misc). `/loadout` is a **guess** and is a text box for that reason — if
+      it is wrong, the key sends a bad command and nothing opens. Tell me the real one and it
+      becomes the default. Presets are matched by name, never by slot, since the grid reorders.
+- [ ] **configlib gained key fields in list rows** (`ListOption.KeyField`), which is what makes
+      "name plus keybind" possible in the shared editor. **This also fixes Command Hotkeys**: its
+      key was never settable from the menu, so every hotkey added there sat unbound and did nothing.
+      Worth checking both lists: click the key button, press a key, and Escape to unbind.
+
+- [ ] **The Pests widget has to be on** (`/widget`). The cooldown is Hypixel's own number, read from
+      the tab list rather than calculated — the sum depends on a reforge, an attribute and a perk,
+      and Hypixel moves all three. With the widget off the HUD says "Enable the Pests widget"
+      instead of showing a wrong number. Check that line actually appears when it is off.
+- [ ] **The tab lines are guesses at strings**, matched on `Pests:` / `Alive: N` / `Cooldown: 1m 58s`
+      / `Plots: 4, 12` after colour stripping. If the HUD stays on "Unknown" with the widget on,
+      those four prefixes are the first thing to print.
+- [ ] **The swap warning.** Slider 0–240s (default 60), because the point is to swap into pest gear
+      *before* the cooldown ends — pest gear shortens the cooldown itself, so the lead time depends
+      on the gap between your two setups. Title + sound, chat optional, and a second warning at
+      expiry. Check it fires once per cooldown and not once per second.
+- [ ] **Expiry is read from READY, not from the countdown hitting zero** — the widget jumps straight
+      from a number to READY, and a tick-boundary miss would otherwise swallow the warning. Watch
+      that the "cooldown is up" warning fires exactly once.
+- [ ] **Pest ESP** boxes any name plate carrying a pest name (all 15), Garden only, from the mob's
+      own bounding box rather than the fixed drop below the plate — pests range from a mite to a
+      field mouse. If a box floats or is the wrong size, the plate had no vehicle and the fallback
+      box was used. "Only with a vacuum in hand" matches the item name (vacuum / hooverius / lasso).
+- [ ] **Is the plate even there?** If nothing is ever boxed, the pest may carry its name on the mob
+      rather than on a separate armour stand — that is the one assumption the whole ESP rests on.
+
 ### Storage Overlay (2.5.3) — the whole feature is written blind
 The NEU sheet: open `/storage` and the overlay draws over that menu — every ender chest page and
 backpack side by side, your own inventory under them, a search box at the bottom. It exists **only**
@@ -197,6 +375,13 @@ Worth a pass before trusting any of it:
       `config/diegoaddonsv2-configlib.json`: it should end up as `config/diegoaddons/config.json`
       with every setting intact, and the log should say it was moved.
 - [ ] HUD editor: ten draggable elements, and a position that survives a restart
+- [ ] **Only enabled elements are editable** (2.5.4, configlib) — Diego, twice: "du kannst nur die
+      elemente bearbeiten, die du auch enabled hast. Die anderen sollen da gar nicht erst editbar
+      sein". 2.5.1 had answered the first telling by *labelling* the disabled ones "(hidden)" in red,
+      which was not what was being asked. They are now left out of the drawing **and** the hit test,
+      so a hidden element cannot take a click from the one drawn under it. A "Hidden: Off / Shown"
+      button in the toolbar brings them back for the one case that needs it — placing an element
+      before switching it on — and right-clicking an element off now drops the selection with it.
 - [ ] Chat search (Ctrl+F) — jump and copy
 - [x] Intro screen on a fresh instance — **seen twice, wrong both times.** 2.5.1 fixed the doubled
       size; the screenshot after it showed the panel far too small for the window, "VERSION 2" drawn
@@ -270,6 +455,23 @@ preview path is the fastest way to check most of them, since it draws without li
 
 ## Done
 
+- **Blackjack deadlocked with nobody to move** (2.5.4) — Diego, from a real game: "hatte eben ein
+  issue dass keiner am Zug war". Two faults, and the second is why it could never recover.
+  **The turn was guessed rather than stated.** A hit was sent as a bare "h", and the receiver worked
+  out whether that card had finished the sender by adding up *its own copy* of their hand. That hand
+  is only known through our own copy of the deck, so a single card of disagreement meant one side
+  decided the other had busted and took the turn, while the other was still playing. Their next line
+  then arrived at a client that thought it was its own turn — and the guard there dropped it as out
+  of turn, silently. Both sides ended up waiting for the other, with no move that could ever arrive.
+  Whose turn it is now is therefore **read from the message**: the player whose turn it just was says
+  whether that ends it. The hand is still tracked for the display, so a disagreement there is now
+  cosmetic rather than fatal.
+  **A lost line was unrecoverable.** Chat is not a reliable transport — a filter, a rate limit or a
+  client that was not listening yet swallows a whisper and a one-message-per-move game has no way to
+  notice. Every line now carries a number, a line already applied is ignored, and that is what makes
+  saying it again safe: after fifteen seconds of silence on someone else's turn the board says so and
+  offers **Send again**, which either lands or was already there. This applies to all four games, not
+  just blackjack.
 - **A module with no settings had no card at all** (2.5.3, configlib) — Diego, on the new No Cursor
   Reset module: "ich kann die setting zu no cursor reset nicht finden. Sie ist nicht da". It was
   registered, it was in the jar, and it still could not be turned on from the menu.

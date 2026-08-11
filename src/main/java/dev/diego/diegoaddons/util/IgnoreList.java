@@ -31,6 +31,25 @@ public final class IgnoreList {
     private static String lastKicked = "";
     private static long lastKickAt;
 
+    /**
+     * A command waiting to go out, and the note to print once it has.
+     *
+     * <p>Kicking used to happen inside the chat handler: both commands left in the same tick, the
+     * instant the join line arrived. That is too fast in two different ways. It reads as a bot -
+     * nobody types a kick in the same frame somebody joins - and Hypixel rate-limits commands, so
+     * the second of two sent together is the one that quietly does not happen. Which meant the
+     * announcement went out and the kick sometimes did not.
+     */
+    private record Pending(String command, long dueAt, String notice) {
+    }
+
+    private static final java.util.Deque<Pending> QUEUE = new java.util.ArrayDeque<>();
+
+    /** Minimum gap between two commands, so they are never in the same tick. */
+    private static final long COMMAND_GAP_MS = 700L;
+
+    private static long lastCommandAt;
+
     private IgnoreList() {
     }
 
@@ -108,17 +127,45 @@ public final class IgnoreList {
         lastKicked = name;
         lastKickAt = now;
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
-            return;
-        }
+        // Queued rather than sent: see Pending. The delay is how long after the join line the first
+        // command goes out, and the gap keeps the two apart after that.
+        long due = now + Math.round(mod.kickDelay() * 1000);
         if (mod.announceReason() && !blocked.reason.isBlank()) {
-            mc.player.connection.sendCommand("pc Blocked for reason: " + blocked.reason);
+            QUEUE.addLast(new Pending("pc Blocked for reason: " + blocked.reason, due, null));
         }
-        mc.player.connection.sendCommand("party kick " + name);
-        mc.gui.getChat().addClientSystemMessage(Component.literal(
+        QUEUE.addLast(new Pending("party kick " + name, due,
                 "§b[DiegoAddons] §fKicked blocked player §e" + name
                         + (blocked.reason.isBlank() ? "" : " §7(" + blocked.reason + ")")));
+    }
+
+    /**
+     * Sends at most one queued command, and never two in the same tick.
+     *
+     * <p>Called every client tick while the module is on. A command whose turn has not come simply
+     * waits, and the note that says what happened is printed when the kick actually leaves rather
+     * than when it was decided on.
+     */
+    public static void tick(Minecraft mc) {
+        if (QUEUE.isEmpty() || mc.player == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Pending next = QUEUE.peekFirst();
+        if (now < next.dueAt() || now - lastCommandAt < COMMAND_GAP_MS) {
+            return;
+        }
+        QUEUE.pollFirst();
+        lastCommandAt = now;
+        mc.player.connection.sendCommand(next.command());
+        if (next.notice() != null && mc.gui != null) {
+            mc.gui.getChat().addClientSystemMessage(Component.literal(next.notice()));
+        }
+    }
+
+    /** Drops anything still waiting - on a disconnect, where the party is gone anyway. */
+    public static void reset() {
+        QUEUE.clear();
+        lastKicked = "";
     }
 
     /** Lower-case name list, for suggestions. */

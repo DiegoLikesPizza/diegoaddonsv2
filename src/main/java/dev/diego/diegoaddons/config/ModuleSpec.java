@@ -97,6 +97,18 @@ public final class ModuleSpec {
         b.hidden("savedEquipment", String[].class,
                 () -> c.savedEquipment, v -> c.savedEquipment = (String[]) v);
         b.hidden("savedPet", String.class, () -> c.savedPet, v -> c.savedPet = (String) v);
+        b.hidden("feastCrops", String.class, () -> c.feastCrops, v -> c.feastCrops = (String) v);
+        b.hidden("feastSeasoning", int.class,
+                () -> c.feastSeasoning, v -> c.feastSeasoning = (Integer) v);
+        b.hidden("feastGrand", boolean.class, () -> c.feastGrand, v -> c.feastGrand = (Boolean) v);
+        b.hidden("feastReadAt", long.class, () -> c.feastReadAt, v -> c.feastReadAt = (Long) v);
+        b.hidden("feastSeasonEnd", long.class,
+                () -> c.feastSeasonEnd, v -> c.feastSeasonEnd = (Long) v);
+        b.hidden("sackCounts", java.util.Map.class,
+                new TypeToken<java.util.Map<String, Integer>>() { }.getType(),
+                () -> c.sackCounts, v -> c.sackCounts = (java.util.Map<String, Integer>) v);
+        b.hidden("sackProfile", String.class, () -> c.sackProfile, v -> c.sackProfile = (String) v);
+        b.hidden("sacksReadAt", long.class, () -> c.sacksReadAt, v -> c.sacksReadAt = (Long) v);
 
         // The list-editor modules' contents. The full generic type is given so Gson rebuilds the
         // records inside rather than handing back a list of maps.
@@ -106,6 +118,8 @@ public final class ModuleSpec {
                 () -> c.wordReplacements, v -> c.wordReplacements = (List<WordReplacement>) v);
         b.hidden("commandHotkeys", List.class, new TypeToken<List<CommandHotkey>>() { }.getType(),
                 () -> c.commandHotkeys, v -> c.commandHotkeys = (List<CommandHotkey>) v);
+        b.hidden("loadoutKeys", List.class, new TypeToken<List<LoadoutKey>>() { }.getType(),
+                () -> c.loadoutKeys, v -> c.loadoutKeys = (List<LoadoutKey>) v);
         b.hidden("miningRoutes", List.class, new TypeToken<List<MiningRoute>>() { }.getType(),
                 () -> c.miningRoutes, v -> c.miningRoutes = (List<MiningRoute>) v);
         b.hidden("gfsItems", List.class, new TypeToken<List<GfsItem>>() { }.getType(),
