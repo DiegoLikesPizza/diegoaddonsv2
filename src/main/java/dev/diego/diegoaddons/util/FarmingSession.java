@@ -26,6 +26,19 @@ public final class FarmingSession {
 
     private static long startedAt;
     private static long lastActivity;
+    /**
+     * Time the session has actually been <b>working</b>, which is what the rates divide by.
+     *
+     * <p>Wall-clock would mean a lunch break halves your crops an hour and makes two setups
+     * incomparable unless you farmed them for the same stretch without pausing. Idle time is simply
+     * not counted, so the numbers answer "how good is this while I am doing it".
+     */
+    private static long activeMs;
+    private static long lastTickAt;
+
+    /** Pest kill drops valued at bazaar prices, and the flat coins the kills themselves paid. */
+    private static double pestDropValue;
+    private static long pestCoins;
 
     private static long cropStart = -1;
     private static long cropNow = -1;
@@ -40,8 +53,39 @@ public final class FarmingSession {
         return startedAt != 0;
     }
 
+    /** Working time, excluding whatever was spent idle. */
     public static long elapsed() {
+        return activeMs;
+    }
+
+    /** Wall-clock since the session began, for the "how long ago did I start" question. */
+    public static long wallClock() {
         return startedAt == 0 ? 0 : System.currentTimeMillis() - startedAt;
+    }
+
+    /** Whether the session is currently paused for inactivity. */
+    public static boolean paused() {
+        return startedAt != 0 && idle() > pauseAfterMs;
+    }
+
+    /** How long without activity before the clock stops, and before the session is dropped. */
+    private static long pauseAfterMs = 2 * 60_000L;
+    private static long endAfterMs = 60 * 60_000L;
+
+    public static void setTimeouts(long pauseMs, long endMs) {
+        pauseAfterMs = pauseMs;
+        endAfterMs = endMs;
+    }
+
+    /** What the pests paid: their drops at bazaar prices plus the coins for the kills. */
+    public static double pestProfit() {
+        return pestDropValue + pestCoins;
+    }
+
+    /** Everything the session earned - the crops plus the pests. */
+    public static double profit() {
+        double crops = coins();
+        return (crops < 0 ? 0 : crops) + pestProfit();
     }
 
     /** Crops harvested since the session began, or -1 when the counter has not been read. */
@@ -105,6 +149,11 @@ public final class FarmingSession {
         copperNow = -1;
         seasoningStart = HarvestFeast.seasoning();
         pests = 0;
+        activeMs = 0;
+        lastTickAt = startedAt;
+        pestDropValue = 0;
+        pestCoins = 0;
+        cropName = "";
     }
 
     public static void tick(Minecraft mc) {
@@ -114,12 +163,16 @@ public final class FarmingSession {
         if (startedAt == 0) {
             reset();
         }
+        advanceClock();
         for (String line : SkyblockLocation.tabLines(mc)) {
             if (line.startsWith("Copper:")) {
-                copperNow = number(line.substring("Copper:".length()));
+                long value = number(line.substring("Copper:".length()));
                 if (copperStart < 0) {
-                    copperStart = copperNow;
+                    copperStart = value;
+                } else if (value > copperNow) {
+                    lastActivity = System.currentTimeMillis();
                 }
+                copperNow = value;
             } else {
                 Matcher m = COUNTER.matcher(line);
                 if (m.matches()) {
@@ -129,6 +182,29 @@ public final class FarmingSession {
             }
         }
         readCropName(mc);
+    }
+
+    /**
+     * Moves the working clock on, and drops the session when it has been idle long enough.
+     *
+     * <p>Ending rather than pausing forever matters: a session left running overnight would come
+     * back with an hour of crops against three minutes of working time, and every rate on the card
+     * would be nonsense. An hour of nothing is a different session.
+     */
+    private static void advanceClock() {
+        long now = System.currentTimeMillis();
+        if (lastTickAt == 0) {
+            lastTickAt = now;
+            return;
+        }
+        if (idle() > endAfterMs) {
+            reset();
+            return;
+        }
+        if (idle() <= pauseAfterMs) {
+            activeMs += now - lastTickAt;
+        }
+        lastTickAt = now;
     }
 
     /**
@@ -142,8 +218,12 @@ public final class FarmingSession {
         if (cropStart < 0 || value < cropNow) {
             cropStart = value;
         }
+        // Only a rise counts as activity. The line is read every tick whether or not it changed, so
+        // marking activity on every read meant the session could never go idle at all.
+        if (value > cropNow) {
+            lastActivity = System.currentTimeMillis();
+        }
         cropNow = value;
-        lastActivity = System.currentTimeMillis();
     }
 
     /** "Counter: 106,271,778" under the crop milestone widget. */
@@ -183,17 +263,48 @@ public final class FarmingSession {
     private static final Pattern CROP_LINE =
             Pattern.compile("\\s*(?<crop>[A-Za-z][A-Za-z ]+?)\\s*(?:MAXED|\\d+)?\\s*");
 
-    /** A pest kill, from the reward line Hypixel prints for it. */
+    /**
+     * A pest kill and what it dropped: "You received 7x Enchanted Potato for killing a Locust!".
+     *
+     * <p>One message carries both facts, which is why the kill count and the drop value are read
+     * from the same line rather than from two features that could disagree about how many pests
+     * died.
+     */
     private static final Pattern PEST_KILL = Pattern.compile(
-            "^You received .* for killing an? (?<pest>.+)!$");
+            "^You received (?:(?<amount>[\\d,]+)x )?(?<item>.+?) for killing an? (?<pest>.+)!$");
+
+    /**
+     * What Hypixel pays for a kill on top of the drop, from the wiki: 1,000 coins, and ten times
+     * that for a Field Mouse.
+     *
+     * <p>A constant rather than a reading, because the coins are not announced in a line this can
+     * match - and leaving them out would understate pest farming by roughly the value of the drop
+     * itself. If Hypixel changes it, this number is the one place to change.
+     */
+    private static final long COINS_PER_KILL = 1_000;
+    private static final long COINS_PER_FIELD_MOUSE = 10_000;
 
     public static void onMessage(String plain) {
         if (!Pests.inGarden()) {
             return;
         }
-        if (PEST_KILL.matcher(plain.trim()).matches()) {
-            pests++;
-            lastActivity = System.currentTimeMillis();
+        Matcher m = PEST_KILL.matcher(plain.trim());
+        if (!m.matches()) {
+            return;
+        }
+        pests++;
+        lastActivity = System.currentTimeMillis();
+
+        String pest = m.group("pest").trim();
+        pestCoins += pest.equalsIgnoreCase("Field Mouse") ? COINS_PER_FIELD_MOUSE : COINS_PER_KILL;
+
+        // The drop is priced when the bazaar knows it and skipped when it does not - an unpriced
+        // rare drop leaves the total low, which is the direction to be wrong in.
+        long amount = m.group("amount") == null
+                ? 1 : Long.parseLong(m.group("amount").replace(",", ""));
+        double each = Bazaar.priceOf(m.group("item").trim());
+        if (each > 0) {
+            pestDropValue += each * amount;
         }
     }
 

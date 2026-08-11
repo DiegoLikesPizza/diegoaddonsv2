@@ -52,10 +52,28 @@ public final class HarvestFeast {
     // --- the reading -------------------------------------------------------------------------------
 
     private static boolean eventInTab;
+    private static boolean inAutumn;
 
-    /** Whether the tab list currently names the feast as the running event. */
+    /**
+     * Whether the feast is on.
+     *
+     * <p>Three signals, taken as "any of them", because the first one on its own was wrong: the tab
+     * list does not reliably name the event, and keying the whole display on a line that may not
+     * exist meant the card never appeared for Diego even while the feast was running and its own
+     * numbers were correct.
+     *
+     * <ul>
+     *   <li><b>The calendar.</b> The Harvest Feast runs Early Autumn through Late Autumn, and the
+     *       season is written on the scoreboard every second of the game. This is the signal that
+     *       cannot go missing.</li>
+     *   <li><b>The tab list</b>, when it does name the event - it is the only one that would catch a
+     *       feast running outside its usual months.</li>
+     *   <li><b>A Grand Feast reading from Ted</b>, which is the case the calendar gets wrong: with
+     *       Finnegan in office the feast runs all year, so autumn is no longer the boundary.</li>
+     * </ul>
+     */
     public static boolean running() {
-        return eventInTab;
+        return inAutumn || eventInTab || (grand() && !stale());
     }
 
     /** The four crops in season, as Ted named them, or empty when Ted has not been visited. */
@@ -144,6 +162,7 @@ public final class HarvestFeast {
             return;
         }
         readTab(mc);
+        readSeason(mc);
         readMenu(mc, module);
         // The calendar answer is recomputed each tick; a lore reading, when there was one, wins by
         // being written back over it below.
@@ -214,6 +233,26 @@ public final class HarvestFeast {
         }
         eventInTab = found;
     }
+
+    /**
+     * Whether the SkyBlock season is one of the three autumn months, from the scoreboard's date line.
+     *
+     * <p>"Early Autumn", "Autumn" and "Late Autumn" all contain the word, so one check covers the
+     * whole feast. Read from the sidebar rather than computed from the epoch: the server writes the
+     * date there itself, and a season derived from arithmetic is one more thing that can drift.
+     */
+    private static void readSeason(Minecraft mc) {
+        for (String line : SkyblockLocation.sidebarLines(mc)) {
+            if (SEASON.matcher(line).find()) {
+                inAutumn = line.toLowerCase(Locale.ROOT).contains("autumn");
+                return;
+            }
+        }
+    }
+
+    /** Any SkyBlock date line, e.g. "Late Autumn 19th". */
+    private static final Pattern SEASON = Pattern.compile(
+            "(?:Early |Late )?(?:Spring|Summer|Autumn|Winter)\\s+\\d{1,2}(?:st|nd|rd|th)");
 
     /** The container already read, so a menu left open is not re-read twenty times a second. */
     private static int readContainer = -1;

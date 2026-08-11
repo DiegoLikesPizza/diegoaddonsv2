@@ -54,8 +54,9 @@ public class PestTimerModule extends HudModule {
             new BooleanSetting(this, "warnExpired", "Warn again when it expires", true);
 
     /**
-     * Auto swap: equip the pest loadout when the warning fires, and the farming one back once a pest
-     * has actually spawned - which is the moment the pest gear has done its job.
+     * Auto swap: equip the pest loadout once the cooldown is inside {@link #swapBefore}, and the
+     * farming one back the moment pests actually spawn - which is when the pest gear has done its
+     * job and every second longer in it is farming fortune you are not getting.
      *
      * <p>Off by default, and it should be: this is the only thing in the Garden features that
      * reaches into the game on your behalf. See {@link #canSwap} for the rules that keep it from
@@ -63,6 +64,13 @@ public class PestTimerModule extends HudModule {
      */
     private final BooleanSetting autoSwap =
             new BooleanSetting(this, "autoSwap", "Auto swap loadout", false);
+    /**
+     * Its own clock rather than the warning's. Warning off used to mean swap off, and the two had to
+     * fire at the same instant - when the useful arrangement is often a warning first and the swap a
+     * little later, or a swap with no warning at all.
+     */
+    private final NumberSetting swapBefore =
+            new NumberSetting(this, "swapBefore", "Swap at (seconds before)", 30, 0, 240, 5);
     private final StringSetting pestLoadout =
             new StringSetting(this, "pestLoadout", "Pest loadout", "", null);
     private final StringSetting farmLoadout =
@@ -77,6 +85,8 @@ public class PestTimerModule extends HudModule {
      */
     private long warnedFor;
     private long expiredFor;
+    /** The cooldown the swap has already been decided for, on the same principle as {@link #warnedFor}. */
+    private long swappedFor;
     /** The cooldown currently being counted down, kept after it ends so the expiry can be named. */
     private long tracking;
 
@@ -92,6 +102,7 @@ public class PestTimerModule extends HudModule {
         settings.add(warnChat);
         settings.add(warnExpired);
         settings.add(autoSwap);
+        settings.add(swapBefore);
         settings.add(pestLoadout);
         settings.add(farmLoadout);
         INSTANCE = this;
@@ -183,12 +194,23 @@ public class PestTimerModule extends HudModule {
         }
 
         long lead = (long) (warnBefore.get() * 1000);
-        if (lead > 0 && warnedFor != end && left <= lead) {
+        // Not while pests are already out. The warning exists to get you into pest gear before the
+        // cooldown ends; with pests on the ground the job is to vacuum them, and a title across the
+        // screen telling you to swap is telling you to do the wrong thing. Deliberately not marked
+        // as warned, so it still fires if you clear them while the cooldown is inside the window.
+        if (lead > 0 && warnedFor != end && left <= lead && Pests.alive() == 0) {
             warnedFor = end;
             warn(mc, "Swap to pest gear", "Pest cooldown in " + time(left));
-            swapPending = true;
-            trySwap(mc);
         }
+        // The swap has its own clock. Tying it to the warning meant turning warnings off turned the
+        // swap off with them, and it forced both to happen at the same moment - when the point is
+        // often to be told first and swapped a little later, or swapped without being told at all.
+        long swapLead = (long) (swapBefore.get() * 1000);
+        if (swapLead > 0 && swappedFor != end && left <= swapLead) {
+            swappedFor = end;
+            swapPending = true;
+        }
+        trySwap(mc);
     }
 
     // --- auto swap --------------------------------------------------------------------------------
@@ -199,6 +221,21 @@ public class PestTimerModule extends HudModule {
     private boolean inPestGear;
     /** The spawn that was last seen, so the swap back happens once per spawn rather than per tick. */
     private long swappedBackAt;
+    /** How many pests were alive when the pest gear went on, for the count-based half of {@link #spawned}. */
+    private int aliveWhenSwapped;
+
+    /**
+     * Whether pests have spawned since the pest gear went on - the signal to swap back.
+     *
+     * <p><b>Two signals, because either alone is a way to get stuck in pest gear.</b> The chat
+     * announcement is immediate but is matched by a pattern that is still a guess at Hypixel's
+     * wording, and chat can be swallowed by a filter. The pest count from the tab widget is the
+     * number Hypixel itself maintains, but it only refreshes about once a second. Taking whichever
+     * arrives first means a wrong guess about a chat line costs a second, not the whole feature.
+     */
+    private boolean spawned() {
+        return Pests.lastSpawn() > swappedBackAt || Pests.alive() > aliveWhenSwapped;
+    }
 
     /**
      * Whether now is a safe moment to open a menu on the player's behalf.
@@ -235,12 +272,13 @@ public class PestTimerModule extends HudModule {
             swapPending = false;
             return;
         }
-        if (inPestGear && Pests.lastSpawn() > swappedBackAt && !farmLoadout.get().isBlank()) {
+        if (inPestGear && spawned() && !farmLoadout.get().isBlank()) {
             if (!canSwap(mc)) {
                 return;
             }
             if (LoadoutKeys.equip(mc, farmLoadout.get())) {
                 swappedBackAt = Pests.lastSpawn();
+                aliveWhenSwapped = Pests.alive();
                 inPestGear = false;
                 announce(mc, "Back to " + farmLoadout.get());
             }
@@ -255,7 +293,10 @@ public class PestTimerModule extends HudModule {
         if (LoadoutKeys.equip(mc, pestLoadout.get())) {
             swapPending = false;
             inPestGear = true;
+            // Both baselines are taken here, at the moment the gear goes on: a spawn only counts as
+            // "since the swap" if it is later than this, and pests already alive must not read as new.
             swappedBackAt = Pests.lastSpawn();
+            aliveWhenSwapped = Pests.alive();
             announce(mc, "Swapped to " + pestLoadout.get());
         }
     }

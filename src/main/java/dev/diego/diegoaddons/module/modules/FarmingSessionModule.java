@@ -4,6 +4,7 @@ import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.HudModule;
+import dev.diego.diegoaddons.module.NumberSetting;
 import dev.diego.diegoaddons.util.Bazaar;
 import dev.diego.diegoaddons.util.FarmingSession;
 import dev.diego.diegoaddons.util.Garden;
@@ -36,6 +37,17 @@ public class FarmingSessionModule extends HudModule {
             new BooleanSetting(this, "showPests", "Show pests killed", true);
     private final BooleanSetting showSeasoning =
             new BooleanSetting(this, "showSeasoning", "Show seasoning", true);
+    private final BooleanSetting splitProfit =
+            new BooleanSetting(this, "splitProfit", "Split farming and pest profit", true);
+    /**
+     * Idle handling, and the two numbers are doing different jobs: pausing keeps a break out of the
+     * rates, ending throws away a session that has stopped being one. Without the second, a client
+     * left running overnight comes back with an hour of crops against three minutes of working time.
+     */
+    private final NumberSetting pauseAfter =
+            new NumberSetting(this, "pauseAfter", "Pause after idle (minutes)", 2, 1, 15, 1);
+    private final NumberSetting endAfter =
+            new NumberSetting(this, "endAfter", "End after idle (minutes)", 60, 5, 180, 5);
     private final ActionSetting reset =
             new ActionSetting(this, "reset", "This session", "Reset", FarmingSession::reset);
 
@@ -47,6 +59,9 @@ public class FarmingSessionModule extends HudModule {
         settings.add(showCopper);
         settings.add(showPests);
         settings.add(showSeasoning);
+        settings.add(splitProfit);
+        settings.add(pauseAfter);
+        settings.add(endAfter);
         settings.add(reset);
         INSTANCE = this;
     }
@@ -68,6 +83,7 @@ public class FarmingSessionModule extends HudModule {
 
     @Override
     public void onClientTick(Minecraft mc) {
+        FarmingSession.setTimeouts((long) (pauseAfter.get() * 60_000), (long) (endAfter.get() * 60_000));
         FarmingSession.tick(mc);
         if (showCoins.get() && Pests.inGarden()) {
             Bazaar.refreshIfDue();
@@ -79,10 +95,11 @@ public class FarmingSessionModule extends HudModule {
         if (!Pests.inGarden() || !FarmingSession.active()) {
             return List.of();
         }
-        List<String> out = new ArrayList<>(6);
-        out.add(showLabel()
-                ? "Session: " + Garden.time(FarmingSession.elapsed())
-                : Garden.time(FarmingSession.elapsed()));
+        List<String> out = new ArrayList<>(8);
+        // The clock says paused rather than silently stopping: a frozen number with no explanation
+        // reads as a broken tracker, which is how you end up not trusting the ones that are right.
+        String clock = Garden.time(FarmingSession.elapsed()) + (FarmingSession.paused() ? " (paused)" : "");
+        out.add(showLabel() ? "Session: " + clock : clock);
 
         long crops = FarmingSession.crops();
         if (crops >= 0) {
@@ -90,13 +107,18 @@ public class FarmingSessionModule extends HudModule {
                     count(crops), FarmingSession.perHour(crops)));
         }
         if (showCoins.get()) {
-            double coins = FarmingSession.coins();
+            double total = FarmingSession.profit();
+            double farming = Math.max(0, FarmingSession.coins());
+            double pestSide = FarmingSession.pestProfit();
             // The reason matters: "no prices yet" resolves itself, "not on the bazaar" does not.
-            if (coins >= 0) {
-                out.add(line("Coins", Visitors.coins(coins),
-                        FarmingSession.perHour((long) coins)));
+            if (total > 0) {
+                out.add(line("Profit", Visitors.coins(total), FarmingSession.perHour((long) total)));
+                if (splitProfit.get() && farming > 0 && pestSide > 0) {
+                    out.add("  from crops: " + Visitors.coins(farming));
+                    out.add("  from pests: " + Visitors.coins(pestSide));
+                }
             } else if (!Bazaar.fresh()) {
-                out.add("Coins: waiting for prices");
+                out.add("Profit: waiting for prices");
             }
         }
         if (showCopper.get()) {

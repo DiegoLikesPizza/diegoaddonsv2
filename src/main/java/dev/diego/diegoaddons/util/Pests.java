@@ -270,8 +270,26 @@ public final class Pests {
             "\\b(" + String.join("|", NAMES.stream()
                     .sorted((a, b) -> b.length() - a.length()).toList()) + ")\\b");
 
-    /** Whether this name plate belongs to a pest. */
+    /**
+     * A pet's name plate, which carries its level: {@code [Lvl 189] Rose Dragon}.
+     *
+     * <p>Six pests share a name with a pet - Slug, Mosquito, Rat, Beetle, Moth and Cricket among
+     * them - so matching the name alone boxes your own pet as vermin, which is exactly what Diego
+     * saw with a Slug. The level prefix is the tell: SkyBlock writes it on every pet plate and on no
+     * mob plate, and {@code SkyblockHud} has been reading pets by that same prefix since the pet HUD
+     * was written, so this is not a new assumption to maintain.
+     *
+     * <p>Deliberately <b>not</b> "skip whatever your active pet is called": that would hide a real
+     * Slug pest for as long as you have a Slug out, and the pest is the thing you are looking for.
+     * Other players' pets carry the prefix too, so the one check covers them as well.
+     */
+    private static final Pattern PET_PLATE = Pattern.compile("\\[Lvl\\s*\\d+]");
+
+    /** Whether this name plate belongs to a pest, and which one - or null for anything else. */
     public static String pestOnPlate(String plate) {
+        if (PET_PLATE.matcher(plate).find()) {
+            return null;
+        }
         Matcher m = PEST_NAME.matcher(plate);
         return m.find() ? m.group(1) : null;
     }

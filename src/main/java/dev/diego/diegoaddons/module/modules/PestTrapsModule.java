@@ -35,6 +35,10 @@ public class PestTrapsModule extends HudModule {
             new BooleanSetting(this, "warnFull", "Warn when a trap fills", true);
     private final BooleanSetting warnBait =
             new BooleanSetting(this, "warnBait", "Warn when a trap runs out of bait", true);
+    private final BooleanSetting warnTitle =
+            new BooleanSetting(this, "warnTitle", "Warning as a title", true);
+    private final BooleanSetting warnChat =
+            new BooleanSetting(this, "warnChat", "Warning in chat", true);
     private final BooleanSetting warnSound =
             new BooleanSetting(this, "warnSound", "Play a sound", true);
 
@@ -48,6 +52,8 @@ public class PestTrapsModule extends HudModule {
         settings.add(hideWhenFine);
         settings.add(warnFull);
         settings.add(warnBait);
+        settings.add(warnTitle);
+        settings.add(warnChat);
         settings.add(warnSound);
         INSTANCE = this;
     }
@@ -98,28 +104,48 @@ public class PestTrapsModule extends HudModule {
             return;
         }
         if (warnFull.get()) {
-            announce(mc, Garden.fullTraps(), announcedFull, "is full");
+            announce(mc, Garden.fullTraps(), announcedFull, "are full", "TRAPS FULL");
         }
         if (warnBait.get()) {
-            announce(mc, Garden.noBaitTraps(), announcedBait, "has no bait");
+            announce(mc, Garden.noBaitTraps(), announcedBait, "are out of bait", "TRAPS EMPTY");
         }
         // A trap that has been emptied or re-baited drops out, which is what lets it warn again.
         announcedFull.retainAll(Garden.fullTraps());
         announcedBait.retainAll(Garden.noBaitTraps());
     }
 
-    private void announce(Minecraft mc, Set<Integer> traps, Set<Integer> already, String what) {
+    /**
+     * Announces the traps that have just gone bad, on the same three channels as the pest timer's
+     * swap warning - title, chat and sound.
+     *
+     * <p>Batched into one warning rather than one per trap: three traps filling within a second of
+     * each other are one thing that happened, and three titles in a row would show you only the
+     * last. Each trap is still marked individually, so a fourth filling later warns on its own.
+     */
+    private void announce(Minecraft mc, Set<Integer> traps, Set<Integer> already, String what,
+                          String headline) {
+        List<Integer> fresh = new ArrayList<>();
         for (int trap : traps) {
-            if (!already.add(trap)) {
-                continue;
+            if (already.add(trap)) {
+                fresh.add(trap);
             }
-            if (mc.gui != null) {
-                mc.gui.getChat().addClientSystemMessage(
-                        Component.literal("§b[DiegoAddons] §fPest trap §e#" + trap + " §f" + what + "."));
-            }
-            if (warnSound.get() && mc.player != null) {
-                mc.player.playSound(SoundEvents.NOTE_BLOCK_DIDGERIDOO.value(), 1.0f, 0.8f);
-            }
+        }
+        if (fresh.isEmpty()) {
+            return;
+        }
+        String which = numbers(new java.util.LinkedHashSet<>(fresh));
+        String detail = (fresh.size() == 1 ? "Trap " : "Traps ") + which + " " + what;
+
+        if (warnTitle.get() && mc.gui != null) {
+            mc.gui.setTitle(Component.literal("§6§l" + headline));
+            mc.gui.setSubtitle(Component.literal("§e" + detail));
+        }
+        if (warnChat.get() && mc.gui != null) {
+            mc.gui.getChat().addClientSystemMessage(
+                    Component.literal("§b[DiegoAddons] §f" + detail + "."));
+        }
+        if (warnSound.get() && mc.player != null) {
+            mc.player.playSound(SoundEvents.NOTE_BLOCK_DIDGERIDOO.value(), 1.0f, 0.8f);
         }
     }
 }

@@ -207,6 +207,13 @@ widget is missing rather than showing a zero.
 Seasoning towards the next milestone plus the four in-season crops, shown **only while the event is
 running**. Diego is on Autumn 19th, so this is the one Garden feature that can be checked today.
 
+- [x] **"Show even when the event is over" was the only way to see the card** — Diego, from a real
+      game: with it off the HUD was simply absent, while everything on it was correct with it on. The
+      detection keyed on a tab line naming the event, and that line is evidently not there. It is now
+      three signals, any of which is enough: **the season on the scoreboard** (the feast runs Early
+      through Late Autumn, and the date is written every second of the game — this is the one that
+      cannot go missing), the tab line if it does appear, and a **Grand Feast reading from Ted**,
+      which is the case the calendar gets wrong since Finnegan's version runs all year.
 - [ ] **Open Feast Chef Ted once**, with "Debug scan (log)" on. The seasoning total and the
       milestone ladder are read from that menu and nowhere else — the tab list only says whether the
       event is on. The dump is what the two patterns (`HarvestFeast.PROGRESS` / `TOTAL`) have to be
@@ -242,9 +249,14 @@ running**. Diego is on Autumn 19th, so this is the one Garden feature that can b
       open a sack again — and are keyed per profile, since the other profile's sacks are somebody
       else's. Shortened numbers ("60.5k") are rounded by Hypixel, so this is "roughly enough",
       not an inventory.
-- [ ] **Auto swap** on the Pest Timer card, off by default: pest loadout when the warning fires,
-      farming loadout back once a pest has actually spawned. Needs the **Loadout Keybinds** module
-      on, since it owns the command and the clicking.
+- [ ] **Auto swap** on the Pest Timer card, off by default, with **its own "Swap at (seconds
+      before)"** slider (default 30). It used to hang off the warning's lead time, which meant
+      turning warnings off turned the swap off with them and both had to fire at the same instant.
+      Needs the **Loadout Keybinds** module on, since it owns the command and the clicking.
+- [ ] **Swapping back watches two signals**, either of which is enough: the spawn chat line (fast,
+      but matched by a guessed pattern that a chat filter can also swallow) and the pest count in the
+      tab widget going up (Hypixel's own number, about a second slower). Either alone is a way to get
+      stuck in pest gear, which is farming fortune quietly bleeding away.
 - [ ] **The safety rule that matters:** farming means holding the attack button, and a menu opening
       under a held button takes that as a click on a real slot. The swap therefore waits for both
       mouse buttons to be up, no other screen to be open, no swap already in flight, and the Garden.
@@ -307,6 +319,14 @@ running**. Diego is on Autumn 19th, so this is the one Garden feature that can b
       box was used. "Only with a vacuum in hand" matches the item name (vacuum / hooverius / lasso).
 - [ ] **Is the plate even there?** If nothing is ever boxed, the pest may carry its name on the mob
       rather than on a separate armour stand — that is the one assumption the whole ESP rests on.
+- [x] **Pets were boxed as pests** — Diego, from a real game: his Slug pet was outlined. Six pests
+      share their name with a pet (Slug, Mosquito, Rat, Beetle, Moth, Cricket), so matching the name
+      alone catches your own pet. Pets carry `[Lvl 189]` on the plate and mobs never do, which is the
+      same prefix `SkyblockHud` has read pets by since the pet HUD was written — so no new assumption.
+      Deliberately not "skip whatever your active pet is called": that would hide a real Slug pest
+      for as long as a Slug is out, and the pest is the thing being looked for. Other players' pets
+      are covered by the same check. Ten cases checked, including `[Lv5] Slug 20/20` still counting
+      as a pest and "Ratatouille" not.
 
 ### Storage Overlay (2.5.3) — the whole feature is written blind
 The NEU sheet: open `/storage` and the overlay draws over that menu — every ender chest page and

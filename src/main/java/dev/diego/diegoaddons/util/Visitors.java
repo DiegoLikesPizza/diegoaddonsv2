@@ -143,21 +143,58 @@ public final class Visitors {
      * every visitor, it is not there for any other Garden menu, and it does not depend on a name.
      */
     public static boolean isVisitorMenu(AbstractContainerScreen<?> screen) {
-        ItemStack info = slot(screen, INFO_SLOT);
-        if (info == null || info.isEmpty()) {
+        return isOfferItem(slot(screen, INFO_SLOT)) || hasAcceptButton(screen);
+    }
+
+    /**
+     * The "Accept Offer" button, Diego's suggestion and the better of the two signals.
+     *
+     * <p>It is a name rather than a lore line, it is the same for every visitor, and it is the one
+     * thing a visitor menu must have to be one. Kept alongside the lore check rather than replacing
+     * it: two independent tells mean a wrong guess about either one costs nothing, and both strings
+     * here are still guesses at Hypixel's exact wording.
+     */
+    private static boolean hasAcceptButton(AbstractContainerScreen<?> screen) {
+        ItemStack accept = slot(screen, ACCEPT_SLOT);
+        if (accept == null || accept.isEmpty()) {
             return false;
         }
-        for (String line : lore(info)) {
-            if (line.startsWith("Offers Accepted:")) {
+        return LegacyText.strip(accept.getHoverName().getString())
+                .toLowerCase(Locale.ROOT).contains("accept offer");
+    }
+
+    /**
+     * Whether this item is a visitor's offer, judged by its own lore.
+     *
+     * <p>By content rather than by which slot it sits in, because the tooltip hook is handed a stack
+     * and asking "is this the same object as slot 13" turned out to be the wrong question - the
+     * hovered stack need not be that identical instance, and when it is not, the whole valuation
+     * silently never appears. Content also answers for the menu itself, so one check serves both.
+     */
+    private static boolean isOfferItem(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        for (String line : lore(stack)) {
+            if (line.contains("Offers Accepted")) {
                 return true;
             }
         }
         return false;
     }
 
-    /** Reads the offer, or null when this is not a visitor menu or its lore did not parse. */
+    /** Reads the offer from the menu's own middle slot. */
     public static Offer read(AbstractContainerScreen<?> screen) {
-        ItemStack info = slot(screen, INFO_SLOT);
+        return read(slot(screen, INFO_SLOT), screen);
+    }
+
+    /**
+     * Reads an offer from the item that carries it.
+     *
+     * <p>The screen is still needed, but only for the visitor's name and rarity - those live in the
+     * window title, not in the offer.
+     */
+    public static Offer read(ItemStack info, AbstractContainerScreen<?> screen) {
         if (info == null || info.isEmpty()) {
             return null;
         }
@@ -256,7 +293,9 @@ public final class Visitors {
         }
         List<String> out = new ArrayList<>(l.lines().size());
         for (var line : l.lines()) {
-            out.add(LegacyText.strip(line.getString()));
+            // Trimmed: Hypixel indents most lore, and a leading space defeats every startsWith in
+            // this file - which is a whole feature failing on an invisible character.
+            out.add(LegacyText.strip(line.getString()).trim());
         }
         return out;
     }
@@ -327,6 +366,34 @@ public final class Visitors {
     }
 
     /**
+     * Writes the price per copper onto Hypixel's own copper line, the way SkyHanni does it:
+     * {@code +150 Copper §7(paying §61.2k §7per)}.
+     *
+     * <p>On the line rather than under the lore, because that is where the question is asked. You
+     * are looking at "150 Copper" and wondering what it costs you; an answer eight lines further
+     * down is an answer you have to go and find.
+     *
+     * <p>The original component is kept and appended to rather than rebuilt from its text. Rebuilding
+     * would mean re-deriving Hypixel's own colours from a stripped string, and getting that subtly
+     * wrong on every visitor line is a poor trade for a suffix.
+     */
+    private static void annotateCopperLine(Offer offer, List<net.minecraft.network.chat.Component> lines) {
+        double perCopper = offer.costPerCopper();
+        if (perCopper < 0 || !Bazaar.fresh()) {
+            return;
+        }
+        for (int i = 0; i < lines.size(); i++) {
+            String plain = LegacyText.strip(lines.get(i).getString()).trim();
+            if (!COPPER.matcher(plain).matches()) {
+                continue;
+            }
+            lines.set(i, lines.get(i).copy().append(net.minecraft.network.chat.Component.literal(
+                    " §7(paying §6" + coins(perCopper) + " §7per)")));
+            return;
+        }
+    }
+
+    /**
      * Adds the valuation under the offer item's own lore.
      *
      * <p>Every line says where its number came from, including when it did not come from anywhere:
@@ -336,16 +403,16 @@ public final class Visitors {
     public static void appendTooltip(AbstractContainerScreen<?> screen, ItemStack stack,
                                      List<net.minecraft.network.chat.Component> lines) {
         VisitorHelperModule m = VisitorHelperModule.INSTANCE;
-        if (m == null || !m.isEnabled() || !m.showTooltip() || !isVisitorMenu(screen)) {
+        if (m == null || !m.isEnabled() || !m.showTooltip() || !isOfferItem(stack)) {
             return;
         }
-        if (stack != slot(screen, INFO_SLOT)) {
-            return;
-        }
-        Offer offer = read(screen);
+        // Read from the hovered item itself rather than from the screen's slot 13 - the same reason
+        // the check above moved to content: what is under the cursor is the thing to price.
+        Offer offer = read(stack, screen);
         if (offer == null) {
             return;
         }
+        annotateCopperLine(offer, lines);
         lines.add(net.minecraft.network.chat.Component.literal(""));
         if (!Bazaar.fresh()) {
             lines.add(net.minecraft.network.chat.Component.literal("§8Bazaar prices not loaded yet"));
@@ -374,11 +441,8 @@ public final class Visitors {
                         : "§e" + e.getKey() + " §7- " + have + " in sacks, " + (need - have) + " short"));
             }
         }
-        if (offer.copper() > 0) {
-            lines.add(net.minecraft.network.chat.Component.literal(
-                    "§7Per copper: §6" + String.format(Locale.ROOT, "%.1f", offer.costPerCopper())
-                            + " §7(" + offer.copper() + " copper)"));
-        }
+        // No "per copper" line here: it is written onto Hypixel's own copper line instead, by
+        // annotateCopperLine. Saying it twice in one tooltip is worse than saying it once.
         double profit = offer.profit();
         if (!Double.isNaN(profit)) {
             lines.add(net.minecraft.network.chat.Component.literal(
