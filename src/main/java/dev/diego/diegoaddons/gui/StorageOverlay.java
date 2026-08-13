@@ -13,6 +13,7 @@ import dev.diego.diegoaddons.util.StorageScanner;
 import dev.diego.diegoaddons.util.Toasts;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.component.DataComponents;
@@ -566,8 +567,15 @@ public final class StorageOverlay {
             clickSheet(mc, screen, l, menu, mx, my, button, shift);
             return true;
         }
-        // Anywhere else inside the panel is swallowed; outside it closes, the way a menu does.
+        // Anywhere else inside the panel is swallowed; outside it closes, the way a menu does -
+        // except while something is on the cursor. The panel is smaller than the window, so the
+        // click that would be "throw this item away" in a vanilla chest lands here often, and
+        // closing on it hands the stack back to your inventory from somewhere you cannot see.
         if (!Ui.hovered(mx, my, l.panelX, l.panelY, l.panelW, l.panelH)) {
+            if (!menu.getCarried().isEmpty()) {
+                Toasts.show("Put it down first", "Closing while holding something would return it");
+                return true;
+            }
             screen.onClose();
         }
         return true;
@@ -625,17 +633,41 @@ public final class StorageOverlay {
         return true;
     }
 
-    /** Returns true when the overlay took the key. Escape closes the menu, as it would anyway. */
-    public static boolean keyPressed(AbstractContainerScreen<?> screen, int key, int modifiers) {
+    /**
+     * Takes every key while the sheet is up. Escape closes the menu, as it would anyway, and the
+     * inventory key does too once you are not typing.
+     *
+     * <p><b>Nothing is passed down to the menu, and that is what stops items being thrown.</b> The
+     * menu's own key handling works off {@code hoveredSlot}, which is assigned in
+     * {@code extractContents} - the very method {@link
+     * dev.diego.diegoaddons.mixin.StorageOverlayMixin} cancels. So while the sheet is drawn that
+     * field is frozen at whatever the cursor happened to be over in the frame before the overlay
+     * took over, and vanilla will happily throw <i>that</i> slot's item on the drop key, or swap it
+     * on a hotbar number, at a slot you can no longer see. A letter is not safe either: the key for
+     * the search box arrives as a key press first, so "e" reached the menu as the inventory key and
+     * closed it mid-word.
+     */
+    public static boolean keyPressed(AbstractContainerScreen<?> screen, KeyEvent event) {
         if (!active(screen)) {
             return false;
         }
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
             close();
             screen.onClose();
             return true;
         }
-        return SEARCH.keyPressed(key, modifiers);
+        if (SEARCH.keyPressed(event.key(), event.modifiers())) {
+            return true;
+        }
+        // The search box takes focus when the sheet opens, so this is the case where it was clicked
+        // away: with nothing being typed, the inventory key should still close the menu.
+        if (!SEARCH.capturingInput()
+                && Minecraft.getInstance().options.keyInventory.matches(event)) {
+            close();
+            screen.onClose();
+            return true;
+        }
+        return true;
     }
 
     public static boolean charTyped(AbstractContainerScreen<?> screen, char c) {

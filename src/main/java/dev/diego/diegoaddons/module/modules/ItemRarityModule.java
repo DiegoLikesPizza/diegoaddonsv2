@@ -12,7 +12,8 @@ import dev.diego.diegoaddons.module.Module;
  * <p><b>Where</b> it draws is deliberately not "everywhere". A SkyBlock menu is mostly filler - grey
  * panes, close buttons, a hundred cosmetic heads - and colouring all of that turns a menu into
  * confetti. Your own items are never filler, so they are always coloured; a server menu is only
- * coloured where its contents are things you own, which so far means the accessory bag.
+ * coloured where its contents are things you own, which so far means the accessory bag and the
+ * pets menu.
  */
 public class ItemRarityModule extends Module {
     public static ItemRarityModule INSTANCE;
@@ -28,6 +29,8 @@ public class ItemRarityModule extends Module {
             new BooleanSetting(this, "everywhere", "Your inventory in every menu", true);
     private final BooleanSetting accessoryBag =
             new BooleanSetting(this, "accessoryBag", "Accessory bag", true);
+    private final BooleanSetting pets =
+            new BooleanSetting(this, "pets", "Pets menu", true);
 
     public ItemRarityModule() {
         super("itemrarity", Category.MISC, "Item Rarity",
@@ -35,6 +38,7 @@ public class ItemRarityModule extends Module {
         settings.add(display);
         settings.add(everywhere);
         settings.add(accessoryBag);
+        settings.add(pets);
         INSTANCE = this;
     }
 
@@ -47,8 +51,13 @@ public class ItemRarityModule extends Module {
         return everywhere.get();
     }
 
-    /** Whether the accessory bag's own slots are coloured - the one server menu that holds your gear. */
+    /** Whether the accessory bag's own slots are coloured - a server menu that holds your gear. */
     public boolean accessoryBag() {
         return accessoryBag.get();
+    }
+
+    /** Whether the pets menu's own slots are coloured - every one of them is a pet you own. */
+    public boolean pets() {
+        return pets.get();
     }
 }

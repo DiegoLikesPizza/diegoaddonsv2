@@ -33,7 +33,8 @@ public final class EspWorld {
      * <p>{@code gradMinY}/{@code gradMaxY} are the height range the two colours belong to, which for
      * an outline's edge is the whole box rather than that thin edge - see {@link WorldGeometry#fillBox}.
      */
-    private record Box(AABB geom, int argbBottom, int argbTop, double gradMinY, double gradMaxY) {
+    private record Box(AABB geom, int argbBottom, int argbTop, double gradMinY, double gradMaxY,
+                       boolean occluded) {
     }
 
     private static final List<Box> BUILDING = new ArrayList<>();
@@ -65,8 +66,27 @@ public final class EspWorld {
         init();
         synchronized (BUILDING) {
             for (AABB edge : WorldGeometry.edges(box, thickness)) {
-                BUILDING.add(new Box(edge, argbA, argbB, box.minY, box.maxY));
+                BUILDING.add(new Box(edge, argbA, argbB, box.minY, box.maxY, false));
             }
+        }
+    }
+
+    /**
+     * A filled box that terrain hides - the "Highlight" style.
+     *
+     * <p>Queued into the same list as everything else and separated at draw time by its flag, rather
+     * than kept in a second list: the two are drawn back to back in one frame and the ordering
+     * between them does not matter, so one list and one flip is the simpler arrangement.
+     */
+    public static void fillOccluded(AABB box, int argb) {
+        fillOccludedFade(box, argb, argb);
+    }
+
+    /** As above, fading up its height. */
+    public static void fillOccludedFade(AABB box, int argbA, int argbB) {
+        init();
+        synchronized (BUILDING) {
+            BUILDING.add(new Box(box, argbA, argbB, box.minY, box.maxY, true));
         }
     }
 
@@ -79,7 +99,7 @@ public final class EspWorld {
     public static void fillFade(AABB box, int argbA, int argbB) {
         init();
         synchronized (BUILDING) {
-            BUILDING.add(new Box(box, argbA, argbB, box.minY, box.maxY));
+            BUILDING.add(new Box(box, argbA, argbB, box.minY, box.maxY, false));
         }
     }
 
@@ -134,8 +154,29 @@ public final class EspWorld {
         // An ESP you cannot see through a wall defeats the point, so this is the see-through variant
         // throughout - the engine's own filled pipeline with the depth test cleared.
         VertexConsumer vc = buffers.getBuffer(EspRenderTypes.QUADS);
+        boolean anyOccluded = false;
         for (Box b : boxes) {
+            if (b.occluded()) {
+                anyOccluded = true;
+                continue;
+            }
             WorldGeometry.fillBox(pose, vc, b.geom(), cam,
+                    b.argbBottom(), b.argbTop(), b.gradMinY(), b.gradMaxY());
+        }
+        buffers.endBatch();
+
+        // The Highlight style, in a second batch: same geometry, depth-tested pipeline, so terrain
+        // in front of it hides it. Batched separately because the two cannot share a buffer - the
+        // render type is what carries the depth state.
+        if (!anyOccluded) {
+            return;
+        }
+        VertexConsumer depth = buffers.getBuffer(EspRenderTypes.QUADS_DEPTH);
+        for (Box b : boxes) {
+            if (!b.occluded()) {
+                continue;
+            }
+            WorldGeometry.fillBox(pose, depth, b.geom(), cam,
                     b.argbBottom(), b.argbTop(), b.gradMinY(), b.gradMaxY());
         }
         buffers.endBatch();

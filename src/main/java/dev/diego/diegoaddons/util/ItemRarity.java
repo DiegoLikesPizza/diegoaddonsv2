@@ -44,8 +44,12 @@ public final class ItemRarity {
         }
         boolean inventoryScreen =
                 screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen;
-        boolean accessories = mod.accessoryBag() && isAccessoryBag(screen);
-        if (!inventoryScreen && !accessories && !mod.everywhere()) {
+        String title = LegacyText.strip(screen.getTitle().getString())
+                .toLowerCase(java.util.Locale.ROOT);
+        // The two server menus whose every slot is something you own.
+        boolean serverSlots = (mod.accessoryBag() && isAccessoryBag(title))
+                || (mod.pets() && isPetsMenu(title));
+        if (!inventoryScreen && !serverSlots && !mod.everywhere()) {
             return;
         }
 
@@ -58,7 +62,7 @@ public final class ItemRarity {
 
         for (int i = 0; i < slots.size(); i++) {
             boolean yours = i >= mine;
-            if (!(yours ? inventoryScreen || mod.everywhere() : accessories)) {
+            if (!(yours ? inventoryScreen || mod.everywhere() : serverSlots)) {
                 continue;
             }
             Slot slot = slots.get(i);
@@ -84,9 +88,23 @@ public final class ItemRarity {
      * form carries a page number ("Accessory Bag (1/3)"), so this looks for the words rather than
      * for the whole title.
      */
-    private static boolean isAccessoryBag(AbstractContainerScreen<?> screen) {
-        return LegacyText.strip(screen.getTitle().getString())
-                .toLowerCase(java.util.Locale.ROOT).contains("accessory bag");
+    private static boolean isAccessoryBag(String lowerTitle) {
+        return lowerTitle.contains("accessory bag");
+    }
+
+    /**
+     * Whether this is the pets menu - every pet you own, and the one other server menu where a
+     * rarity colour is information rather than decoration.
+     *
+     * <p>Matched from the <b>start</b> of the title rather than anywhere in it: the menu is "Pets"
+     * or, once you have more than a page of them, "Pets (1/2)". Looking for the word anywhere would
+     * also catch every menu that merely mentions pets.
+     *
+     * <p>The buttons along the bottom of the menu need no excluding: a sort or filter button has no
+     * rarity line, so {@link #color} answers 0 for it and it is left alone.
+     */
+    private static boolean isPetsMenu(String lowerTitle) {
+        return lowerTitle.startsWith("pets");
     }
 
     /**
@@ -143,6 +161,16 @@ public final class ItemRarity {
         }
     }
 
+    /**
+     * The rarity word itself, which is what a rarity line is recognised by.
+     *
+     * <p>Word boundaries rather than a whole-line match, because the line is not always only the
+     * word: a dungeon item reads "LEGENDARY DUNGEON HELMET", and a recombobulated one wraps it in
+     * obfuscated characters that strip down to stray letters either side.
+     */
+    private static final java.util.regex.Pattern RARITY = java.util.regex.Pattern.compile(
+            "\\b(COMMON|UNCOMMON|RARE|EPIC|LEGENDARY|MYTHIC|DIVINE|SPECIAL|SUPREME|ULTIMATE|ADMIN)\\b");
+
     /** The ARGB rarity colour of an item, or 0 if it has no readable rarity line. */
     public static int color(ItemStack stack) {
         ItemLore lore = stack.get(DataComponents.LORE);
@@ -150,14 +178,26 @@ public final class ItemRarity {
             return 0;
         }
         List<Component> lines = lore.lines();
+        Component bottom = null;
+        // Bottom-up, because the rarity is the last thing an item's lore says about itself.
         for (int i = lines.size() - 1; i >= 0; i--) {
             Component c = lines.get(i);
-            if (LegacyText.strip(c.getString()).isBlank()) {
+            String text = LegacyText.strip(c.getString());
+            if (text.isBlank()) {
                 continue;
             }
-            return firstColor(c);   // the bottom-most non-blank line carries the rarity
+            if (RARITY.matcher(text).find()) {
+                return firstColor(c);
+            }
+            if (bottom == null) {
+                bottom = c;
+            }
         }
-        return 0;
+        // Nothing named a rarity, so fall back to the bottom-most line's colour - which is what
+        // this read used to be in full. A menu item is where the two differ: the pets menu ends
+        // every pet with "Click to summon!", and taking that line would paint the whole menu
+        // yellow while the rarity sat one line above it.
+        return bottom == null ? 0 : firstColor(bottom);
     }
 
     /** The colour of the first coloured, non-blank run of a component. */

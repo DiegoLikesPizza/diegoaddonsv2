@@ -119,7 +119,20 @@ public class FeastHudModule extends HudModule {
             return "old - reopen Ted";
         }
         long left = HarvestFeast.msLeftInSeason();
-        return left < 0 ? "" : Garden.time(left);
+        return left < 0 ? "" : clock(left);
+    }
+
+    /**
+     * {@code 3:20:15} - hours, minutes and seconds, zero-padded.
+     *
+     * <p>A season runs to over ten hours, and "620m 15s" is a number you have to convert in your
+     * head before it means anything. The shared {@code Garden.time} shape is right for a two-minute
+     * pest cooldown and wrong here.
+     */
+    private static String clock(long ms) {
+        long total = Math.max(0, ms) / 1000;
+        return String.format(java.util.Locale.ROOT, "%d:%02d:%02d",
+                total / 3600, (total % 3600) / 60, total % 60);
     }
 
     // --- the element ------------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.4-b-1** — the first beta build, `mod_version` in `gradle.properties`. Fabric
+**Current version: 2.5.4-b-6** — a beta build, `mod_version` in `gradle.properties`. Fabric
 parses it as a pre-release (`b-1`) and orders it below `2.5.4`, checked against the loader itself, so
 a later `2.5.4` release supersedes it on every instance whether or not pre-releases are switched on.
 2.5.3 is released (tag `v2.5.3`, jar attached). RenderLib is gone; the mod runs on
@@ -328,6 +328,198 @@ running**. Diego is on Autumn 19th, so this is the one Garden feature that can b
       are covered by the same check. Ten cases checked, including `[Lv5] Slug 20/20` still counting
       as a pest and "Ratatouille" not.
 
+### Safari (2.5.4-b-5) — SkyBlock 0.27, written the week the island shipped
+A **Safari** category for the Critter Safari on Torrhus Canyon: **Critter ESP**, **Sparkling
+Critters** and **Floor Drops ESP**. Everything here was written off the wiki, four days after an
+island that did not exist when the last version shipped — so more of this is guesswork than usual,
+and the guesses are named below rather than buried.
+
+- [ ] **Everything rests on one thing: do critters carry name plates?** All thirty-seven are matched
+      by reading the plate, not by entity type, and that is a deliberate choice — about a third of
+      them are not vanilla animals at all (Duplico disguises itself as a block, Gazer only appears
+      while you sleep, Hideyho is a skinned player entity), so type matching would cover two thirds
+      and silently miss the rest, including most of the rare ones. The wiki's own statement that a
+      sparkling critter shows a `SPARKLING` **prefix** is the evidence there is a name to prefix.
+      **If nothing is ever boxed, turn on "Debug plates (log)" on the Critter ESP card**: it prints
+      every plate it did *not* match, which is the one measurement that settles this.
+- [ ] **The thirty-seven names are the wiki's spelling**, in `util/Safari.java`, with a biome and a
+      rarity each (9 Cavern / 9 Forest / 10 Haunted / 9 Icy). A name Hypixel spells differently is
+      the one failure the loose matching cannot absorb — the debug log is again the way to find it.
+- [ ] **One card, not thirty-seven.** A critter is a thing you catch once, so the filters are the
+      two that get used: four biome toggles and an "At least <rarity>" floor, plus "Colour by
+      rarity" (on by default). Check the rarity colours actually read at distance in a dark cave.
+- [ ] **The biome toggles filter by which critter it is, not where you stand** — the four biomes meet
+      in the middle of the island, and filtering by location would blink boxes on and off at the
+      borders.
+- [ ] **Sparkling is its own module and ignores those filters on purpose** — a sparkling Cavernfish
+      is still a Rainbow Feather even with every common hidden. 1 in 8,192 (1 in 4,096 with the
+      Sparkling Amulet), so **this may take a very long time to see even once**. Worth testing the
+      notification path by temporarily matching a common name instead.
+- [ ] **The notification fires once per critter, with a re-announce cooldown** (default 60s) rather
+      than once ever: a critter can leave view and come back, and once-ever risks the second sighting
+      being the silent one. Watch it does not repeat every tick.
+- [ ] **Floor Drops are a block scan, which is new for this mod** — every other ESP reads entities.
+      The marker is "String on the ground", i.e. `minecraft:tripwire`, and **that is a guess, so it
+      is a text box** (Block id) rather than a constant, the same call the Storage Overlay's commands
+      got. If the boxes never appear, look at what the string actually is and type it in.
+- [ ] **The scan is on a timer, not per tick** — a 24-block radius is about eighty thousand block
+      reads, so it runs every 2s and again at once when you have moved 8 blocks. **A picked-up drop
+      therefore stays boxed for up to 2 seconds.** That is the right way round, but check the scan
+      does not stutter the game at radius 64.
+- [ ] **"Only on the Foraging islands"** (default on) gates it to Moonglade Marsh, Torrhus Canyon and
+      the Critter Safari. Turn it off to test the scan anywhere.
+- [ ] **The new "Highlight (no x-ray)" style is on every ESP in the mod**, not just these three: a
+      filled mark that terrain hides, which is what makes a busy island readable when forty boxes
+      through a hillside is not. It is a **new render path** (`EspRenderTypes.QUADS_DEPTH`, the
+      engine's own depth-tested debug-box pipeline, drawn in a second batch) and has never been on
+      screen. Two things to check: that it is actually hidden behind terrain, and that it composites
+      at all — unlike the see-through types it does not set `ITEM_ENTITY_TARGET`, because the depth
+      test has to run against the main framebuffer. **If it draws nothing, that output target is the
+      first thing to try.**
+- [ ] It is last in the style list on purpose — the indices are what gets saved, so inserting it
+      anywhere else would have moved every ESP already set to "Player outline".
+
+### Safari, second pass (2.5.4-b-6) — four more, off Diego's picks
+Diego took Hideyho, the cold warning, floor-drop waypoints and quest tooltips off the list below, and
+replaced the sparkling radar with **an ESP for the particles themselves**. All four are still written
+blind.
+
+- [ ] **Sparkling: found by particles now, not only by the plate.** A plate is a rendered entity, so
+      it does not exist until the mob is loaded and roughly in front of you; a particle arrives as a
+      packet from much further out and through terrain. For a 1-in-8,192 spawn that difference *is*
+      the feature — the failure being designed against is walking past one.
+- [ ] **Which particle it is, is not known**, so "Particle ids" is a **comma-separated text box**
+      watching three likely ones at once (`end_rod`, `firework`, `crit`). Two things make a wrong
+      guess survivable: several ids at once, and a marker needs a **cluster** — 8 particles in one
+      spot by default — so a stray crit from hitting a mob never becomes a waypoint.
+      **"Debug particles (log)" is the measurement that ends the guessing**: it logs every particle
+      type arriving on the island with counts every 5s. Stand next to a sparkling critter with it on
+      and the answer is whichever type suddenly appears.
+- [ ] **The two routes must not both shout.** The plate stays quiet while the particle route is
+      marking something; if the ids turn out wrong, that is false and the plate becomes the
+      announcement again. Watch for a double notification — that would mean the guard is inverted.
+- [ ] **Hideyho Finder.** Not an ESP — there is nothing to box, it teleports out of view the moment
+      it agrees to play. It draws the **eleven documented hiding spots** and strikes each off as you
+      get within 8 blocks, so what is left on screen means "still to check". Driven by three chat
+      lines matched on fragments (`no peeking` / `come find me` / `you found me`) rather than whole
+      sentences, because the real lines carry a time and a shard count.
+      **Check the state does not get stuck on** — if it never clears, the "you found me" fragment is
+      the thing to print. Six start positions are behind a toggle, off by default.
+- [ ] **Are the eleven spots right?** Wiki coordinates, community-collected. If it is repeatedly
+      found somewhere unmarked, that list needs the extra spot.
+- [ ] **Cold Warning — and it is not gated to the Safari.** The Icy biome borrowed the Glacite
+      Tunnels' mechanic wholesale and Hypixel writes the same sidebar line in both, so this covers
+      the Dwarven Mines for free. Read from `Cold: -14❄` (Hypixel writes it **negative**; the sign is
+      dropped here). Two tiers — 60 and 85 by default — with different sounds, because the two have
+      to be tellable apart without looking. **Check the sidebar line actually reads that way**; the
+      pattern is SkyHanni's, which is good evidence but not a measurement.
+- [ ] **Cold re-arms on the campfire line** (`reduced your ... Cold`) and on freezing to death, so
+      the warning fires once per approach rather than once per tick. Watch that a campfire visit
+      actually silences it.
+- [ ] **Floor Drop waypoints — 113 known Safari spots**, drawn as a quieter second layer under the
+      live block scan. **These are preset spots, not drops**: the wiki says a drop has "a chance to
+      spawn in preset locations", so a marker means "something can be here", never "something is
+      here". A spot the scan has already found is skipped, so the two layers never draw on top of
+      each other. If they are systematically off by a block, the wiki's numbers are somebody's F3
+      readout and the ±2 tolerance in the overlap check is where to widen.
+- [ ] **Safari Item Tooltips.** Eleven items, and the point is the ones that gate a critter — a
+      Shining Coin describes itself as a shiny coin, not as the only way a Gimmiegold appears.
+      Matched on the display name by `contains`; a name that stops matching costs a missing line,
+      not a wrong one. Plain foods (bamboo, lily pads) are behind a toggle, off by default, because
+      a Safari note on every stack of bamboo you ever pick up is noise.
+
+### Safari — features not built, worth considering
+Written down rather than built, so the list survives the session. Roughly in the order they would
+pay off:
+
+1. **Critterdex tracker / "still to catch" filter.** The single most useful thing on the island: box
+   only what you have *not* caught. Needs the Critterdex menu scanned once (the same shape as the
+   Storage Overlay's scan) and the caught set cached per profile. Everything else here is smaller.
+2. **Capsule counter on the HUD.** Capsules are the run's limiting resource and regular hunting tools
+   get sent to the Stash, so "how many left" is the number that decides whether to keep going.
+3. **Safari Essence session tracker** — essence, shards and Hunting XP per hour, on the shape
+   `FarmingSession` already has. Ties into whether a run is worth finishing.
+4. **The seven bells.** Waypoints for the ones found, and a list of which are missing; the reward is
+   an attribute and an achievement, and they are one-time, so a checklist is the whole feature.
+5. **Biome waypoints from the centre** — the four biome entrances named at distance, which is
+   SkyHanni's `namesInCenter`. Cheap, and the middle of the island is genuinely disorienting.
+6. **Birdfeeder helper** — three of the Forest critters (Bluebird, Parakeet, Macaw) come from
+   feeding a specific bait, and Macaw is legendary. A reminder of which bait is loaded. Partly
+   covered by the item tooltips now; the missing half is knowing what is currently in the feeder.
+7. **Campfire waypoints in the Icy biome** — the Cold warning says "go to a campfire" and does not
+   say where one is. The natural follow-up once the warning has been seen working.
+
+**Declined:** *FarmingSession* — Diego's call, leave it. *Sparkling radar* — replaced by the particle
+ESP above, which solves the same problem (finding one before it is in view) without a HUD compass.
+
+### Hunting (2.5.4-b-4) — a new category, ten ESPs, none of them seen
+A **Hunting** category holds the ten ESPs from Diego's screenshot. Nine are ordinary boxes around a
+kind of mob; the tenth finds something that cannot be seen at all. All ten default **on-island only**
+(a toggle per card), because eight of them box plain vanilla animals — a dolphin is a dolphin, and
+with the gate off this lights up the whole of Backwater Bayou while you are fishing.
+
+- [ ] **Is the island name right?** The gate matches the tab list's `Area:` line *or* the
+      scoreboard's `⏣` area against `Galatea` / `Moonglade Marsh`, and `Crimson Isle` /
+      `Blazing Volcano`. Both readings because the tab gives the island and the scoreboard gives the
+      sub-area. **If nothing is ever boxed on Galatea, those two strings are the first thing to
+      print** — turn the module's "Only on Galatea" off and see whether boxes appear.
+- [ ] **The critters are matched by entity type, not by name plate**, which is the opposite of every
+      other ESP in the mod: they are real vanilla animals wearing a SkyBlock name, so Puffer =
+      pufferfish (Spike), Turtle = Shellwise, Dolphin = Joydive, Axolotl = Coralot, Frog = Mossybit
+      **and** Birries (tadpole, on the same card since it is the same animal younger), Panda =
+      Bambuleaf and Mochibear. **Feesh is "a fish that is not one of those"** — cod and salmon today,
+      and deliberately open-ended so the next fish critter is covered without a code change. If it
+      boxes something it should not, that rule is why.
+- [ ] **Cinderbats are just bats.** No plate, no distinguishing anything — the wiki says they carry
+      nothing above their heads and are found by their fire particles. So the island gate is the
+      *only* thing keeping this off dungeon secret bats, and turning it off means two ESPs on the
+      same bat in two colours. Check they show hanging from cave ceilings under the Blazing Volcano.
+- [ ] **Matcho is the one plated mob** here, boxed off `contains("matcho")` on the plate, which
+      should read something like `[Lv100] Matcho 750k/750k`. It only spawns after the volcano
+      erupts, so this cannot be checked on demand.
+- [ ] **Invisibug — the whole feature rests on one assumption.** It has no model, no plate and no
+      hit box: it is a marker armour stand that Hypixel sprays crit particles around. So every crit
+      particle packet is checked, and the nearest *plain* armour stand within 5 blocks — no custom
+      name, no equipment, so not a name plate or a prop — is taken to be the bug and remembered by
+      entity id. **If nothing is ever boxed while standing in a cloud of crit particles, there is no
+      marker stand there and the whole approach is wrong**, not a threshold to tune.
+- [ ] **A bug is only found after it throws a particle**, so expect a moment on approach where it is
+      not boxed yet. That is by design; a bug that stays unboxed for many seconds is not.
+- [ ] **The box geometry is a guess** and is two sliders for that reason: "Box size" (0.8) and "Box
+      height offset" (0.4), built around the marker's position because a marker has no size to
+      inherit. If the box sits beside the particles rather than on them, move those two rather than
+      anything in the code.
+- [ ] **The tracer** is off by default and has its own colour — a line from your eye to each bug.
+      Worth turning on once to confirm the bugs are where the boxes say they are.
+- [ ] **Particles are read off the packet, not the renderer** (`ClientPacketListenerMixin`,
+      `handleParticleEvent` at RETURN rather than HEAD — a packet handler is entered on the network
+      thread first and vanilla throws there to reschedule, so only a return is on the client thread).
+      Crit particles arrive by the hundred from anyone hitting anything, so the type check and the
+      already-known check come before any search of the world; watch for a frame-rate cost anyway.
+- [ ] **Not implemented from the screenshot:** only the ESP block was. The Hunting / Mining / Slayer
+      rows under it (Disable Huntaxe ability, Fusion Delay, Endstone Sell Delay, Mining Ability
+      Alert, Auto Blaze 3) are a different kind of feature and were not asked for.
+- [ ] **Pets are excluded by the same rule the Garden uses.** A Dolphin, a Turtle, an Axolotl and a
+      Bat are all real SkyBlock pets, so four of these ten would box whatever is following you
+      around. A mob's plate rides the mob, so the passengers are checked for the `[Lvl n]` prefix
+      that pet plates carry and mob plates never do — `Pests.isPetPlate`, now shared rather than
+      copied. **Stand next to someone with a Dolphin pet and check it stays unboxed.**
+- [ ] **Squid critters have no card** — Azure, Verdant and Lumisquid are glow squids and are not in
+      the screenshot, so they were left out. One more module if they turn out to be wanted.
+
+### Item Rarity in the pets menu (2.5.4-b-3) — written blind
+- [ ] **Open `/pets` and check every pet is tinted its own rarity**, and that the buttons along the
+      bottom row (sort, filter, autopet, back, close) are *not*. Toggle "Pets menu" on the Item
+      Rarity card. The menu is found by its title **starting with** "pets", which covers the paged
+      "Pets (1/2)"; if nothing is coloured at all, that string is the first thing to print.
+- [ ] **The rarity read changed for every item, not only pets.** It used to take the bottom-most
+      non-blank lore line's colour, which in a menu is a "Click to summon!" line rather than the
+      rarity — so the whole pets menu would have come out yellow. It now walks the lore bottom-up
+      for a line **containing a rarity word** (COMMON … DIVINE, word-boundary matched so
+      "LEGENDARY DUNGEON HELMET" and the recombobulated form still count) and falls back to the old
+      bottom-line behaviour when none is found. Watch for an item that used to be coloured right and
+      now is not — that would mean its rarity word is spelled something this list does not have.
+
 ### Storage Overlay (2.5.3) — the whole feature is written blind
 The NEU sheet: open `/storage` and the overlay draws over that menu — every ender chest page and
 backpack side by side, your own inventory under them, a search box at the bottom. It exists **only**
@@ -362,6 +554,20 @@ every slot's item name once per menu, which is what the patterns have to be tune
       list is what to extend.
 - [ ] **The search box takes focus on open**, so number keys type instead of swapping hotbar slots
       while the sheet is up. Escape closes. Worth a second opinion on that trade.
+- [ ] **Items could be thrown out of a slot you could not see** (2.5.4-b-3). The sheet only claimed
+      the keys its search box wanted, and everything else fell through to the menu underneath —
+      whose key handling works off `hoveredSlot`, assigned in `extractContents`, the one method
+      `StorageOverlayMixin` cancels. So that field stayed frozen at whatever the cursor was over in
+      the frame before the sheet came up, and **Q threw that item**, a hotbar number swapped it, all
+      at a slot nothing on screen was pointing at. The same leak made "e" close the menu mid-word,
+      since the inventory key is checked on the key press before the character is typed.
+      The sheet now takes **every** key while it is up: Escape closes, the inventory key closes once
+      the search box is not focused, and nothing reaches the menu. Screenshots and fullscreen are
+      unaffected — `KeyboardHandler` handles those before the screen is asked (checked in the 26.1.2
+      bytecode). Clicking outside the panel while carrying something is refused with a toast now too,
+      the same way navigating to another page already was.
+      **To check:** pick an item up onto the cursor, press Q, press 1-9, then click outside the
+      panel — nothing should move and nothing should close. Then type a word with an "e" in it.
 - [ ] **Is it still slow?** The first cut ran at a crawl; see the Done entry for what was doing it.
       If it is still heavy, the next thing to look at is the item models themselves — a thousand of
       them is a thousand model submissions, and the only lever left is drawing fewer (a smaller

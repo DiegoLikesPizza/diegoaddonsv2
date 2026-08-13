@@ -49,7 +49,13 @@ public final class EntityEsp {
         boolean doPlayer = players != null && players.isEnabled();
         PestEspModule pests = PestEspModule.INSTANCE;
         boolean doPest = pests != null && pests.isEnabled() && Pests.inGarden() && pests.shouldDraw(mc);
-        if (!doStarred && !doCustom && !doBat && !doMiniboss && !doPlayer && !doPest
+        // The hunting ESPs decided which of them are drawing before this ran - see Hunting.tick.
+        boolean doHunting = Hunting.active();
+        // The Safari's critters and its sparkling variants, decided from the same plate - see
+        // SafariEsp, which was told whether it is drawing just before this ran.
+        boolean doSafari = SafariEsp.active();
+        if (!doStarred && !doCustom && !doBat && !doMiniboss && !doPlayer && !doPest && !doHunting
+                && !doSafari
                 || mc.player == null || mc.level == null) {
             return;
         }
@@ -76,10 +82,19 @@ public final class EntityEsp {
                 }
                 continue;
             }
+            // The hunting critters are real vanilla animals rather than costumed mobs, so they are
+            // the one group here matched by entity type and boxed from their own bounding box.
+            if (doHunting && Hunting.onEntity(e)) {
+                continue;
+            }
             if (!(e instanceof ArmorStand stand) || !stand.hasCustomName()) {
                 continue;
             }
             String name = LegacyText.strip(stand.getCustomName().getString());
+            // Matcho is the one hunting mob wearing a plate rather than being an animal, so it is
+            // resolved here with the rest of them rather than in the type pass above.
+            dev.diego.diegoaddons.module.HuntingEspModule hunted =
+                    doHunting ? Hunting.onPlate(name) : null;
 
             if (doStarred && name.contains(STAR) && !starred.hideDead(name)) {
                 box(stand, starred);
@@ -90,7 +105,19 @@ public final class EntityEsp {
                     box(stand, miniboss);
                 }
             } else if (doPest && Pests.pestOnPlate(name) != null) {
+                if (pests.debugPlates()) {
+                    // The raw plate, colour codes and all: what a pet's plate actually says is the
+                    // one fact this feature is still missing, and it cannot be guessed twice more.
+                    dev.diego.diegoaddons.DiegoAddonsV2Client.LOGGER.info(
+                            "[pest esp] boxing plate: {}", stand.getCustomName().getString());
+                }
                 boxPest(stand, pests);
+            } else if (hunted != null) {
+                box(stand, hunted);
+            } else if (doSafari && SafariEsp.onPlate(mc, stand, name)) {
+                // Boxed by SafariEsp itself: a critter's box comes from its own body and its colour
+                // from its rarity, neither of which the shared box() knows about.
+                continue;
             } else if (doCustom) {
                 String match = CustomEsp.match(name);
                 if (match != null) {

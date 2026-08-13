@@ -41,6 +41,23 @@ public final class EspRenderTypes {
                     .setLayeringTransform(LayeringTransform.VIEW_OFFSET_Z_LAYERING)
                     .createRenderSetup());
 
+    /**
+     * The same quads, <b>depth-tested</b>: hidden behind terrain like anything else in the world.
+     *
+     * <p>This is the whole of the "Highlight" style. Everything else here exists to defeat the depth
+     * test; this one deliberately keeps it, so the mark reads as paint on the mob rather than as a
+     * shape floating in front of the landscape. The engine's own debug-box pipeline already has the
+     * state wanted, so it is used as it comes rather than rebuilt with a hole in it.
+     *
+     * <p>No output target is set, unlike {@link #QUADS}: the depth test has to run against the main
+     * framebuffer's depth, which is where the terrain was just drawn.
+     */
+    public static final RenderType QUADS_DEPTH = RenderType.create("diegoaddons_quads_depth",
+            RenderSetup.builder(RenderPipelines.DEBUG_FILLED_BOX)
+                    .sortOnUpload()
+                    .setLayeringTransform(LayeringTransform.VIEW_OFFSET_Z_LAYERING)
+                    .createRenderSetup());
+
     private EspRenderTypes() {
     }
 }

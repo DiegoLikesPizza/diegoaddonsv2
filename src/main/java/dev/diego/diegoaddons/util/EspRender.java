@@ -59,6 +59,16 @@ public final class EspRender {
                 }
             }
             case EspModule.SQUARE_2D -> EspDraw.square2d(box, argb);
+            case EspModule.HIGHLIGHT -> {
+                // Deliberately more opaque than the see-through fill: that one is translucent so you
+                // can still make out the mob behind it, and here there is nothing behind it to see -
+                // if it is drawn at all, you are already looking straight at the thing.
+                if (fade) {
+                    EspWorld.fillOccludedFade(box, highlight(bottom), highlight(top));
+                } else {
+                    EspWorld.fillOccluded(box, highlight(argb));
+                }
+            }
             case EspModule.MODEL -> {
                 if (entity != null) {
                     EspWorld.outlineModel(entity, argb);
@@ -81,5 +91,10 @@ public final class EspRender {
     /** A filled ESP at full alpha hides the thing it is pointing at. */
     private static int translucent(int argb) {
         return (argb & 0x00FFFFFF) | (0x66 << 24);
+    }
+
+    /** The highlight's alpha: heavier than a see-through fill, still not opaque. */
+    private static int highlight(int argb) {
+        return (argb & 0x00FFFFFF) | (0xAA << 24);
     }
 }

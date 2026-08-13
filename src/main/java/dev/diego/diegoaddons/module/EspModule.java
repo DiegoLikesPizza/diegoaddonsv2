@@ -18,9 +18,21 @@ public abstract class EspModule extends Module {
     public static final int SQUARE_2D = 2;
     /** The entity's own model outlined, rather than a box around it. */
     public static final int MODEL = 3;
+    /**
+     * A filled mark that terrain hides - the only style here that is <b>not</b> an x-ray.
+     *
+     * <p>Every other style defeats the depth test on purpose, which is what an ESP is for and also
+     * what makes a busy island unreadable: forty critters through a hillside is forty boxes over
+     * everything you are trying to look at. This one marks what you can already see, so it reads as
+     * paint on the mob rather than as a shape floating in front of the landscape.
+     *
+     * <p>Last in the list because the indices are what gets saved - inserting it anywhere else would
+     * silently move every ESP already set to a style after it.
+     */
+    public static final int HIGHLIGHT = 4;
 
     private final CycleSetting style = new CycleSetting(this, "espStyle", "Style", OUTLINE,
-            "Box outline", "Filled box", "2D square", "Player outline");
+            "Box outline", "Filled box", "2D square", "Player outline", "Highlight (no x-ray)");
     private final ColorSetting color;
 
     protected EspModule(String id, Category category, String name, String description,

@@ -285,9 +285,20 @@ public final class Pests {
      */
     private static final Pattern PET_PLATE = Pattern.compile("\\[Lvl\\s*\\d+]");
 
+    /**
+     * Whether this name plate belongs to a pet rather than to a mob.
+     *
+     * <p>Public because the hunting ESPs need the same answer for the same reason: several critters
+     * are the entity type of a real SkyBlock pet - a Dolphin, a Turtle, an Axolotl, a Bat - so
+     * boxing by type alone boxes whatever is following the player around. One regex, one place.
+     */
+    public static boolean isPetPlate(String plate) {
+        return PET_PLATE.matcher(plate).find();
+    }
+
     /** Whether this name plate belongs to a pest, and which one - or null for anything else. */
     public static String pestOnPlate(String plate) {
-        if (PET_PLATE.matcher(plate).find()) {
+        if (isPetPlate(plate)) {
             return null;
         }
         Matcher m = PEST_NAME.matcher(plate);

@@ -26,13 +26,27 @@ public class PestEspModule extends EspModule {
      */
     private final BooleanSetting onlyWithVacuum =
             new BooleanSetting(this, "onlyWithVacuum", "Only with a vacuum in hand", false);
+    /**
+     * Logs every name plate this boxes, with its colour codes intact.
+     *
+     * <p>Here because the pet guard has now been wrong twice: pets are excluded by the {@code [Lvl n]}
+     * prefix that the pet <i>menu</i> uses, and a pet's plate in the world may simply not be written
+     * that way. Guessing a third time is worse than printing the string once.
+     */
+    private final BooleanSetting debug =
+            new BooleanSetting(this, "debug", "Debug plates (log)", false);
 
     public PestEspModule() {
         super("pestesp", Category.GARDEN, "Pest ESP",
                 "Box the pests in the Garden so you can find them in the crops.",
                 0xFF55FF55);
         settings.add(onlyWithVacuum);
+        settings.add(debug);
         INSTANCE = this;
+    }
+
+    public boolean debugPlates() {
+        return debug.get();
     }
 
     /** Whether pests should be boxed this tick. */

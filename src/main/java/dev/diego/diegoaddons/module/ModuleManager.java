@@ -186,6 +186,25 @@ public final class ModuleManager {
         register(new dev.diego.diegoaddons.module.modules.FeastHudModule(), false);
         register(new dev.diego.diegoaddons.module.modules.FarmingSessionModule(), false);
         register(new dev.diego.diegoaddons.module.modules.LoadoutKeybindModule(), false);
+        // Hunting. Order here is the order of the cards: the two that need finding before they can
+        // be caught first, then the critters in the order the wiki groups them (water, ground).
+        register(new dev.diego.diegoaddons.module.modules.InvisibugEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.CinderbatEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.MatchoEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.PufferEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.TurtleEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.DolphinEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.FeeshEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.AxolotlEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.FrogEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.PandaEspModule(), false);
+        // Safari (the Critter Safari on Torrhus Canyon, SkyBlock 0.27).
+        register(new dev.diego.diegoaddons.module.modules.CritterEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.SparklingCritterModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.FloorDropsEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.HideyhoFinderModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.ColdWarningModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.SafariItemsModule(), false);
         // Off by default like everything else, and for one more reason: it reaches the network and
         // replaces the mod's own jar, which is nobody's default.
         register(new AutoUpdateModule(), false);
@@ -206,6 +225,11 @@ public final class ModuleManager {
         // What a party is short of, at the bottom of the tooltip you are already reading.
         net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register(
                 (stack, context, flag, lines) -> PartyFinder.appendTooltip(stack, lines));
+
+        // What a Safari quest item is for, under its own lore.
+        net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register(
+                (stack, context, flag, lines) ->
+                        dev.diego.diegoaddons.util.SafariItems.appendTooltip(stack, lines));
 
         // What a visitor's offer is worth, under the offer's own lore.
         net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register(
@@ -229,6 +253,9 @@ public final class ModuleManager {
             // The pest cooldown is read from the tab list, so it has to be read before the modules
             // that warn off it - and once, not once per Garden feature.
             dev.diego.diegoaddons.util.Pests.tick(mc);
+            // Cold, before the module that warns off it - the module ticks in the loop below, and a
+            // reading taken after it would always be a tick behind the warning that used it.
+            dev.diego.diegoaddons.util.Cold.tick(mc);
             // After Pests: the plot borders follow its list of infested plots.
             dev.diego.diegoaddons.util.Garden.tick(mc);
             // Sacks are read from whatever menu is open, so this runs wherever you are.
@@ -241,6 +268,16 @@ public final class ModuleManager {
                     tickSafely(m, mc);
                 }
             }
+            // Which hunting ESPs are on the right island is decided once here, so the entity pass
+            // below can ask that instead of reading the tab list per module per entity. This also
+            // draws the Invisibugs, which are not found in that pass at all.
+            dev.diego.diegoaddons.util.Hunting.tick(mc);
+            // Same arrangement for the Safari: whether its two features are drawing is decided once,
+            // and the plate pass below asks that rather than the tab list.
+            dev.diego.diegoaddons.util.SafariEsp.tick(mc);
+            // The sparkling trail, which is found from particle packets rather than from entities -
+            // so it draws itself here rather than in the plate pass below.
+            dev.diego.diegoaddons.util.SparkleParticles.tick(mc);
             // Both ESP features read the same name plates, so they share a single pass.
             dev.diego.diegoaddons.util.EntityEsp.tick(mc);
             // Promote everything submitted this tick to the frames until the next one, so world
@@ -313,6 +350,8 @@ public final class ModuleManager {
                 dev.diego.diegoaddons.util.Garden.onMessage(plain);
                 dev.diego.diegoaddons.util.HarvestFeast.onMessage(plain);
                 dev.diego.diegoaddons.util.FarmingSession.onMessage(plain);
+                dev.diego.diegoaddons.util.Hideyho.onMessage(plain);
+                dev.diego.diegoaddons.module.modules.ColdWarningModule.onMessage(plain);
                 PrinceMessageModule.onMessage(plain);
                 AutoRequeueModule.onMessage(plain);
                 AnnounceKickModule.onMessage(plain);
@@ -374,12 +413,11 @@ public final class ModuleManager {
                     return false;
                 });
                 // Deny hotbar-swap / drop keys that would move a locked slot's item, and let the
-                // storage sheet have the keys first - a letter typed into its search box must not
-                // also be a hotbar swap.
+                // storage sheet have the keys first - it takes every one of them while it is up,
+                // because a key reaching the menu underneath acts on a slot the sheet has hidden.
                 ScreenKeyboardEvents.allowKeyPress(screen).register((scr, event) -> {
                     AbstractContainerScreen<?> container = (AbstractContainerScreen<?>) scr;
-                    if (dev.diego.diegoaddons.gui.StorageOverlay.keyPressed(
-                            container, event.key(), event.modifiers())) {
+                    if (dev.diego.diegoaddons.gui.StorageOverlay.keyPressed(container, event)) {
                         return false;
                     }
                     return !dev.diego.diegoaddons.util.SlotLocks.locksKey(container, event);
@@ -422,6 +460,14 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.MiningAbility.reset();
             dev.diego.diegoaddons.util.AutoGfs.reset();
             dev.diego.diegoaddons.util.EtherwarpHelper.reset();
+            // The armour stands an Invisibug was found through do not survive the world change,
+            // and a remembered id would point at whatever entity is given it next.
+            dev.diego.diegoaddons.util.Invisibug.clear();
+            dev.diego.diegoaddons.util.SafariEsp.clear();
+            dev.diego.diegoaddons.util.FloorDrops.clear();
+            dev.diego.diegoaddons.util.SparkleParticles.clear();
+            dev.diego.diegoaddons.util.Hideyho.reset();
+            dev.diego.diegoaddons.util.Cold.reset();
             dev.diego.diegoaddons.util.WorldRender.clear();
             dev.diego.diegoaddons.util.EspDraw.clear();
             dev.diego.diegoaddons.util.EspWorld.clear();

@@ -77,16 +77,20 @@ public class PestTimerModule extends HudModule {
             new StringSetting(this, "farmLoadout", "Farming loadout", "", null);
 
     /**
-     * The cooldown each warning has already fired for, identified by the moment it ends.
+     * Whether the warning and the swap are allowed to fire, re-armed once the cooldown climbs back
+     * above their thresholds.
      *
-     * <p>A flag would not do: the widget re-reads the same cooldown once a second, so "have I warned"
-     * has to mean "have I warned about *this* cooldown". A new cooldown has a new end time, which is
-     * what makes both warnings fire again without anything having to notice a pest spawning.
+     * <p><b>Arming rather than "have I fired for this cooldown".</b> The first version identified a
+     * cooldown by the moment it ends, which fails on the very thing this feature does: pest gear
+     * shortens the cooldown, so swapping changes the end time, and the shortened cooldown reads as a
+     * brand new one that is already inside the window. It swapped to pest gear, back to farming, and
+     * straight into pest gear again - Diego watched it happen. Firing on the <i>crossing</i> of the
+     * threshold cannot loop, because after a swap the timer is below the line and stays disarmed
+     * until a spawn resets it to a full cooldown.
      */
-    private long warnedFor;
+    private boolean warnArmed = true;
+    private boolean swapArmed = true;
     private long expiredFor;
-    /** The cooldown the swap has already been decided for, on the same principle as {@link #warnedFor}. */
-    private long swappedFor;
     /** The cooldown currently being counted down, kept after it ends so the expiry can be named. */
     private long tracking;
 
@@ -194,20 +198,30 @@ public class PestTimerModule extends HudModule {
         }
 
         long lead = (long) (warnBefore.get() * 1000);
+        long swapLead = (long) (swapBefore.get() * 1000);
+
+        // Re-arm whenever the cooldown is comfortably above its threshold again. Both of these fire
+        // on the *crossing*, not on the value - see the note on arming below.
+        if (left > lead) {
+            warnArmed = true;
+        }
+        if (left > swapLead) {
+            swapArmed = true;
+        }
+
         // Not while pests are already out. The warning exists to get you into pest gear before the
         // cooldown ends; with pests on the ground the job is to vacuum them, and a title across the
-        // screen telling you to swap is telling you to do the wrong thing. Deliberately not marked
-        // as warned, so it still fires if you clear them while the cooldown is inside the window.
-        if (lead > 0 && warnedFor != end && left <= lead && Pests.alive() == 0) {
-            warnedFor = end;
+        // screen telling you to swap is telling you to do the wrong thing. Left armed, so it still
+        // fires if you clear them while the cooldown is inside the window.
+        if (lead > 0 && warnArmed && left <= lead && Pests.alive() == 0) {
+            warnArmed = false;
             warn(mc, "Swap to pest gear", "Pest cooldown in " + time(left));
         }
         // The swap has its own clock. Tying it to the warning meant turning warnings off turned the
         // swap off with them, and it forced both to happen at the same moment - when the point is
         // often to be told first and swapped a little later, or swapped without being told at all.
-        long swapLead = (long) (swapBefore.get() * 1000);
-        if (swapLead > 0 && swappedFor != end && left <= swapLead) {
-            swappedFor = end;
+        if (swapLead > 0 && swapArmed && left <= swapLead) {
+            swapArmed = false;
             swapPending = true;
         }
         trySwap(mc);

@@ -46,6 +46,16 @@ public final class LoadoutKeys {
         return ConfigManager.get().loadoutKeys;
     }
 
+    private static long lastComplaint;
+
+    /** One line in chat, prefixed like everything else the mod says. */
+    private static void say(Minecraft mc, String message) {
+        if (mc.gui != null) {
+            mc.gui.getChat().addClientSystemMessage(
+                    net.minecraft.network.chat.Component.literal("§b[DiegoAddons] " + message));
+        }
+    }
+
     /** The loadout a press is waiting to click, or null when nothing is pending. */
     private static String pending;
     private static long pendingSince;
@@ -58,6 +68,7 @@ public final class LoadoutKeys {
         }
         pollKeys(mc, module);
         applyPending(mc);
+        closeIfDue(mc);
     }
 
     private static void pollKeys(Minecraft mc, LoadoutKeybindModule module) {
@@ -91,7 +102,16 @@ public final class LoadoutKeys {
      */
     public static boolean equip(Minecraft mc, String name) {
         LoadoutKeybindModule module = LoadoutKeybindModule.INSTANCE;
-        if (module == null || !module.isEnabled() || name == null || name.isBlank()) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        if (module == null || !module.isEnabled()) {
+            // The pest timer drives this, and its card does not say that a second module has to be
+            // on. Rather than do nothing, name the missing piece - once, not once a tick.
+            if (System.currentTimeMillis() - lastComplaint > 30_000) {
+                lastComplaint = System.currentTimeMillis();
+                say(mc, "§cAuto swap needs the §eLoadout Keybinds §cmodule switched on.");
+            }
             return false;
         }
         if (pending != null) {
@@ -113,6 +133,7 @@ public final class LoadoutKeys {
             command = command.substring(1);
         }
         if (command.isBlank() || mc.player == null) {
+            say(mc, "§cNo menu command set on the Loadout Keybinds card.");
             return;
         }
         pending = name;
@@ -131,6 +152,11 @@ public final class LoadoutKeys {
             return;
         }
         if (System.currentTimeMillis() - pendingSince > TIMEOUT_MS) {
+            // Silence here was the worst part of this feature: a swap that never happened looked
+            // exactly like a swap that was never asked for. The command is a guess, so say which one.
+            String command = LoadoutKeybindModule.INSTANCE == null
+                    ? "?" : LoadoutKeybindModule.INSTANCE.command();
+            say(mc, "§cThe loadout menu did not open. Is \"" + command + "\" the right command?");
             pending = null;
             return;
         }
@@ -157,6 +183,38 @@ public final class LoadoutKeys {
             mc.gameMode.handleContainerInput(menu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
         }
         pending = null;
+        closeAt = System.currentTimeMillis() + CLOSE_DELAY_MS;
+    }
+
+    /**
+     * How long to wait after the click before shutting the menu.
+     *
+     * <p>Not the same tick. The click and the close are two packets on one connection, so the server
+     * does see them in order - but SkyBlock answers a loadout click by rewriting the menu, and
+     * closing into the middle of that has a way of leaving the client and the server disagreeing
+     * about what is open. A tenth of a second is invisible to you and unambiguous to the server.
+     */
+    private static final long CLOSE_DELAY_MS = 100;
+    private static long closeAt;
+
+    /**
+     * Shuts the loadout menu once the swap has gone through.
+     *
+     * <p>Only if a loadout menu is still what is open: between the click and this, you may have hit
+     * Escape yourself or the server may have put something else up, and closing that would be the
+     * feature reaching further than it was asked to.
+     */
+    private static void closeIfDue(Minecraft mc) {
+        if (closeAt == 0 || System.currentTimeMillis() < closeAt) {
+            return;
+        }
+        closeAt = 0;
+        if (mc.player == null || !(mc.screen instanceof AbstractContainerScreen<?> screen)) {
+            return;
+        }
+        if (LegacyText.strip(screen.getTitle().getString()).toLowerCase(Locale.ROOT).contains("loadout")) {
+            mc.player.closeContainer();
+        }
     }
 
     /**

@@ -175,17 +175,25 @@ public final class Visitors {
         if (stack == null || stack.isEmpty()) {
             return false;
         }
+        // "Items Required" is the tell, and it is on the accept button. "Offers Accepted" stays as a
+        // second chance in case a visitor is ever laid out the way this first assumed.
         for (String line : lore(stack)) {
-            if (line.contains("Offers Accepted")) {
+            if (line.contains("Items Required") || line.contains("Offers Accepted")) {
                 return true;
             }
         }
         return false;
     }
 
-    /** Reads the offer from the menu's own middle slot. */
+    /**
+     * Reads the offer from the menu.
+     *
+     * <p>From the <b>accept button</b>, not the item in the middle: Hypixel puts "Items Required"
+     * and "Rewards" in the lore of the thing you click to agree, which is where they belong and is
+     * not where this looked at first. Slot 13 carries the visitor, not the deal.
+     */
     public static Offer read(AbstractContainerScreen<?> screen) {
-        return read(slot(screen, INFO_SLOT), screen);
+        return read(slot(screen, ACCEPT_SLOT), screen);
     }
 
     /**
@@ -220,15 +228,13 @@ public final class Visitors {
                 inRewards = true;
                 continue;
             }
-            if (s.startsWith("Offers Accepted")) {
+            if (s.startsWith("Offers Accepted") || s.startsWith("Click to give")) {
                 break;
             }
             if (inItems) {
                 Matcher m = ITEM.matcher(s);
                 if (m.matches()) {
-                    int amount = m.group("amount") == null
-                            ? 1 : Integer.parseInt(m.group("amount").replace(",", ""));
-                    required.merge(m.group("name").trim(), amount, Integer::sum);
+                    required.merge(m.group("name").trim(), amountOf(m), Integer::sum);
                 }
             } else if (inRewards) {
                 Matcher c = COPPER.matcher(s);
@@ -236,7 +242,10 @@ public final class Visitors {
                     copper += Integer.parseInt(c.group("amount").replace(",", ""));
                     continue;
                 }
-                Matcher m = REWARD.matcher(s);
+                if (NOT_AN_ITEM.matcher(s).matches()) {
+                    continue;
+                }
+                Matcher m = ITEM.matcher(s);
                 if (m.matches()) {
                     rewards.add(m.group("name").trim());
                 }
@@ -248,17 +257,33 @@ public final class Visitors {
         return new Offer(nameOf(screen), rarityOf(screen), required, copper, rewards);
     }
 
-    /** "- 24x Enchanted Carrot", "24x Enchanted Carrot", "Enchanted Carrot". */
+    /**
+     * A required item or a reward item, with the amount on either side of the name.
+     *
+     * <p>Hypixel writes it <b>after</b> the name - {@code Enchanted Wild Rose x285} - which is the
+     * opposite of what this expected at first, and the reason no offer parsed at all. Both forms are
+     * accepted now; a line with no number at all is one of the thing.
+     */
     private static final Pattern ITEM = Pattern.compile(
-            "^[-+•\\s]*(?:(?<amount>[\\d,]+)x\\s+)?(?<name>[A-Za-z][A-Za-z' ]+)$");
+            "^[-+•\\s]*(?:(?<pre>[\\d,]+)x\\s+)?(?<name>[A-Za-z][A-Za-z'’ ]*[A-Za-z'’])"
+                    + "(?:\\s*x\\s*(?<post>[\\d,]+))?$");
 
-    /** "+150 Copper". */
+    /** "+36 Copper". */
     private static final Pattern COPPER = Pattern.compile(
             "^\\+?(?<amount>[\\d,]+) Copper.*$");
 
-    /** Any other reward line, e.g. "+1x Space Helmet". */
-    private static final Pattern REWARD = Pattern.compile(
-            "^[+\\s]*(?:[\\d,]+x\\s+)?(?<name>[A-Za-z][A-Za-z' ]+)$");
+    /**
+     * Reward lines that are not items and must never be priced: {@code +683 Farming XP},
+     * {@code +15 Garden Experience}. Left in the tooltip by Hypixel, meaningless to the bazaar.
+     */
+    private static final Pattern NOT_AN_ITEM =
+            Pattern.compile(".*\\b(XP|Experience)\\b.*", Pattern.CASE_INSENSITIVE);
+
+    /** The amount, from whichever side of the name it was written on. */
+    private static int amountOf(Matcher m) {
+        String amount = m.group("pre") != null ? m.group("pre") : m.group("post");
+        return amount == null ? 1 : Integer.parseInt(amount.replace(",", ""));
+    }
 
     private static String nameOf(AbstractContainerScreen<?> screen) {
         return LegacyText.strip(screen.getTitle().getString()).trim();
