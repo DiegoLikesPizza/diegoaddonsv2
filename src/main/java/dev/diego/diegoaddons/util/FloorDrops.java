@@ -9,6 +9,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -16,18 +17,25 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Finds Floor Drops by looking for the block that marks them.
+ * Finds Floor Drops, primarily by the particles rising off them.
  *
- * <p>Unlike everything else in the ESP family this reads <b>blocks</b>, not entities, and that is
- * the whole of its cost: a block scan asks the level what is at every position in a cube, and a
- * 24-block radius is about eighty thousand of those. So the scan does not run per tick - it runs on
- * a timer, and again immediately whenever the player has moved far enough that the last answer is
- * about somewhere else. What it found is redrawn every tick from the cached list, which is what
- * keeps the boxes solid between scans.
+ * <p><b>The first cut looked for the wrong thing.</b> It went hunting for a tripwire, on the wiki's
+ * word that a drop is "String on the ground". Diego's screenshot settles it: a Floor Drop is an
+ * ordinary-looking block with a scatter of pale bits on its top face and a stream of green sparkle
+ * particles rising out of it. The block is the weaker signal of the two by a wide margin - whatever
+ * it turns out to be, the island is presumably covered in it, so boxing every one would mark the
+ * ground rather than the drop. <b>The particles are what only an active drop does.</b>
  *
- * <p>The failure mode worth naming: a Floor Drop that is picked up stays boxed until the next scan,
- * up to {@link #PERIOD_MS} later. That is the right way round - a ghost box for a second is a
- * shrug, and a box that flickers because the scan is chasing the player is unusable.
+ * <p>So particles are the detector and the block scan is kept as the fallback for if they are not
+ * what they look like - off by default, and its id is still a text box. Both feed the same list, so
+ * a drop found either way is drawn once.
+ *
+ * <p>The scan, when it is on, does not run per tick: asking the level what is at every position in a
+ * 24-block cube is about eighty thousand reads. It runs on a timer and again whenever the player has
+ * moved far enough that the last answer was about somewhere else, and what it found is redrawn every
+ * tick from the cached list. The cost of that is a picked-up drop staying boxed for up to
+ * {@link #PERIOD_MS} - which is the right way round, since a box that flickers because the scan is
+ * chasing the player is unusable.
  */
 public final class FloorDrops {
     /** How often to re-scan while standing still. */
@@ -39,6 +47,21 @@ public final class FloorDrops {
     private static final String[] ISLANDS = {"Moonglade Marsh", "Galatea", "Torrhus Canyon", "Critter Safari"};
 
     private static final List<BlockPos> found = new ArrayList<>();
+
+    /**
+     * The particle sources, which are the real detector.
+     *
+     * <p>A tighter radius than the sparkling critters use: a critter moves and trails behind itself,
+     * while a floor drop is a block and never goes anywhere, so anything more than a block or two
+     * away is a different drop rather than the same one.
+     */
+    private static final ParticleClusters PARTICLES = new ParticleClusters(2.0, 3000);
+    private static java.util.Set<net.minecraft.core.particles.ParticleType<?>> watched = java.util.Set.of();
+    private static String cachedParticleIds;
+    /** Debug: what has been seen since the last report, so the id can stop being a guess. */
+    private static final java.util.Map<String, Integer> seenParticles = new java.util.HashMap<>();
+    private static long lastParticleReport;
+
     private static long lastScan;
     private static Vec3 lastCentre;
     /** The id last resolved, and what it resolved to, so a text setting is not parsed per scan. */
@@ -104,20 +127,55 @@ public final class FloorDrops {
         return false;
     }
 
+    /**
+     * A particle packet. Called on the client thread from the packet handler.
+     *
+     * <p>Ordered cheapest-first, because this runs for every particle the server sends anywhere.
+     */
+    public static void onParticle(net.minecraft.core.particles.ParticleOptions options,
+                                  double x, double y, double z) {
+        FloorDropsEspModule m = FloorDropsEspModule.INSTANCE;
+        if (m == null || !m.isEnabled() || !m.particles()) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null || !m.here(mc)) {
+            return;
+        }
+        if (m.debug()) {
+            Identifier id = BuiltInRegistries.PARTICLE_TYPE.getKey(options.getType());
+            seenParticles.merge(id == null ? "?" : id.toString(), 1, Integer::sum);
+        }
+        if (!watch(m.particleIds()).contains(options.getType())) {
+            return;
+        }
+        PARTICLES.add(x, y, z);
+    }
+
     /** Re-scans when it is due, then draws whatever is known. Called from the module's tick. */
     public static void tick(Minecraft mc, FloorDropsEspModule module) {
         if (mc.level == null || mc.player == null || !module.here(mc)) {
             found.clear();
+            PARTICLES.clear();
             lastCentre = null;
             return;
         }
         Vec3 me = mc.player.position();
+        if (module.particles()) {
+            reportParticles(module);
+            drawParticles(module);
+        } else {
+            PARTICLES.clear();
+        }
         long now = System.currentTimeMillis();
         boolean moved = lastCentre == null || lastCentre.distanceToSqr(me) > MOVED * MOVED;
-        if (moved || now - lastScan > PERIOD_MS) {
+        if (module.scan() && (moved || now - lastScan > PERIOD_MS)) {
             scan(mc, module, me);
             lastScan = now;
             lastCentre = me;
+        }
+        if (!module.scan()) {
+            found.clear();
         }
         draw(mc, module);
         if (module.presets() && Safari.onSafari(mc)) {
@@ -200,20 +258,136 @@ public final class FloorDrops {
         }
     }
 
+    /**
+     * Boxes each particle source, snapped down to the block it is rising out of.
+     *
+     * <p>The particles come off the top face and drift upwards, so the cluster settles above the
+     * block rather than in it - hence the drop. That offset is a setting because how far above
+     * depends on how high they rise before the cluster stops seeing them, which is a thing to look
+     * at in game rather than to reason about.
+     */
+    private static void drawParticles(FloorDropsEspModule module) {
+        for (ParticleClusters.Source s : PARTICLES.ready(module.particleMin())) {
+            int bx = (int) Math.floor(s.x);
+            int by = (int) Math.floor(s.y - module.particleDrop());
+            int bz = (int) Math.floor(s.z);
+            // Skip one the block scan has already boxed, so the two detectors never draw twice on
+            // the same drop.
+            boolean already = false;
+            for (BlockPos p : found) {
+                // Compared loosely on height because the two detectors arrive at the block from
+                // opposite sides - the scan from the string above it, the particles from the cloud
+                // over it - and a one-block disagreement is still the same drop.
+                if (p.getX() == bx && p.getZ() == bz && Math.abs(p.getY() - by) <= 2) {
+                    already = true;
+                    break;
+                }
+            }
+            if (already) {
+                continue;
+            }
+            mark(module, bx, by, bz);
+        }
+    }
+
+    /**
+     * One Floor Drop: the block boxed in the module's style, and its top face painted.
+     *
+     * <p>Both halves are drawn for the same reason rather than for decoration. The string is
+     * <i>on the top face</i>, so that face is the surface you are looking for and the one you have
+     * to click; a box alone says "here is a block", which is a weaker sentence when you are running
+     * past at head height. The face is lifted a hair above the block so it does not fight the
+     * block's own top face for depth and flicker.
+     */
+    private static void mark(FloorDropsEspModule module, int bx, int by, int bz) {
+        AABB box = new AABB(bx, by, bz, bx + 1, by + 1, bz + 1);
+        EspRender.draw(null, box, module);
+        if (module.topFace()) {
+            WorldRender.filledBox(
+                    new AABB(bx, by + 1.0, bz, bx + 1, by + 1.02, bz + 1),
+                    module.topColor(), true);
+        }
+        if (module.beam()) {
+            WorldRender.path(List.of(
+                            new Vec3(bx + 0.5, by, bz + 0.5),
+                            new Vec3(bx + 0.5, by + 12, bz + 0.5)),
+                    module.color(), 0.15);
+        }
+    }
+
+    /** Parses the id list, once per change rather than once per particle. */
+    private static java.util.Set<net.minecraft.core.particles.ParticleType<?>> watch(String ids) {
+        if (ids.equals(cachedParticleIds)) {
+            return watched;
+        }
+        cachedParticleIds = ids;
+        watched = ParticleClusters.parseIds(ids);
+        return watched;
+    }
+
+    /** Prints what has actually been arriving, so the id above can stop being a guess. */
+    private static void reportParticles(FloorDropsEspModule module) {
+        if (!module.debug()) {
+            seenParticles.clear();
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastParticleReport < 5000 || seenParticles.isEmpty()) {
+            return;
+        }
+        lastParticleReport = now;
+        StringBuilder sb = new StringBuilder();
+        seenParticles.entrySet().stream()
+                .sorted((a, b) -> b.getValue() - a.getValue())
+                .limit(12)
+                .forEach(e -> sb.append(e.getKey()).append(" x").append(e.getValue()).append("  "));
+        DiegoAddonsV2Client.LOGGER.info(
+                "[floor drops] particles in the last 5s: {}", sb.toString().trim());
+        seenParticles.clear();
+    }
+
+    /**
+     * Logs the block the player is looking at.
+     *
+     * <p>The one measurement that ends the argument about what a Floor Drop actually is: stand in
+     * front of one, put the crosshair on it, press the button, and the log says its id.
+     */
+    public static void logLookingAt() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || !(mc.hitResult instanceof BlockHitResult hit)) {
+            DiegoAddonsV2Client.LOGGER.info("[floor drops] not looking at a block");
+            chat("§b[DiegoAddons] §fYou are not looking at a block.");
+            return;
+        }
+        BlockPos pos = hit.getBlockPos();
+        var state = mc.level.getBlockState(pos);
+        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        DiegoAddonsV2Client.LOGGER.info("[floor drops] looking at {} at {} {} {} - state {}",
+                id, pos.getX(), pos.getY(), pos.getZ(), state);
+        chat("§b[DiegoAddons] §fThat block is §e" + id + "§f. It is in the log too.");
+    }
+
+    private static void chat(String message) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.gui != null) {
+            mc.gui.getChat().addClientSystemMessage(
+                    net.minecraft.network.chat.Component.literal(message));
+        }
+    }
+
     /** Draws the cached positions. Runs every tick, so it does no work beyond queueing boxes. */
     private static void draw(Minecraft mc, FloorDropsEspModule module) {
         for (BlockPos p : found) {
             // A tripwire is a few pixels tall, and a box that height is invisible at any distance -
-            // which is the problem this module exists to solve. So the box is the full block.
-            AABB box = new AABB(p.getX(), p.getY(), p.getZ(),
-                    p.getX() + 1, p.getY() + 1, p.getZ() + 1);
-            EspRender.draw(null, box, module);
-            if (module.beam()) {
-                WorldRender.path(List.of(
-                                new Vec3(p.getX() + 0.5, p.getY(), p.getZ() + 0.5),
-                                new Vec3(p.getX() + 0.5, p.getY() + 12, p.getZ() + 0.5)),
-                        module.color(), 0.15);
-            }
+            // which is the problem this module exists to solve. So the box is the full block, and
+            // the "top face" is the top of that block rather than of the string itself.
+            // The scan finds the string; the screenshot boxes the block it is stuck in. A tripwire
+            // occupies the air space above a solid block and its strings render just off that
+            // block's top face, which is why they look embedded in it - so the block to draw is one
+            // down. A switch rather than a constant, because whether Hypixel places it that way is
+            // exactly the sort of thing to check in game.
+            int by = module.stringAbove() ? p.getY() - 1 : p.getY();
+            mark(module, p.getX(), by, p.getZ());
         }
     }
 
@@ -245,6 +419,8 @@ public final class FloorDrops {
     /** Drops everything, e.g. on leaving a world. */
     public static void clear() {
         found.clear();
+        PARTICLES.clear();
+        seenParticles.clear();
         lastCentre = null;
     }
 }

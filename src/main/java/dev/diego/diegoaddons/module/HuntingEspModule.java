@@ -40,6 +40,14 @@ public abstract class HuntingEspModule extends EspModule {
     public static final String[] GALATEA = {"Galatea", "Moonglade Marsh"};
     /** The Crimson Isle, for the two hunting mobs that are not critters at all. */
     public static final String[] CRIMSON = {"Crimson Isle", "Blazing Volcano"};
+    /**
+     * Torrhus Canyon, the second Foraging island.
+     *
+     * <p>Just "Torrhus", because the Heights are part of it and at least one mob (Sneaky Tiki) is
+     * documented in both - one name that covers the whole place beats two that have to be kept in
+     * step with wherever Hypixel draws the line between them.
+     */
+    public static final String[] TORRHUS = {"Torrhus"};
 
     /** The location names that count as "here", matched case-insensitively by {@code contains}. */
     private final String[] places;

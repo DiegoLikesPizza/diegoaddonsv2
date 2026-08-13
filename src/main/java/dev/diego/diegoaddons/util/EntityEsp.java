@@ -87,6 +87,10 @@ public final class EntityEsp {
             if (doHunting && Hunting.onEntity(e)) {
                 continue;
             }
+            // Safari critters by type, for the ones that carry no plate - see SafariEsp.onEntity.
+            if (doSafari && SafariEsp.onEntity(e)) {
+                continue;
+            }
             if (!(e instanceof ArmorStand stand) || !stand.hasCustomName()) {
                 continue;
             }

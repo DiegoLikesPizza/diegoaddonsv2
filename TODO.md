@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.4-b-6** — a beta build, `mod_version` in `gradle.properties`. Fabric
+**Current version: 2.5.4-b-8** — a beta build, `mod_version` in `gradle.properties`. Fabric
 parses it as a pre-release (`b-1`) and orders it below `2.5.4`, checked against the loader itself, so
 a later `2.5.4` release supersedes it on every instance whether or not pre-releases are switched on.
 2.5.3 is released (tag `v2.5.3`, jar attached). RenderLib is gone; the mod runs on
@@ -334,6 +334,25 @@ Critters** and **Floor Drops ESP**. Everything here was written off the wiki, fo
 island that did not exist when the last version shipped — so more of this is guesswork than usual,
 and the guesses are named below rather than buried.
 
+- [x] **Critter ESP boxed nothing** (b-8) — Diego: "fix die critter ESPs". The cause is the
+      assumption named in the next item: it matched **only** name plates, and the Galatea critters
+      were already proof that assumption is unsafe, since a Cinderbat carries no nametag at all.
+      It now also matches the **vanilla entity type**, which covers 28 of the 37 with no plate
+      needed. The plate is still preferred where there is one, because it is the only thing that says
+      *which* critter a shared type is — a Bat is a Flitter or a Bloodbat, all three parrots are
+      parrots. Where the type is shared the filter is applied to the whole candidate set (drawn if
+      any of them would be) and the rarity colour is only used when the candidates agree on one.
+      Hideyho deliberately has **no** type: it is a skinned player entity, and matching that would
+      box every player in the lobby.
+- [ ] **Did that fix it?** If critters are still not boxed with "Match by entity type too" on, then
+      the entities are not the vanilla types the wiki lists either, and the next step is a debug that
+      logs the type of everything nearby rather than another guess.
+- [ ] **Is it now boxing scenery?** The risk of the type match is the opposite failure - a decorative
+      parrot or an ambient bat getting a box. Pets are excluded by the `[Lvl n]` plate; anything else
+      over-boxing means the toggle comes back off.
+- [ ] **The island gate got a second reading too** — the tab list's island name *or* the scoreboard
+      area naming one of the four biomes ("Icy Biome"), since the whole category is dead if that one
+      tab string is wrong.
 - [ ] **Everything rests on one thing: do critters carry name plates?** All thirty-seven are matched
       by reading the plate, not by entity type, and that is a deliberate choice — about a third of
       them are not vanilla animals at all (Duplico disguises itself as a block, Gazer only appears
@@ -358,10 +377,35 @@ and the guesses are named below rather than buried.
 - [ ] **The notification fires once per critter, with a re-announce cooldown** (default 60s) rather
       than once ever: a critter can leave view and come back, and once-ever risks the second sighting
       being the silent one. Watch it does not repeat every tick.
-- [ ] **Floor Drops are a block scan, which is new for this mod** — every other ESP reads entities.
-      The marker is "String on the ground", i.e. `minecraft:tripwire`, and **that is a guess, so it
-      is a text box** (Block id) rather than a constant, the same call the Storage Overlay's commands
-      got. If the boxes never appear, look at what the string actually is and type it in.
+- [x] **Floor Drops were looking for the wrong thing** (fixed in b-7). The first cut hunted for a
+      tripwire, on the wiki's word that a drop is "String on the ground". **Diego's screenshot
+      settles it**: a Floor Drop is an ordinary block with pale bits on its top face and a stream of
+      green four-pointed sparkles rising off it. The block is by far the weaker signal — whatever it
+      is, the island is presumably covered in it, so boxing every one marks the ground rather than
+      the drop. **Particles are the detector now** (`minecraft:happy_villager` by default, a text box
+      as usual, 4 in one spot before marking), and the block scan is kept as a fallback, **off by
+      default**, with its id defaulted to `minecraft:rooted_dirt` as a better guess than tripwire.
+- [x] **It is tripwire after all** (b-8). Diego: "floor drops erkennt man daran, dass da strings in
+      dem block stecken". The pale squiggles on the screenshot's top face *are* the string, so the
+      wiki's "String on the ground" and the screenshot are the same thing seen twice, and the first
+      guess was right before I talked myself out of it on the strength of a picture. The scan is the
+      main detector again (**on** by default, `minecraft:tripwire`), particles are the second one.
+- [ ] **Is the box on the right block?** A tripwire occupies the air space *above* a solid block and
+      renders its strings just off that block's top face, which is why they look embedded in it — so
+      the box is drawn one block down from where the scan finds the string. That is the
+      **"String sits above the block"** switch; if the boxes come out a block low, turn it off.
+- [ ] **The look now matches Diego's screenshot** — the block boxed in the module's style plus its
+      **top face painted** in a second colour (magenta by default, box gold). The face is not
+      decoration: the string is *on* that face, so it is the surface you have to click. Lifted 0.02
+      above the block so it does not fight the block's own face for depth.
+- [ ] **"Block I'm looking at → Log"** is still on the card and still worth one press, to confirm the
+      block really is `minecraft:tripwire` and not something that merely looks like it.
+- [ ] **Is the sparkle really `happy_villager`?** It is the green four-pointed particle in the
+      screenshot, which is the villager-happy one. "Debug particles (log)" lists every type arriving
+      with counts every 5s if it is not.
+- [ ] **Is "Block is below by" right?** The particles come off the top face and drift up, so the
+      cluster settles above the block; the slider (default 1.0) is what puts the box back on it. If
+      the boxes float a block high, that is the row to move.
 - [ ] **The scan is on a timer, not per tick** — a 24-block radius is about eighty thousand block
       reads, so it runs every 2s and again at once when you have moved 8 blocks. **A picked-up drop
       therefore stays boxed for up to 2 seconds.** That is the right way round, but check the scan
@@ -378,6 +422,29 @@ and the guesses are named below rather than buried.
       first thing to try.**
 - [ ] It is last in the style list on purpose — the indices are what gets saved, so inserting it
       anywhere else would have moved every ESP already set to "Player outline".
+
+### Torrhus ESP (2.5.4-b-8) — one card, nine switches
+Diego's ask: the Torrhus Canyon hunting mobs as **one** module in Hunting, with every mob switchable.
+One card suits them — unlike the Galatea critters, which are ordinary animals you might want boxed
+one at a time in different colours, these are all the same job on the same island, and what changes
+between runs is which of them you are still after.
+
+- [ ] **Seven by entity type, two by plate.** Firefox = Fox, Mountain Goat = Goat, Drybark =
+      Creaking, Groundhog = **Hoglin**, Honeybuzz = Bee, Pangolin = Armadillo, Blue Jay = Parrot —
+      all off the wiki's own table. **Grizzly Bear and Tiki are not vanilla mobs**: the bear is a
+      custom level-101 mob (1% chance when breaking a tree) and a Tiki is a totem of three rotating
+      heads, so both are matched by name plate only. If either never boxes, its plate is spelled
+      something else.
+- [ ] **Honeybuzz boxes every bee**, and the row says so. Beeheemoth and Pollendart are also bees and
+      nothing on the entity separates them; a plate naming one is the only thing that can. Silently
+      missing the Honeybuzz would be the worse failure, so it over-boxes on purpose.
+- [ ] **Tiki matches on the word "Tiki"**, which also catches Wiki Tiki — a sea creature, so only the
+      island gate keeps them apart. Fine on Torrhus, worth remembering if the gate is ever turned off.
+- [ ] **The island gate is just "Torrhus"**, so it covers the Heights too — Sneaky Tiki is documented
+      in both, and one name beats two that have to track wherever Hypixel draws that line.
+- [ ] **Shared types across islands are handled by the gate, not by the match**: a Fox is a Firefox
+      here and a Foxtrot on the Safari, an Armadillo is a Pangolin here and a Scrappy there. Both
+      modules would claim the entity; only one of them is on the right island at a time.
 
 ### Safari, second pass (2.5.4-b-6) — four more, off Diego's picks
 Diego took Hideyho, the cold warning, floor-drop waypoints and quest tooltips off the list below, and

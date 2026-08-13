@@ -1,5 +1,6 @@
 package dev.diego.diegoaddons.mixin;
 
+import dev.diego.diegoaddons.util.FloorDrops;
 import dev.diego.diegoaddons.util.Invisibug;
 import dev.diego.diegoaddons.util.SparkleParticles;
 import dev.diego.diegoaddons.util.TpsTracker;
@@ -39,5 +40,6 @@ public class ClientPacketListenerMixin {
         // Two features read the same packets and they are on different islands, so neither can be
         // folded into the other; both check their own module first and cost a boolean when off.
         SparkleParticles.onParticle(packet.getParticle(), packet.getX(), packet.getY(), packet.getZ());
+        FloorDrops.onParticle(packet.getParticle(), packet.getX(), packet.getY(), packet.getZ());
     }
 }

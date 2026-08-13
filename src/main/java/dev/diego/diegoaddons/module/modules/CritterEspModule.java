@@ -46,6 +46,20 @@ public class CritterEspModule extends EspModule {
     private final BooleanSetting labels =
             new BooleanSetting(this, "labels", "Show names", false);
     /**
+     * Also match critters by their entity type, not only by their name plate.
+     *
+     * <p>On by default, because the plate assumption turned out to be the weak half. The Galatea
+     * critters are the proof: a Cinderbat carries no nametag at all, so there is no reason a Safari
+     * critter must. Matching the vanilla type as well covers 28 of the 37 without a plate, and the
+     * plate is still preferred whenever there is one - it is the only thing that says <i>which</i>
+     * critter a shared type is.
+     *
+     * <p>Costs almost nothing where plates do exist, and is the difference between a working ESP and
+     * an empty island where they do not. Turn it off if it starts boxing scenery.
+     */
+    private final BooleanSetting byType =
+            new BooleanSetting(this, "byType", "Match by entity type too", true);
+    /**
      * Logs every plate this boxes and every plate it nearly boxed.
      *
      * <p>Here because the plate format is the one assumption the whole card rests on, and if the
@@ -66,6 +80,7 @@ public class CritterEspModule extends EspModule {
         settings.add(minRarity);
         settings.add(byRarity);
         settings.add(labels);
+        settings.add(byType);
         settings.add(debug);
         INSTANCE = this;
     }
@@ -90,6 +105,10 @@ public class CritterEspModule extends EspModule {
 
     public boolean labels() {
         return labels.get();
+    }
+
+    public boolean byType() {
+        return byType.get();
     }
 
     public boolean debugPlates() {

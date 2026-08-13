@@ -14,6 +14,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+// Vec3 and AABB are used by both the plate and the type path.
+
 /**
  * The Safari's two entity features, decided from the same name plate.
  *
@@ -60,6 +62,67 @@ public final class SafariEsp {
     /** Whether anything here wants a look at this tick's plates. */
     public static boolean active() {
         return critters || sparkling;
+    }
+
+    /**
+     * Boxes an entity that is a critter by its <b>type</b>, for the critters that carry no plate.
+     *
+     * <p>Which critter it is may be genuinely unknown - a Bat is a Flitter or a Bloodbat and nothing
+     * on the entity says which - so the filter is applied to the whole candidate set: if any of them
+     * would be drawn, it is drawn. The colour follows the rarity only when the candidates agree on
+     * one, because colouring an unknown by a guess is worse than not colouring it.
+     *
+     * @return whether it was claimed, so the caller can stop considering it
+     */
+    public static boolean onEntity(Entity e) {
+        CritterEspModule c = CritterEspModule.INSTANCE;
+        if (!critters || c == null || !c.byType()) {
+            return false;
+        }
+        List<Safari.Critter> candidates = Safari.byEntity(e);
+        if (candidates.isEmpty()) {
+            return false;
+        }
+        // Not somebody's pet - a Fox, a Bee, a Parrot, a Panda and a Dolphin are all real pets, and
+        // the plate they carry is the same [Lvl n] the Garden already reads them by.
+        if (isPet(e)) {
+            return false;
+        }
+        Safari.Critter wanted = null;
+        boolean sameRarity = true;
+        for (Safari.Critter cand : candidates) {
+            if (!c.wants(cand)) {
+                continue;
+            }
+            if (wanted == null) {
+                wanted = cand;
+            } else if (wanted.rarity() != cand.rarity()) {
+                sameRarity = false;
+            }
+        }
+        if (wanted == null) {
+            return false;
+        }
+        int argb = sameRarity ? c.colorFor(wanted) : c.color();
+        EspRender.draw(e, e.getBoundingBox().inflate(0.1), c, argb);
+        if (c.labels()) {
+            AABB box = e.getBoundingBox();
+            String name = candidates.size() == 1 ? candidates.get(0).name() : "Critter";
+            WorldRender.text(name,
+                    new Vec3(box.getCenter().x, box.maxY + 0.4, box.getCenter().z), 1.0f);
+        }
+        return true;
+    }
+
+    /** A mob carrying a {@code [Lvl n]} plate is a pet, not a critter. See {@link Pests#isPetPlate}. */
+    private static boolean isPet(Entity e) {
+        for (Entity rider : e.getPassengers()) {
+            if (rider instanceof ArmorStand stand && stand.hasCustomName()
+                    && Pests.isPetPlate(LegacyText.strip(stand.getCustomName().getString()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

@@ -198,6 +198,7 @@ public final class ModuleManager {
         register(new dev.diego.diegoaddons.module.modules.AxolotlEspModule(), false);
         register(new dev.diego.diegoaddons.module.modules.FrogEspModule(), false);
         register(new dev.diego.diegoaddons.module.modules.PandaEspModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.TorrhusEspModule(), false);
         // Safari (the Critter Safari on Torrhus Canyon, SkyBlock 0.27).
         register(new dev.diego.diegoaddons.module.modules.CritterEspModule(), false);
         register(new dev.diego.diegoaddons.module.modules.SparklingCritterModule(), false);
