@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.4-b-8** — a beta build, `mod_version` in `gradle.properties`. Fabric
+**Current version: 2.5.4-b-9** — a beta build, `mod_version` in `gradle.properties`. Fabric
 parses it as a pre-release (`b-1`) and orders it below `2.5.4`, checked against the loader itself, so
 a later `2.5.4` release supersedes it on every instance whether or not pre-releases are switched on.
 2.5.3 is released (tag `v2.5.3`, jar attached). RenderLib is gone; the mod runs on
@@ -438,8 +438,44 @@ between runs is which of them you are still after.
 - [ ] **Honeybuzz boxes every bee**, and the row says so. Beeheemoth and Pollendart are also bees and
       nothing on the entity separates them; a plate naming one is the only thing that can. Silently
       missing the Honeybuzz would be the worse failure, so it over-boxes on purpose.
-- [ ] **Tiki matches on the word "Tiki"**, which also catches Wiki Tiki — a sea creature, so only the
-      island gate keeps them apart. Fine on Torrhus, worth remembering if the gate is ever turned off.
+- [x] **Tiki found nothing** (b-9) — Diego, from a real game: "tiki hat kein nametag wenn es unsolved
+      is". Confirmed the diagnosis: a Tiki is a sleeping totem of three heads until you turn them all
+      to face the same way, and only the mob that wakes out of it carries a name. So the plate was
+      the wrong half of the problem entirely — by the time it exists the thing is awake and hitting
+      you, which is not when you needed to find it.
+      It now marks the **24 documented totem spots** instead (all three Tikis share one set — the
+      Cheeky page lists the same coordinates as the Sneaky one), with a range slider and optional
+      distance labels. The plate match is kept for the awakened mob.
+- [x] **Blue Jay and Pangolin were never plate-dependent** — Diego thought they were the other
+      nametag-less ones. They are matched by **entity type** (Parrot, Armadillo) and always were, so
+      a missing plate cannot affect them. Only two of the nine were ever plate-only: Tiki, now fixed
+      with waypoints, and the Grizzly Bear.
+- [x] **Grizzly Bear wears a player model** — Diego, from a real game. That rules out a type match
+      outright: the class is the same one every real player in the lobby has. What separates them is
+      that a SkyBlock mob wearing a player model is a **fake player** — client-side, version-2 UUID,
+      no tab-list entry — and `EntityEsp.isRealPlayer` has known that difference since Player ESP was
+      written, so it was reused rather than rediscovered.
+- [ ] **With no skin id set it boxes every player-model mob on the island**, NPCs included, and the
+      row says so. Over-boxing you can see beats a switch that silently does nothing. The fix is one
+      paste: "Debug entities (log)" now prints **the skin texture of every fake player nearby**, and
+      dropping that id into "Grizzly skin id" makes it exact. Real players' skins are deliberately
+      left out of the log — they are never the mob and it is nobody's business.
+- [ ] **Does the bear carry a plate at all?** The plate match on "Grizzly Bear" is still there as the
+      second route; if it never fires, the bear is nameless like the Tiki and the skin id is the only
+      way to be exact.
+- [ ] **"Debug entities (log)" is the thing that ends this.** Every entity type within 32 blocks,
+      with counts, plus every name plate in full. **This module has now been wrong twice for the same
+      reason** - the wiki says what a mob *is*, not what the client is handed - so one walk around
+      Torrhus with it on maps all nine definitively and beats a fourth guess. Plates are listed
+      separately because they fix a different half of the problem than the types do.
+- [ ] **Are the 24 coordinates the base or a head?** Not stated, so the box runs from y-1 to y+3 -
+      deliberately generous enough to contain the totem either way. If they all sit a little high or
+      low, that offset is why.
+- [ ] **Nothing is struck off as you visit it**, unlike the Hideyho spots: a totem is a fixture that
+      respawns, not one hidden thing in one of eleven places, so "already checked" means nothing here.
+- [ ] **Tiki still matches the word "Tiki"** on a plate, which also catches Wiki Tiki — a sea
+      creature, so only the island gate keeps them apart. Fine on Torrhus, worth remembering if the
+      gate is ever turned off.
 - [ ] **The island gate is just "Torrhus"**, so it covers the Heights too — Sneaky Tiki is documented
       in both, and one name beats two that have to track wherever Hypixel draws that line.
 - [ ] **Shared types across islands are handled by the gate, not by the match**: a Fox is a Firefox

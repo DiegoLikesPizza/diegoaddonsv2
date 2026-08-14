@@ -196,7 +196,7 @@ public final class EntityEsp {
      * A real party/lobby player versus a SkyBlock NPC. NPCs are spawned as client-side player entities
      * with a version-2 UUID and no tab-list entry; real accounts are version 4 and are listed.
      */
-    private static boolean isRealPlayer(Minecraft mc, Player p) {
+    public static boolean isRealPlayer(Minecraft mc, Player p) {
         if (p.getUUID().version() != 4) {
             return false;
         }
