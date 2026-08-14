@@ -224,8 +224,9 @@ public final class Updater {
      * path is easier to trust than two. Releases come back newest first.
      */
     private static Release fetchLatest(boolean prereleases) throws Exception {
-        String json = get(API + "?per_page=10");
+        String json = get(API + "?per_page=30");
         JsonArray releases = JsonParser.parseString(json).getAsJsonArray();
+        Release best = null;
         for (JsonElement el : releases) {
             JsonObject r = el.getAsJsonObject();
             if (bool(r, "draft") || (bool(r, "prerelease") && !prereleases)) {
@@ -256,9 +257,20 @@ public final class Updater {
                     break;
                 }
             }
-            return new Release(version, name, url, string(r, "html_url"));
+            // The highest version wins, not the first one listed.
+            //
+            // This used to return here, on the assumption that GitHub hands the releases back
+            // newest-first. It does not, and the way it fails is silent: with b-9 and b-10 both
+            // published, the live feed came back b-9, b-10, b-8, b-6, b-2 - neither by date nor
+            // alphabetically - so every client would have been offered b-9 forever and the newer
+            // build would simply never have existed to them. Comparing is correct whatever order
+            // the feed is in, which is the point: the order was never ours to rely on.
+            Release candidate = new Release(version, name, url, string(r, "html_url"));
+            if (best == null || compare(candidate.version(), best.version()) > 0) {
+                best = candidate;
+            }
         }
-        return null;
+        return best;
     }
 
     /**

@@ -3,10 +3,9 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.4-b-10** — a beta build, `mod_version` in `gradle.properties`. Fabric
-parses it as a pre-release (`b-1`) and orders it below `2.5.4`, checked against the loader itself, so
-a later `2.5.4` release supersedes it on every instance whether or not pre-releases are switched on.
-2.5.3 is released (tag `v2.5.3`, jar attached). RenderLib is gone; the mod runs on
+**Current version: 2.5.4** — released (tag `v2.5.4`, jar attached), and the first non-beta since
+2.5.3. It supersedes every `2.5.4-b-N` on every instance, whether or not pre-releases are switched
+on, because a release outranks any pre-release of the same numbers. RenderLib is gone; the mod runs on
 [diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
 `includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
@@ -783,6 +782,24 @@ preview path is the fastest way to check most of them, since it draws without li
 ---
 
 ## Done
+
+- **The updater trusted GitHub's ordering, and GitHub does not order how we assumed** (2.5.4-b-11) —
+  found while publishing b-10, by looking at the live feed rather than assuming it. With b-9 and b-10
+  both published, `/releases` came back **b-9, b-10, b-8, b-6, b-2, b-1, 2.5.3, …** — neither newest
+  first nor alphabetical, and I could not work out the rule from five samples. `fetchLatest` returned
+  the **first** entry it accepted, so it would have picked b-9.
+  The way that fails is the bad way: a client on b-9 asks, is handed b-9, compares it with itself and
+  is told it is up to date — **forever**, with the newer build simply not existing as far as it is
+  concerned. No error, nothing in the log, exactly the quiet failure §4 warns about.
+  It now walks every candidate and keeps the **highest version by `compare`**, which is correct under
+  any ordering — the point being that the order was never ours to rely on. `per_page` raised from 10
+  to 30 for the same reason: with the highest-wins rule, a longer list can only help.
+  Verified against the live feed by replaying the comparison over the real tag list: the old rule
+  picks `2.5.4-b-9`, the new one picks `2.5.4-b-10`, and every older tag ranks below b-9 as it should.
+  - [ ] **Everyone on b-9 or b-10 has to update by hand once.** Both were built before this fix, so
+        their own updater still picks b-9 off the feed and reports "up to date". After one manual jar
+        swap to b-11 they are fine permanently. Worth remembering before assuming a future beta is
+        not being offered.
 
 - **We crashed somebody else's game over a chat constant** (2.5.4-b-10) — a friend of Diego's, on
   b-9 alongside SkyHanni and Skysoft: `InjectionError: Critical injection failure: Constant modifier
