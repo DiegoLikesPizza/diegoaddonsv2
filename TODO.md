@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.4-b-9** — a beta build, `mod_version` in `gradle.properties`. Fabric
+**Current version: 2.5.4-b-10** — a beta build, `mod_version` in `gradle.properties`. Fabric
 parses it as a pre-release (`b-1`) and orders it below `2.5.4`, checked against the loader itself, so
 a later `2.5.4` release supersedes it on every instance whether or not pre-releases are switched on.
 2.5.3 is released (tag `v2.5.3`, jar attached). RenderLib is gone; the mod runs on
@@ -783,6 +783,30 @@ preview path is the fastest way to check most of them, since it draws without li
 ---
 
 ## Done
+
+- **We crashed somebody else's game over a chat constant** (2.5.4-b-10) — a friend of Diego's, on
+  b-9 alongside SkyHanni and Skysoft: `InjectionError: Critical injection failure: Constant modifier
+  method skysoftVisibleLineLimit(I)I ... failed injection check, (0/1) succeeded`, with
+  `@ModifyConstant conflict. Skipping skysoft ... already redirected by diegoaddonsv2` earlier in the
+  log. **Ours was the mod holding the constant**, and Skysoft's failure to get it was fatal.
+  `@ModifyConstant` is a redirect, and a redirect *owns* the instruction it lands on: the first mod
+  to claim vanilla's 100-entry chat cap wins, every other mod's is skipped, and Mixin turns a failed
+  *required* injection into a hard crash. Both mods raise the same cap for the same reason, so the
+  collision was inevitable the moment they were installed together — nothing was wrong with either
+  feature.
+  Now `@ModifyExpressionValue` (MixinExtras, already bundled with the loader — no new dependency).
+  It does not replace the instruction; it takes the value after it is produced and returns a new one,
+  so nothing is claimed and any number of mods can stack on the same constant. The knock-on is worth
+  having: with our unlimited history **off** we now return whatever we were handed, which is the
+  other mod's number rather than vanilla's, so the two features compose instead of one silently
+  undoing the other.
+  Checked before shipping: all three target methods (`addMessageToDisplayQueue`,
+  `addMessageToQueue`, `addRecentChat`) hold **exactly one** `100` in the 26.1.2 bytecode, so there
+  is no ordinal ambiguity and each injection is 1/1. An audit of the whole mixin package found this
+  was the **only** exclusive injector in the mod — no other `@ModifyConstant`, `@Redirect` or
+  `@Overwrite` anywhere — so no second mod can be crashed the same way.
+  - [ ] **Unproven until his friend launches it.** The mechanism and the constants are verified; that
+        the two mods now coexist is not, because it cannot be reproduced without Skysoft installed.
 
 - **Blackjack deadlocked with nobody to move** (2.5.4) — Diego, from a real game: "hatte eben ein
   issue dass keiner am Zug war". Two faults, and the second is why it could never recover.
