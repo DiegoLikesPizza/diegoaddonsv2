@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.5-b-4** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
+**Current version: 2.5.5-b-3** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
 (tag `v2.5.4`, jar attached, marked Latest) and supersedes every `2.5.4-b-N` on every instance,
 whether or not pre-releases are switched on, because a release outranks any pre-release of the same
 numbers.
@@ -12,7 +12,7 @@ numbers.
 
 ## 2.5.5, in progress
 
-### 0. The menu search box was too small and sat over tooltips (2.5.5-b-4)
+### 0. The menu search box was too small and sat over tooltips (2.5.5-b-3)
 Diego: "die search bar ist sehr klein und die font scaled nicht richtig. Außerdem overlapt sie
 tooltips."
 
@@ -30,7 +30,9 @@ Both are `InventorySearch`, the box under a container menu — not the storage s
   to paint over it — which is the only thing `afterExtract` was buying. `Toasts` stays behind on
   `afterExtract` and still lands on top of everything.
 
-**Not yet run in game.** The main instance had MC open, so b-4 is only on the test instance.
+**Not yet run in game.** Folded into b-3 rather than shipped as its own build — b-3 had not been
+released, only deployed, so both instances were simply overwritten with the rebuilt jar and no
+2.5.5-b-4 exists.
 
 ### 0. The HUD editor crashed the game from the main menu (2.5.5-b-3)
 Opening the HUD editor on the title screen killed the client outright:
