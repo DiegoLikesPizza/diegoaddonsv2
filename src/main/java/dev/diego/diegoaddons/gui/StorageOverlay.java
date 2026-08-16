@@ -624,6 +624,40 @@ public final class StorageOverlay {
         }
     }
 
+    /**
+     * Refuses the release and the drag outright while the sheet is up.
+     *
+     * <p><b>This is the item-dropping bug.</b> The sheet claimed the mouse <i>press</i> and nothing
+     * else, and vanilla's {@code mouseReleased} is not a formality - it calls {@code slotClicked}
+     * seven times over, one of them with slot id {@code -999}, which is the id that means "outside
+     * the window" and whose effect is to throw whatever is on the cursor onto the floor. So picking
+     * an item up in the sheet and letting go anywhere the real menu does not have a slot handed it
+     * to the ground. Occasional rather than constant, because it needs something on the cursor and a
+     * release over the wrong place - which is exactly how Diego described it.
+     *
+     * <p>{@code mouseDragged} goes the same way: it drives the quick-craft distribution and moves
+     * items too. Neither is vetoed by the press veto, because a press that never reached vanilla
+     * does not stop the release from arriving.
+     *
+     * <p>Refused wholesale rather than by working out which of those paths was firing. The sheet has
+     * no drag or release behaviour of its own beyond the search box's text selection, so there is
+     * nothing to preserve here and every one of those paths moves items - a narrower fix would be a
+     * guess about which one, and being wrong costs somebody their items.
+     */
+    public static boolean mouseReleased(AbstractContainerScreen<?> screen) {
+        return active(screen);
+    }
+
+    /** As {@link #mouseReleased}: the drag moves items too. Text selection still reaches the box. */
+    public static boolean mouseDragged(AbstractContainerScreen<?> screen, double mouseX,
+                                       double mouseY, int button) {
+        if (!active(screen)) {
+            return false;
+        }
+        SEARCH.mouseDragged(Ui.u(mouseX), Ui.u(mouseY), button);
+        return true;
+    }
+
     public static boolean mouseScrolled(AbstractContainerScreen<?> screen, double amount) {
         if (!active(screen)) {
             return false;

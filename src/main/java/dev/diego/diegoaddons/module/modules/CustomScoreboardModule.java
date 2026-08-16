@@ -39,6 +39,15 @@ public class CustomScoreboardModule extends HudModule {
             new BooleanSetting(this, "hideDate", "Hide the date line", false);
     private final BooleanSetting showBank =
             new BooleanSetting(this, "showBank", "Show bank balance", false);
+    /**
+     * The running mod version, in grey at the very bottom.
+     *
+     * <p>Off by default - it is a line of screen space that says nothing about the game. It earns
+     * its place when a build is being tested or a bug reported, which is exactly when "which version
+     * am I actually on" is the first question and the hardest one to answer from inside the game.
+     */
+    private final BooleanSetting showVersion =
+            new BooleanSetting(this, "showVersion", "Show the mod version", false);
     private final StringSetting title =
             new StringSetting(this, "title", "Custom title", "", null);
     private final StringSetting top =
@@ -57,6 +66,7 @@ public class CustomScoreboardModule extends HudModule {
         settings.add(hideUrl);
         settings.add(hideDate);
         settings.add(showBank);
+        settings.add(showVersion);
         settings.add(title);
         settings.add(top);
         settings.add(bottom);
@@ -83,6 +93,10 @@ public class CustomScoreboardModule extends HudModule {
 
     public boolean showBank() {
         return showBank.get();
+    }
+
+    public boolean showVersion() {
+        return showVersion.get();
     }
 
     /** A title of your own, or blank to keep the server's. */

@@ -83,9 +83,16 @@ public final class SkyblockHud {
      *
      * <p>Deliberately loose about what follows the name - the trailing "! VIEW RULE" is a clickable
      * suffix that has changed before, and the name is the only part worth being strict about.
+     *
+     * <p><b>Two things a pet skin does to this line, both of which used to break the name.</b> A
+     * skinned pet is announced as {@code ... Rabbit ✦!}, and a Golden Dragon with a skin number as
+     * {@code ... [122✦] Golden Dragon!}. The old pattern took everything up to the {@code !}, so the
+     * name came out as "Rabbit ✦" or "[122✦] Golden Dragon" - which then matched nothing in the
+     * seen-pets map, and the HUD dropped the icon for exactly the pets most worth showing. The star
+     * suffix and the count prefix are now both consumed around the name rather than into it.
      */
-    private static final Pattern AUTOPET =
-            Pattern.compile("Autopet\\s+equipped\\s+your\\s+\\[Lvl (\\d+)]\\s+([^!]+)!");
+    private static final Pattern AUTOPET = Pattern.compile(
+            "Autopet equipped your \\[Lvl (?<level>\\d+)] (?:\\[\\d+✦] )?(?<pet>[\\w -]+?)(?: ✦)?!");
     /**
      * Summoning and despawning by hand: {@code You summoned your [Lvl 100] Golden Dragon!}
      *
@@ -93,9 +100,15 @@ public final class SkyblockHud {
      * that would have noticed the change is not running by the time the change happens - the HUD
      * went on showing the previous pet until the menu was opened again, which is exactly the moment
      * you no longer need to be told.
+     *
+     * <p><b>The level is optional, and that is the whole fix.</b> This pattern required
+     * {@code [Lvl n]}, and the real line does not have one - Hypixel writes
+     * {@code You summoned your Golden Dragon!} with no level at all. So it never matched once, and
+     * summoning a pet by hand has been invisible to the HUD for as long as this has existed. It is
+     * left optional rather than removed in case the level comes back.
      */
-    private static final Pattern SUMMON =
-            Pattern.compile("You\\s+summoned\\s+your\\s+\\[Lvl (\\d+)]\\s+([^!]+)!");
+    private static final Pattern SUMMON = Pattern.compile(
+            "You summoned your (?:\\[Lvl (?<level>\\d+)] )?(?<pet>[\\w -]+?)(?: ✦)?!");
     private static final Pattern DESPAWN = Pattern.compile("You\\s+despawned\\s+your\\s+");
 
     /**
@@ -167,6 +180,13 @@ public final class SkyblockHud {
     /** When on, the contents of any open container are dumped to the log (name + lore per slot). */
     public static boolean debug = false;
     private static Object lastDumped;
+    /**
+     * The loadout menu currently open, by identity, so opening one can be told from keeping it open.
+     *
+     * <p>The screen object is the only thing that changes when a menu is reopened - the title and
+     * the contents may be identical - so identity is what "opened it again" means here.
+     */
+    private static Object lastLoadoutScreen;
 
     static {
         Arrays.fill(equipment, ItemStack.EMPTY);
@@ -388,6 +408,9 @@ public final class SkyblockHud {
         restore(mc);
         if (!(mc.screen instanceof AbstractContainerScreen<?> screen)) {
             lastDumped = null;
+            // The menu is gone, so the next one to open is a fresh look rather than a continuation.
+            lastLoadoutScreen = null;
+            panelSignature = null;
             return;
         }
         String rawTitle = screen.getTitle().getString();
@@ -407,10 +430,19 @@ public final class SkyblockHud {
         // A loadout menu holds one icon per loadout rather than the gear itself, so it gets its own
         // scan - the equipment and pet scans would find nothing in it to read.
         if (loadout) {
+            // Opening the menu is itself a request to look again, so the fingerprint is dropped and
+            // the first scan of a newly opened menu always applies. Without this, opening /loadout
+            // after an Autopet swap would compare against what was on screen last time and decide
+            // nothing had happened - which is exactly the case the menu is being opened for.
+            if (screen != lastLoadoutScreen) {
+                lastLoadoutScreen = screen;
+                panelSignature = null;
+            }
             scanLoadouts(slots, limit);
             persist(mc);
             return;
         }
+        lastLoadoutScreen = null;
         if (title.contains(EQUIPMENT_WORD)) {
             // Two different menus say "equipment". The wardrobe lists every set you have saved, so
             // a piece in it is only yours if it is marked as the equipped one - that is what was
@@ -516,7 +548,6 @@ public final class SkyblockHud {
         if (col < 0) {
             return false;
         }
-        System.arraycopy(set, 0, equipment, 0, 4);
 
         // The row the panel starts on, from whichever piece was found: the four sit in category
         // order, so a piece's own category is how far down the panel it is.
@@ -527,11 +558,69 @@ public final class SkyblockHud {
                 break;
             }
         }
+
+        // Nothing has moved since the last look, so there is nothing to write. The menu is read
+        // every tick it is open, and nineteen ticks in twenty the answer is the same one.
+        if (!panelChanged(slots, limit, set, top, col)) {
+            return true;
+        }
+
+        System.arraycopy(set, 0, equipment, 0, 4);
         if (top >= 0) {
             scanPanelArmour(slots, limit, top, col + 1);
             scanPanelPet(slots, limit, top, col + 2);
         }
         return true;
+    }
+
+    /**
+     * A fingerprint of the equipped panel as it was last applied, or null when there is none.
+     *
+     * <p>Reset when the loadout menu is opened, so opening it always counts as a change and always
+     * produces a fresh read - which is the point: reopening the menu is how you ask the mod to look
+     * again, and it should not be answered from a cache.
+     */
+    private static String panelSignature;
+
+    /**
+     * Whether the panel says something different from what is already on the HUD.
+     *
+     * <p>This is what makes a loadout swap land: the menu does not close when you switch, so the
+     * only signal that anything happened is its contents changing under you. Comparing them turns
+     * that into an event, and everything downstream - including clearing a pet that the new loadout
+     * does not have - hangs off it.
+     *
+     * <p>Built from the item names rather than from the stacks: the server sends new stack objects
+     * for slots that did not actually change, so identity would report a swap every time the menu
+     * refreshed, and the pet clear below would then fire against a panel that is still filling in.
+     */
+    private static boolean panelChanged(List<Slot> slots, int limit, ItemStack[] set,
+                                        int top, int col) {
+        StringBuilder sb = new StringBuilder();
+        for (ItemStack piece : set) {
+            sb.append(nameOf(piece)).append('|');
+        }
+        if (top >= 0) {
+            for (int c = 0; c < 4; c++) {
+                sb.append(nameOf(at(slots, limit, (top + c) * COLS + col + 1))).append('|');
+            }
+            sb.append(nameOf(at(slots, limit, (top + 1) * COLS + col + 2)));
+        }
+        String signature = sb.toString();
+        if (signature.equals(panelSignature)) {
+            return false;
+        }
+        panelSignature = signature;
+        return true;
+    }
+
+    /** The stack at a slot index, or empty when the index is outside the menu. */
+    private static ItemStack at(List<Slot> slots, int limit, int i) {
+        return i >= 0 && i < limit ? slots.get(i).getItem() : ItemStack.EMPTY;
+    }
+
+    private static String nameOf(ItemStack stack) {
+        return stack.isEmpty() ? "" : strip(stack.getHoverName().getString()).trim();
     }
 
     /**
@@ -552,7 +641,16 @@ public final class SkyblockHud {
         }
     }
 
-    /** The active pet, which sits beside the chestplate - the panel's second row. */
+    /**
+     * The active pet, which sits beside the chestplate - the panel's second row.
+     *
+     * <p><b>An empty pet slot is an answer, not a missing one.</b> This used to return early when
+     * the slot held nothing, which meant switching to a loadout with no pet left the previous pet
+     * sitting on the HUD indefinitely: the panel said "none" and the HUD went on showing the last
+     * one it had happened to read. Since this only runs once the panel has been located <i>and</i>
+     * its contents have actually changed, an empty slot here is the menu stating that no pet is out,
+     * and it is now believed.
+     */
     private static void scanPanelPet(List<Slot> slots, int limit, int top, int col) {
         if (col >= COLS) {
             return;
@@ -562,11 +660,12 @@ public final class SkyblockHud {
             return;
         }
         ItemStack stack = slots.get(i).getItem();
-        if (stack.isEmpty() || !LEVEL.matcher(strip(stack.getHoverName().getString())).find()) {
-            return;
+        boolean isPet = !stack.isEmpty()
+                && LEVEL.matcher(strip(stack.getHoverName().getString())).find();
+        if (isPet) {
+            seenPets.put(petKey(stack), stack.copy());
         }
-        seenPets.put(petKey(stack), stack.copy());
-        pet = stack;
+        pet = isPet ? stack : ItemStack.EMPTY;
         petInfoSource = null;   // force a re-parse against the new stack
         petInfoCache = null;
     }
@@ -667,7 +766,7 @@ public final class SkyblockHud {
                 return false;
             }
         }
-        String name = m.group(2).trim();
+        String name = m.group("pet").trim();
         ItemStack known = seenPets.get(name.toLowerCase(Locale.ROOT));
         if (known != null && !known.isEmpty()) {
             pet = known;
@@ -679,11 +778,15 @@ public final class SkyblockHud {
         // than left showing the previous pet, which would be a confident wrong answer.
         pet = ItemStack.EMPTY;
         petInfoSource = null;
-        petInfoCache = new PetInfo(name, 0xFFFFFFFF, parseInt(m.group(1)), null);
+        petInfoCache = new PetInfo(name, 0xFFFFFFFF, parseInt(m.group("level")), null);
         return true;
     }
 
+    /** -1 for "not stated", which a summon message now legitimately is. */
     private static int parseInt(String s) {
+        if (s == null) {
+            return -1;
+        }
         try {
             return Integer.parseInt(s);
         } catch (NumberFormatException e) {
@@ -890,6 +993,10 @@ public final class SkyblockHud {
         petInfoSource = null;
         petInfoCache = null;
         restored = false;   // the saved copy stays; it is restored again on the next join
+        // A fingerprint describes a menu on a server we have just left; keeping it would let the
+        // first loadout menu on the next one be compared against the last one on this.
+        lastLoadoutScreen = null;
+        panelSignature = null;
     }
 
     private static List<String> loreOf(ItemStack stack) {

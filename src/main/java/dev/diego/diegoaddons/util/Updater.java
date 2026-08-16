@@ -68,6 +68,10 @@ public final class Updater {
     /** A generous ceiling on a mod jar, so a wrong URL cannot fill the disk. */
     private static final long MAX_BYTES = 64L * 1024 * 1024;
     private static final String STAGING_DIR = "diegoaddons-updates";
+    /**
+     * The backup name older versions left behind. Nothing writes one any more - it exists only so
+     * {@link #removeStaleBackup} can find and delete the ones already sitting in mods folders.
+     */
     private static final String BACKUP_NAME = DiegoAddonsV2Client.MOD_ID + "-previous.jar.bak";
 
     /** Where the check has got to. Read by the module for its status row; written by the worker. */
@@ -491,12 +495,21 @@ public final class Updater {
     }
 
     /**
-     * Puts the old jar aside and the new one in its place.
+     * Deletes the old jar and puts the new one in its place.
      *
-     * <p>Ordered so a half-done swap still leaves a working mods folder: the old jar moves first, and
-     * if the new one then cannot be put in, the old is moved straight back. The alternative order
-     * would leave two jars with the same mod id in the folder for as long as it took to fail, and
-     * that combination does not start.
+     * <p><b>The old jar is deleted, not kept.</b> It used to be renamed to a {@code .jar.bak} beside
+     * it, on the reasoning that a backup is the way back from a bad update. That reasoning was
+     * wrong twice over: the way back is the GitHub release it came from, which is still there and
+     * still downloadable, and a spare jar left in the <i>mods folder</i> is a loaded gun. Diego's
+     * instance was broken badly enough by exactly that to need a reboot. A folder the loader scans
+     * is no place to store anything that is not meant to be loaded.
+     *
+     * <p>Ordered delete-then-move rather than the other way round, and the reason is which failure
+     * you would rather have. Moving the new one in first and failing to remove the old leaves
+     * <b>two jars with the same mod id</b>, which does not start at all - the very thing this is
+     * being changed to avoid. Deleting first and failing to move leaves <b>no</b> mod, which starts
+     * fine without it and is fixed by dragging one file in from the staging folder. Missing beats
+     * broken.
      */
     private static void install(Path currentJar, Path newJar) {
         if (!Files.exists(newJar)) {
@@ -504,25 +517,49 @@ public final class Updater {
         }
         Path mods = currentJar.getParent();
         Path target = mods.resolve(newJar.getFileName().toString());
-        Path backup = mods.resolve(BACKUP_NAME);
         try {
-            Files.move(currentJar, backup, StandardCopyOption.REPLACE_EXISTING);
+            Files.delete(currentJar);
         } catch (IOException e) {
             // The usual case on Windows: the jar is still mapped by the JVM that is exiting. Hand
             // the job to something that outlives it.
-            handOff(currentJar, backup, newJar, target);
+            handOff(currentJar, newJar, target);
             return;
         }
         try {
             Files.move(newJar, target, StandardCopyOption.REPLACE_EXISTING);
             DiegoAddonsV2Client.LOGGER.info("[DiegoAddons] Updated to {}", target.getFileName());
         } catch (IOException e) {
-            try {
-                Files.move(backup, currentJar, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException restore) {
-                DiegoAddonsV2Client.LOGGER.error("[DiegoAddons] The update failed and the old jar "
-                        + "could not be put back. It is at {}", backup, restore);
+            // Nothing to put back - the old one is gone on purpose. Say plainly where the new jar
+            // is, because the game will start without any version of this mod at all.
+            DiegoAddonsV2Client.LOGGER.error("[DiegoAddons] The old jar was removed but the new one "
+                    + "could not be put in place. Move {} into {} by hand", newJar, mods, e);
+        }
+    }
+
+    /**
+     * Removes a {@code .jar.bak} left in the mods folder by a version that still made them.
+     *
+     * <p>Deleting a file at startup is not something to do lightly, so this is deliberately narrow:
+     * one exact name, one that only this mod ever writes, in the folder this mod is running from.
+     * It is here because the file is actively harmful where it sits and everybody who updated on an
+     * older version already has one - leaving them to find out the way Diego did is not a fix.
+     */
+    public static void removeStaleBackup() {
+        try {
+            Path own = ownJar();
+            if (own == null) {
+                return;
             }
+            Path backup = own.getParent().resolve(BACKUP_NAME);
+            if (Files.deleteIfExists(backup)) {
+                DiegoAddonsV2Client.LOGGER.info(
+                        "[DiegoAddons] Removed a leftover {} from the mods folder", BACKUP_NAME);
+            }
+        } catch (IOException | RuntimeException e) {
+            // Not worth failing startup over: the file is inert until something tries to load it,
+            // and saying so is all that can usefully be done.
+            DiegoAddonsV2Client.LOGGER.warn(
+                    "[DiegoAddons] Could not remove a leftover {}; delete it by hand", BACKUP_NAME, e);
         }
     }
 
@@ -533,7 +570,7 @@ public final class Updater {
      * It gives up after a minute rather than looping forever, and deletes itself either way - a
      * failed swap leaves the old version running, which is the outcome to prefer.
      */
-    private static void handOff(Path oldJar, Path backup, Path newJar, Path target) {
+    private static void handOff(Path oldJar, Path newJar, Path target) {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (!os.contains("win")) {
             DiegoAddonsV2Client.LOGGER.warn("[DiegoAddons] Could not replace {} - the new jar is at "
@@ -546,12 +583,11 @@ public final class Updater {
                     @echo off
                     setlocal
                     set "OLD=%s"
-                    set "BAK=%s"
                     set "NEW=%s"
                     set "DST=%s"
                     set /a tries=0
                     :retry
-                    move /y "%%OLD%%" "%%BAK%%" >nul 2>&1
+                    del /f /q "%%OLD%%" >nul 2>&1
                     if not exist "%%OLD%%" goto place
                     set /a tries+=1
                     if %%tries%% GEQ 60 goto done
@@ -561,7 +597,7 @@ public final class Updater {
                     move /y "%%NEW%%" "%%DST%%" >nul 2>&1
                     :done
                     del "%%~f0"
-                    """.formatted(oldJar, backup, newJar, target);
+                    """.formatted(oldJar, newJar, target);
             Files.writeString(script, body);
             new ProcessBuilder("cmd", "/c", "start", "", "/min", script.toString())
                     .directory(script.getParent().toFile())

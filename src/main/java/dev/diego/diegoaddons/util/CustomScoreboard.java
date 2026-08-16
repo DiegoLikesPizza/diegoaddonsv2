@@ -93,7 +93,32 @@ public final class CustomScoreboard {
         if (!mod.bottomText().isBlank()) {
             lines.add(Component.literal(mod.bottomText().replace('&', '§')));
         }
+        // Last, under whatever the user put there: the version is a footer, not a line of content,
+        // and it is the one thing on here that is about the mod rather than about the game.
+        if (mod.showVersion()) {
+            lines.add(Component.literal("§8v" + modVersion()));
+        }
         return lines;
+    }
+
+    /**
+     * The running mod version, from the loader rather than from a constant.
+     *
+     * <p>Read once and held: it cannot change while the game is running, and this is called every
+     * frame. Asking the loader rather than hard-coding it is the whole point of showing it - a
+     * number typed into the source is a number that can disagree with the jar it is in, which is
+     * exactly the confusion this line exists to end.
+     */
+    private static String modVersion;
+
+    private static String modVersion() {
+        if (modVersion == null) {
+            modVersion = net.fabricmc.loader.api.FabricLoader.getInstance()
+                    .getModContainer(dev.diego.diegoaddons.DiegoAddonsV2Client.MOD_ID)
+                    .map(c -> c.getMetadata().getVersion().getFriendlyString())
+                    .orElse("?");
+        }
+        return modVersion;
     }
 
     /**

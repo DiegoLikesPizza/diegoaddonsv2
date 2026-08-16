@@ -206,9 +206,15 @@ public final class ModuleManager {
         register(new dev.diego.diegoaddons.module.modules.HideyhoFinderModule(), false);
         register(new dev.diego.diegoaddons.module.modules.ColdWarningModule(), false);
         register(new dev.diego.diegoaddons.module.modules.SafariItemsModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.InventorySearchModule(), false);
         // Off by default like everything else, and for one more reason: it reaches the network and
         // replaces the mod's own jar, which is nobody's default.
         register(new AutoUpdateModule(), false);
+        // Older versions parked the previous jar next to the new one as a .jar.bak. That file is a
+        // hazard where it sits and everybody who ever auto-updated has one, so it is cleared here
+        // rather than left to be discovered the hard way. Runs whatever the module is set to: the
+        // leftover is not the feature's doing any more, it is just rubbish in the mods folder.
+        dev.diego.diegoaddons.util.Updater.removeStaleBackup();
         // Nothing is read or written here any more. The saved state arrives when configlib reads
         // its file, which happens after this method - the spec it reads into is built from what was
         // just registered - and the modules that came back on are woken by applyEnabled.
@@ -372,6 +378,10 @@ public final class ModuleManager {
                     // With the background rather than after everything: drawn last it sat on
                     // top of item tooltips.
                     dev.diego.diegoaddons.util.SlotLocks.render((AbstractContainerScreen<?>) scr, g);
+                    // With the background for the same reason the rarity backing is: the highlight
+                    // belongs under the item, not painted over it.
+                    dev.diego.diegoaddons.gui.InventorySearch.renderHighlights(
+                            (AbstractContainerScreen<?>) scr, g);
                     PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
@@ -379,6 +389,10 @@ public final class ModuleManager {
                     // extension (see InventoryButtonsExtension), which owns their hit testing too.
                     dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
                     dev.diego.diegoaddons.util.SlotLocks.keys((AbstractContainerScreen<?>) scr, mx, my);
+                    // After the menu's own contents so the box is not painted over, and before the
+                    // toasts so a toast still lands on top of everything.
+                    dev.diego.diegoaddons.gui.InventorySearch.renderBox(
+                            (AbstractContainerScreen<?>) scr, g, mx, my);
                     Toasts.render(g);
                 });
                 // Deny the click to the menu when it lands on a locked slot. Our own buttons are
@@ -395,16 +409,37 @@ public final class ModuleManager {
                             container, ev.x(), ev.y(), ev.button(), shift)) {
                         return false;
                     }
+                    // Before the slot logic: the box sits under the menu, so a click that lands on
+                    // it is never also a click on a slot, but it must not fall through to the menu.
+                    if (dev.diego.diegoaddons.gui.InventorySearch.mouseClicked(
+                            container, ev.x(), ev.y(), ev.button())) {
+                        return false;
+                    }
                     return !dev.diego.diegoaddons.util.SlotLocks.locksClick(container, ev.x(), ev.y());
                 });
+                // The release and the drag, which the click veto does not cover and which move
+                // items on their own - vanilla's mouseReleased throws the carried stack on the
+                // floor via slot -999. This is the storage sheet dropping things; see
+                // StorageOverlay.mouseReleased.
+                ScreenMouseEvents.allowMouseRelease(screen).register((scr, ev) ->
+                        !dev.diego.diegoaddons.gui.StorageOverlay.mouseReleased(
+                                (AbstractContainerScreen<?>) scr));
+                ScreenMouseEvents.allowMouseDrag(screen).register((scr, ev, dx, dy) ->
+                        !dev.diego.diegoaddons.gui.StorageOverlay.mouseDragged(
+                                (AbstractContainerScreen<?>) scr, ev.x(), ev.y(), ev.button()));
                 ScreenMouseEvents.allowMouseScroll(screen).register((scr, mx, my, hs, vs) ->
                         !dev.diego.diegoaddons.gui.StorageOverlay.mouseScrolled(
                                 (AbstractContainerScreen<?>) scr, vs));
                 // Typing goes to the sheet's search box while it is up, which is also why the keys
                 // that would otherwise close the menu have to be asked about first.
-                ScreenKeyboardEvents.allowCharType(screen).register((scr, event) ->
-                        !dev.diego.diegoaddons.gui.StorageOverlay.charTyped(
-                                (AbstractContainerScreen<?>) scr, (char) event.codepoint()));
+                ScreenKeyboardEvents.allowCharType(screen).register((scr, event) -> {
+                    AbstractContainerScreen<?> container = (AbstractContainerScreen<?>) scr;
+                    char c = (char) event.codepoint();
+                    if (dev.diego.diegoaddons.gui.StorageOverlay.charTyped(container, c)) {
+                        return false;
+                    }
+                    return !dev.diego.diegoaddons.gui.InventorySearch.charTyped(container, c);
+                });
                 // Which storage icon was clicked, so the backpack menu that follows can be
                 // attributed to the slot it came from. After the click rather than before: this
                 // only observes, and the click itself is what opens the backpack.
@@ -419,6 +454,12 @@ public final class ModuleManager {
                 ScreenKeyboardEvents.allowKeyPress(screen).register((scr, event) -> {
                     AbstractContainerScreen<?> container = (AbstractContainerScreen<?>) scr;
                     if (dev.diego.diegoaddons.gui.StorageOverlay.keyPressed(container, event)) {
+                        return false;
+                    }
+                    // Before the lock check, so a hotbar number typed into a focused search box is
+                    // text rather than a swap - the same trap the storage sheet had to be fixed for.
+                    if (dev.diego.diegoaddons.gui.InventorySearch.keyPressed(
+                            container, event.key(), event.modifiers())) {
                         return false;
                     }
                     return !dev.diego.diegoaddons.util.SlotLocks.locksKey(container, event);

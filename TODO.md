@@ -3,9 +3,179 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.4** — released (tag `v2.5.4`, jar attached), and the first non-beta since
-2.5.3. It supersedes every `2.5.4-b-N` on every instance, whether or not pre-releases are switched
-on, because a release outranks any pre-release of the same numbers. RenderLib is gone; the mod runs on
+**Current version: 2.5.5-b-1** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
+(tag `v2.5.4`, jar attached, marked Latest) and supersedes every `2.5.4-b-N` on every instance,
+whether or not pre-releases are switched on, because a release outranks any pre-release of the same
+numbers.
+
+---
+
+## 2.5.5, in progress
+
+### 0b. Auto Update kept the old jar in the mods folder (2.5.5-b-1)
+Diego: the leftover `.jar.bak` "hat letztens meine instanz so gefickt dass ich meinen pc neu starten
+musste, weil ich die bak datei nicht disabled habe bevor ich gestarted hab."
+
+The old jar was renamed to `diegoaddonsv2-previous.jar.bak` **beside the new one**, on the reasoning
+that a backup is the way back from a bad update. That was wrong twice: the way back is the GitHub
+release it came from, which is still there and still downloadable, and a folder the loader scans is
+no place to keep something not meant to be loaded. The old jar is now **deleted**.
+
+- **Ordering was reversed on purpose**, and it is a choice between failures. Moving the new jar in
+  first and then failing to remove the old leaves **two jars with the same mod id**, which does not
+  start - the exact thing being fixed. Deleting first and failing to move leaves **no** mod, which
+  starts fine and is fixed by dragging one file out of the staging folder. Missing beats broken, so
+  it deletes first and says loudly where the new jar is if the move then fails.
+- The Windows batch fallback does the same: `del /f /q` instead of `move` to a backup.
+- **Leftovers are cleaned up on start** (`Updater.removeStaleBackup`) - one exact filename, one that
+  only this mod writes, in the folder this mod runs from. Everyone who ever auto-updated already has
+  one of these sitting there, and leaving them to find out the way Diego did is not a fix. Runs
+  regardless of the module's setting: the file is no longer the feature's doing, just rubbish.
+- Verified by running the **real batch template against real files** in a temp folder: old jar gone,
+  new jar in place with the right contents, staging emptied, script self-deleted, and exactly one
+  jar left in the folder.
+
+### 0. The storage sheet was throwing items on the floor (2.5.5-b-1) — **the important one**
+Diego, on b-9: "ab und zu ist es noch so dass im storage overlay einfach sachen gedropt werden...
+bisher hab ich noch nichts gevoided aber das ist auch nur eine frage der zeit."
+
+The 2.5.4-b-3 fix — the sheet taking every **key** — was real and still holds: `keyPressed` ends in
+`return true`, so Q never reaches vanilla. What it did not cover is the **mouse release**. The sheet
+vetoed the press and nothing else, and a press that never reaches vanilla does not stop the release
+from arriving.
+
+`AbstractContainerScreen.mouseReleased` is not a formality: it calls `slotClicked` **seven times**,
+one of them with slot id **-999**, which is the id meaning "outside the window" and whose effect is
+to throw the carried stack on the ground. So picking an item up in the sheet and letting go anywhere
+the real menu has no slot handed it to the floor. Occasional rather than constant, because it needs
+something on the cursor *and* a release over the wrong place — exactly as described.
+`mouseDragged` is the same shape: three more item-moving calls, driving quick-craft distribution.
+
+Both are now refused outright while the sheet is up (`allowMouseRelease`, `allowMouseDrag` — neither
+was registered at all). **Refused wholesale rather than by identifying which of those paths fired**:
+the sheet has no release or drag behaviour of its own beyond the search box's text selection, so
+there is nothing to preserve, and a narrower fix would be a guess about which call was doing it
+where being wrong costs somebody their items.
+
+- The one thing given up: **drag-to-distribute inside the sheet**. Against items on the floor, that
+  is the right trade. Picking up and putting down still work — those are presses.
+- [ ] **Test it deliberately**: pick an item up in the sheet, then release over the panel, over the
+      grey outside it, and over another page. Nothing should ever leave your inventory.
+- [ ] **This has not reached the main instance.** It is in a beta, and the daily driver runs with
+      pre-releases off — so until 2.5.5 is a real release, the sheet on that instance can still drop
+      things. Worth deciding quickly, since the whole point is that it loses items.
+
+### 1. Loadout re-scan (2.5.5-b-1) — Diego's first ask for this cycle
+"Immer wenn man /loadout öffnet oder sein loadout im Menü wechselt" the Player HUD and Pet HUD
+should be read again. The scan already ran every tick the menu was open, so the missing half was not
+frequency — it was that **nothing counted as an event**, and one branch could not report a change at
+all.
+
+- **A loadout with no pet left the old pet on the HUD.** `scanPanelPet` returned early on an empty
+  slot, so "no pet" was indistinguishable from "did not read one". An empty slot in a located,
+  freshly-changed panel is the menu *stating* that nothing is out, and it is now believed.
+- **Opening the menu now always produces a fresh read.** The panel fingerprint is dropped when the
+  loadout screen changes identity, so reopening `/loadout` — which is how you ask the mod to look
+  again — is never answered from a cache. That is the case that matters after an Autopet swap.
+- **A swap while the menu stays open is detected by the panel's contents changing**, since the menu
+  does not close when you switch. The fingerprint is built from item **names**, not stack identity:
+  the server hands out fresh stack objects for slots that did not change, so identity would report a
+  swap on every refresh and the pet clear would fire against a panel still filling in.
+- [ ] **Switch loadouts with the menu open** and watch the Player HUD and Pet HUD follow.
+- [ ] **Switch to a loadout with no pet out** — the Pet HUD should go empty rather than keeping the
+      last pet. This is the specific bug being fixed.
+- [ ] **Autopet swap, then open `/loadout`** — the HUD should correct itself on opening.
+- [ ] Watch for a **flicker**: if the pet blinks empty for a tick when the menu opens, the panel is
+      being read before the server has filled it and the fingerprint needs a settle delay.
+
+### 1e. Inventory Search (2.5.5-b-1) — a search box over every menu, with a calculator in it
+A Misc module. The storage sheet has had a search since 2.5.3 and it only ever worked there, which
+is the wrong way round: the sheet is the one place your items are already laid out for you. The
+menus where finding something is genuinely hard have no search at all — a bazaar page, a sack, an
+auction browser, somebody's 54-slot trade window.
+
+- **Matches are highlighted, non-matches are not veiled** — the opposite of the storage sheet, on
+  purpose. The sheet is a map of everything you own, so dimming the rest keeps its shape; a server
+  menu is somebody else's layout you are hunting through, and there the useful thing is one slot
+  lighting up.
+- **Nothing steals a key.** Ctrl+F belongs to the chat search (Diego), and a container menu already
+  spends the inventory key, 1-9 and Q. So the box is focused by **clicking it**, and the keybind on
+  the card is **unbound by default** for whoever knows which key is free for them.
+- Keys only reach the box while it has focus, and the check runs **before** the slot-lock handling —
+  so a hotbar number typed into a focused box is text, not a swap. That is the same trap the storage
+  sheet had to be fixed for in 2.5.4-b-3.
+- The box sits **under** the menu, not over it: a container's own area is the server's layout, and a
+  box across the middle of a bazaar page would cover the thing being searched for.
+- The query is dropped when the menu changes, so a search does not follow you into the next one.
+- **The calculator** is `util/Calc`, shunting-yard, `+ - * x /` with brackets. `x` multiplies
+  because that is what people actually type (`2x2`, `32x64`), and numbers take SkyBlock's own
+  shorthand (`1.4m`, `60k`). The sum is drawn **beside** the box as an annotation - the text stays
+  what you typed and the search goes on matching it, so `2x2` still finds an item called that.
+- Verified with a harness over 30 cases: the `2x2` forms, precedence and brackets, the k/m/b/t
+  suffixes, and - the ones that matter most - that plain words like `dragon`, `aspect of the end`
+  and `Lvl 100` evaluate to nothing and stay ordinary searches. Malformed input (`2+`, `(2+3`, `5/0`)
+  returns nothing rather than throwing.
+- [ ] **Click the box in a few different menus** and check it lands under each one - the position
+      comes from the menu's own reported size, which not every SkyBlock menu is honest about.
+- [ ] **Check it stays out of the storage sheet's way** — the sheet has its own box and takes every
+      key while it is up; this one stands down entirely there.
+- [ ] Does the highlight colour read well over a rarity backing? Both draw with the background.
+
+### 1d. Loadout swap delays (2.5.5-b-1)
+Two waits, on the **Loadout Keybinds** card rather than the Pest Timer one - that card owns the
+command and the clicking, so the keybind swaps get them too and there is one place to tune.
+
+- **"Wait before clicking"** (default 150 ms) is new behaviour, not just a knob. It used to click on
+  the first tick the menu was open and the preset was found; that is fine when the menu arrives
+  complete and is exactly what breaks when SkyBlock is still filling it in, since a click into a
+  half-built menu lands on whatever is at that slot number.
+- **"Wait before closing"** (default 100 ms) was the hard-coded `CLOSE_DELAY_MS`. Same reasoning as
+  before - closing into SkyBlock's rewrite of the menu leaves client and server disagreeing about
+  what is open - but the right number depends on ping.
+- **"Vary the waits" / "Vary by (±%)"** (off, 15%). Worth being straight about what this is for: it
+  stops a fixed wait that happens to land just short of the menu being ready from failing *every*
+  swap identically. It does **not** make the sequence look hand-driven - three menu actions a tenth
+  of a second apart are machine-timed whatever the numbers are.
+- The timeout no longer fires while a click is scheduled. It exists for "the menu never opened", and
+  without that guard a long wait plus a slow menu would abandon a swap that was going fine.
+- Jitter bounds checked with a standalone harness over 200k rolls at four base/percent combinations:
+  the observed range matches `base ± percent` exactly, the mean stays on the base, off returns the
+  base untouched, and a zero base can never go negative.
+- [ ] **Watch a swap at the defaults** and confirm it still lands, then try a low wait to see the
+      half-built-menu failure it is guarding against.
+
+### 1c. Mod version on the custom scoreboard (2.5.5-b-1)
+Diego's ask, and it answers a question this session kept running into — he thought he was on
+`2.5.4-b-9` while the test instance had moved on. A grey `v<version>` at the very bottom, under the
+custom bottom text, **off by default**: it is screen space that says nothing about the game, and it
+earns its place while testing a build or reporting a bug.
+Read from the loader rather than a constant, and cached: a version typed into the source is one that
+can disagree with the jar it is in, which is exactly the confusion the line exists to end.
+
+### 1b. Autopet from chat (2.5.5-b-1) — it existed, and two thirds of it never worked
+Diego asked whether pet rules could be read off the chat message. They already were — `SkyblockHud`
+has matched Autopet, summon and despawn lines since before 2.5.4. **But the patterns were wrong**,
+and checking them against SkyHanni's own `REGEX-TEST` samples proved it rather than guessing:
+
+- **Summoning by hand never matched once.** The pattern required `[Lvl n]` and the real line has no
+  level at all — Hypixel writes `You summoned your Golden Dragon!`. So the entire manual-summon path
+  has been dead for as long as it has existed. The level is now optional, in case it comes back.
+- **A pet skin broke the name, twice over.** A skinned pet is announced as `... Rabbit ✦!` and a
+  skin-numbered dragon as `... [122✦] Golden Dragon!`. The old pattern took everything up to the
+  `!`, so the name came out as `Rabbit ✦` or `[122✦] Golden Dragon`, matched nothing in the
+  seen-pets map, and the HUD dropped the icon — for exactly the pets most worth showing.
+- Verified with a standalone harness over all six real Autopet lines, all four summon forms and the
+  despawn line: **all pass**, and the old patterns visibly fail the same cases. The harness is in
+  the scratchpad, not the repo.
+- The `✦` is a literal in the source, like the `⏣` in `SkyblockLocation`. Confirmed it survives the
+  build by finding its UTF-8 bytes (`E2 9C A6`) three times in the compiled class — twice for
+  Autopet, once for summon.
+- [ ] **Summon a pet by hand** and watch the Pet HUD change without opening a menu. This is the path
+      that has never once worked.
+- [ ] **Let an Autopet rule fire on a pet with a skin** — the icon should appear rather than vanish.
+- [ ] **A pet never opened in the pets menu** still has no icon: the message gives a name, not an
+      item, so the HUD falls back to text. Worth deciding whether that is good enough or whether the
+      pet cache should be seeded from `/pets` once. RenderLib is gone; the mod runs on
 [diegos-config-lib](../diegos-config-lib) (`dev.diego:configlib`), consumed through
 `includeBuild` in `settings.gradle` — a fresh clone needs that directory beside this one to build.
 
@@ -40,7 +210,34 @@ sound and unchanged since before RenderLib, so this is a design pass rather than
       into their own buffer, flushed on the spot. If they are still missing, the log now carries one
       `World labels failed to draw` line with the cause.
 
-### 2b. Scoreboard symbols — the 2.5.3 fix only half took
+### 2b. Scoreboard symbols — cause found (2.5.5-b-1), the earlier fixes aimed at the wrong thing
+**Diego's screenshot settled it**: the remaining boxes sit on the **pest icon** in the Garden, next
+to the `x2`. That is a Hypixel glyph, not a Unicode one — and it is why "der fix funktioniert nur so
+halb" was the exactly right description.
+
+All ten of the mod's fonts fell back to `minecraft:include/default`, `include/unifont` and
+`include/space`. 2.5.3 chose those deliberately, to **equal vanilla's coverage** — and that is the
+bug, stated as the goal. A server resource pack adds its glyphs by overriding
+**`minecraft:default`**; the three includes are precisely the part of the chain a pack does not
+touch. So the symbols vanilla itself has (⏣ ✦ ❤ ☠) were fixed, and the ones only Hypixel's pack
+carries had nothing to fall through to and stayed boxed. Matching vanilla exactly is what guaranteed
+the pack's glyphs would be missing.
+
+Every font now falls back to **`minecraft:default`** itself, so it inherits whatever that resolves
+to at load time: vanilla's glyphs with no pack, and the pack's additions with one. Vanilla's own
+uniform/unifont filtering comes along with it rather than being reimplemented.
+
+- [ ] **Look at the Garden sidebar.** The pest icon beside `x2` is the test case; it is the one that
+      has never worked.
+- [ ] **If a symbol is still boxed**, the Symbol report is still on the card, and its two columns
+      still mean opposite things: **mod=MISSING, vanilla=ok** is ours; **both MISSING** is a glyph
+      the client genuinely does not have, which now also means the pack did not supply it.
+- [ ] **Watch the mixed look.** Pack glyphs will draw in the pack's own pixel style beside Poppins,
+      which is the usual look for a SkyBlock mod but is a visible mix.
+- [ ] Worth checking on an instance **without** a server resource pack too, that nothing regressed
+      where the old chain was sufficient.
+
+### 2c. Old notes on the scoreboard symbols (2.5.3/2.5.4 attempts)
 Diego, on 2.5.4: "der fix für symbole im scoreboard funktioniert nur so halb" — some symbols still
 draw as a box. The 2.5.3 fix (vanilla fallbacks in every `assets/diegoaddonsv2/font/*.json`) was
 checked against the game's own assets afterwards, and the mod's coverage now **equals vanilla's**:

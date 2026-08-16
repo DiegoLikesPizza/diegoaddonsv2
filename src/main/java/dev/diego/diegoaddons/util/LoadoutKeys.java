@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Switches SkyBlock loadout with one key.
@@ -138,6 +139,7 @@ public final class LoadoutKeys {
         }
         pending = name;
         pendingSince = System.currentTimeMillis();
+        clickAt = 0;   // a fresh press schedules its own wait once its menu shows up
         mc.player.connection.sendCommand(command);
     }
 
@@ -151,13 +153,17 @@ public final class LoadoutKeys {
         if (pending == null) {
             return;
         }
-        if (System.currentTimeMillis() - pendingSince > TIMEOUT_MS) {
+        // Not while a click is already scheduled: the timeout is for "the menu never opened", and
+        // once it has opened and we are only waiting out the configured delay, giving up would
+        // abandon a swap that is going fine. Without this, a long wait plus a slow menu times out.
+        if (clickAt == 0 && System.currentTimeMillis() - pendingSince > TIMEOUT_MS) {
             // Silence here was the worst part of this feature: a swap that never happened looked
             // exactly like a swap that was never asked for. The command is a guess, so say which one.
             String command = LoadoutKeybindModule.INSTANCE == null
                     ? "?" : LoadoutKeybindModule.INSTANCE.command();
             say(mc, "§cThe loadout menu did not open. Is \"" + command + "\" the right command?");
             pending = null;
+            clickAt = 0;
             return;
         }
         if (!(mc.screen instanceof AbstractContainerScreen<?> screen)) {
@@ -168,6 +174,19 @@ public final class LoadoutKeys {
             return;
         }
         int slot = findPreset(screen, pending);
+        if (slot >= 0 && clickAt == 0) {
+            // The menu is up and the preset is in it. Schedule the click rather than sending it on
+            // this tick: SkyBlock may still be filling the menu in, and a click into a half-built
+            // one lands on whatever is at that slot number - the exact failure the whole
+            // wait-for-the-menu design exists to prevent.
+            clickAt = System.currentTimeMillis() + roll(delay(true));
+            return;
+        }
+        if (slot >= 0 && System.currentTimeMillis() < clickAt) {
+            // Still waiting. The preset is re-found every tick on purpose: if the menu changes
+            // under us before the click lands, the slot number goes with it.
+            return;
+        }
         if (slot < 0) {
             // The menu is open but the name is not in it: say so once rather than leave a key that
             // silently does nothing. A typo in the name is by far the likeliest cause.
@@ -176,6 +195,7 @@ public final class LoadoutKeys {
                         "§b[DiegoAddons] §fNo loadout called §e" + pending + "§f in this menu."));
             }
             pending = null;
+            clickAt = 0;
             return;
         }
         AbstractContainerMenu menu = screen.getMenu();
@@ -183,16 +203,50 @@ public final class LoadoutKeys {
             mc.gameMode.handleContainerInput(menu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
         }
         pending = null;
-        closeAt = System.currentTimeMillis() + CLOSE_DELAY_MS;
+        clickAt = 0;
+        closeAt = System.currentTimeMillis() + roll(delay(false));
+    }
+
+    /** When the pending click is due, or 0 when one has not been scheduled yet. */
+    private static long clickAt;
+
+    /** The configured wait, or the old hard-coded default when the module is not there to ask. */
+    private static long delay(boolean beforeClick) {
+        LoadoutKeybindModule module = LoadoutKeybindModule.INSTANCE;
+        if (module == null) {
+            return beforeClick ? 0 : CLOSE_DELAY_MS;
+        }
+        return beforeClick ? module.clickDelayMs() : module.closeDelayMs();
     }
 
     /**
-     * How long to wait after the click before shutting the menu.
+     * The wait, varied by the configured percentage when that is switched on.
      *
-     * <p>Not the same tick. The click and the close are two packets on one connection, so the server
-     * does see them in order - but SkyBlock answers a loadout click by rewriting the menu, and
-     * closing into the middle of that has a way of leaving the client and the server disagreeing
-     * about what is open. A tenth of a second is invisible to you and unambiguous to the server.
+     * <p>The point of varying it is not disguise - three menu actions a tenth of a second apart are
+     * machine-timed whatever the exact numbers are. It is that a fixed wait which happens to land
+     * just short of the menu being ready fails <b>every</b> swap in exactly the same way, whereas a
+     * varying one fails some and succeeds others: less bad while it is wrong, and far easier to
+     * recognise as a timing problem rather than a broken feature.
+     */
+    private static long roll(long base) {
+        LoadoutKeybindModule module = LoadoutKeybindModule.INSTANCE;
+        if (module == null || !module.randomDelay() || base <= 0) {
+            return base;
+        }
+        double spread = module.randomPercent() / 100.0;
+        double factor = 1 + (ThreadLocalRandom.current().nextDouble() * 2 - 1) * spread;
+        return Math.max(0, Math.round(base * factor));
+    }
+
+    /**
+     * The fallback wait before shutting the menu, used only when the module is not available to ask.
+     *
+     * <p>The reasoning it was chosen for still holds and is why the setting defaults to it: the click
+     * and the close are two packets on one connection, so the server does see them in order - but
+     * SkyBlock answers a loadout click by rewriting the menu, and closing into the middle of that has
+     * a way of leaving the client and the server disagreeing about what is open. A tenth of a second
+     * is invisible to you and unambiguous to the server; a slower connection may want more, which is
+     * what made it a setting.
      */
     private static final long CLOSE_DELAY_MS = 100;
     private static long closeAt;
