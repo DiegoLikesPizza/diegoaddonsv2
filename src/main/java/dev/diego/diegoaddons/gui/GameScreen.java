@@ -127,7 +127,9 @@ public final class GameScreen extends Screen {
         int h = panelH();
 
         Ui.beginHiRes(g);
-        Ui.shadow(g, x, y, w, h, t.radius(), 24, 0x66000000);
+        // No drop shadow: configlib dropped Ui.shadow when rounded shapes moved to the SDF shader,
+        // and its own panels now sit on the surface + outline alone. Matching that keeps this
+        // screen looking like the config GUI rather than the odd one out.
         Ui.roundRect(g, x, y, w, h, t.radius(), t.surface());
         Ui.roundOutline(g, x, y, w, h, t.radius(), 1, t.stroke());
 

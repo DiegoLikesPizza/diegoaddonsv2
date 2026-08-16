@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.5-b-1** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
+**Current version: 2.5.5-b-2** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
 (tag `v2.5.4`, jar attached, marked Latest) and supersedes every `2.5.4-b-N` on every instance,
 whether or not pre-releases are switched on, because a release outranks any pre-release of the same
 numbers.
@@ -11,6 +11,23 @@ numbers.
 ---
 
 ## 2.5.5, in progress
+
+### 0a. configlib draws rounded shapes with a shader (2.5.5-b-2)
+Done over in `diegos-config-lib`, not here: rounded rectangles, outlines and circles now go through
+a signed-distance-field pipeline submitted into the vanilla GUI batcher, so a corner is smooth at
+any GUI scale and a shape costs one quad instead of three fills per corner scanline. It carries its
+own `configlib.accesswidener` (two `GuiGraphicsExtractor` fields plus `ScissorStack.peek`) and its
+own `assets/configlib/shaders/core/round_rect.{vsh,fsh}`, both of which ride along inside the
+nested jar — nothing had to be declared on this side, and the CPU scanline rasteriser stays as the
+fallback if the pipeline will not compile.
+
+The one thing this repo had to change: **`Ui.shadow` is gone.** configlib dropped panel drop
+shadows with the rewrite, so `GameScreen` lost its shadow call too rather than growing a private
+copy — the minigame panel now sits on surface + outline, matching the config GUI instead of being
+the one screen still wearing a shadow.
+
+**Not yet run in game.** Built, bundled and deployed only; the shader path itself is unverified at
+runtime.
 
 ### 0b. Auto Update kept the old jar in the mods folder (2.5.5-b-1)
 Diego: the leftover `.jar.bak` "hat letztens meine instanz so gefickt dass ich meinen pc neu starten
