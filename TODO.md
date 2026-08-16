@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.5-b-3** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
+**Current version: 2.5.5-b-4** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
 (tag `v2.5.4`, jar attached, marked Latest) and supersedes every `2.5.4-b-N` on every instance,
 whether or not pre-releases are switched on, because a release outranks any pre-release of the same
 numbers.
@@ -11,6 +11,26 @@ numbers.
 ---
 
 ## 2.5.5, in progress
+
+### 0. The menu search box was too small and sat over tooltips (2.5.5-b-4)
+Diego: "die search bar ist sehr klein und die font scaled nicht richtig. Außerdem overlapt sie
+tooltips."
+
+Both are `InventorySearch`, the box under a container menu — not the storage sheet's.
+
+- **Size.** It passed `BOX_H = 22` to configlib's `SearchBox`, which is built around **34**. The
+  widget squashes its frame to whatever height it is handed (`Math.min(height, BOX_H)`) but scales
+  nothing inside: the magnifier column is a fixed 34 wide and the field's font is one of the
+  pre-baked sizes. So the frame ended up half the height of its own contents, which reads exactly as
+  "font doesn't scale". The sheet has passed 34 since 2.5.3 and looks right; same number now.
+  `BOX_W` already matched `preferredWidth()`.
+- **Order.** It drew on `afterExtract`, i.e. after the screen's tooltips. Moved to `afterBackground`
+  where the rarity backing, the slot locks and its own match highlights already sit. Nothing is lost
+  by going early: the box is **below the menu's rectangle**, so the menu has nothing down there left
+  to paint over it — which is the only thing `afterExtract` was buying. `Toasts` stays behind on
+  `afterExtract` and still lands on top of everything.
+
+**Not yet run in game.** The main instance had MC open, so b-4 is only on the test instance.
 
 ### 0. The HUD editor crashed the game from the main menu (2.5.5-b-3)
 Opening the HUD editor on the title screen killed the client outright:
