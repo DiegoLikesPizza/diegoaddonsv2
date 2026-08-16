@@ -38,8 +38,16 @@ import java.util.Locale;
  */
 public final class InventorySearch {
     private static final SearchBox SEARCH = new SearchBox("Search this menu...");
-    /** Height of the box in configlib units. */
-    private static final int BOX_H = 22;
+    /**
+     * Height of the box in configlib units, and it has to be the 34 {@code SearchBox} is built
+     * around. The widget squashes its frame to whatever height it is handed
+     * ({@code Math.min(height, BOX_H)}) but scales nothing inside to match: the magnifier column is
+     * a fixed 34 wide and the field's font is a pre-baked size. At the 22 this used to pass, the
+     * frame came out half the height of its own contents - a tiny box with text that looked like it
+     * had missed the scale.
+     */
+    private static final int BOX_H = 34;
+    /** Matches {@code SearchBox.preferredWidth()}, for the same reason. */
     private static final int BOX_W = 260;
 
     /** The screen the box currently belongs to, so a new menu starts a new search. */
@@ -106,11 +114,12 @@ public final class InventorySearch {
     }
 
     /**
-     * Draws the box itself, after the menu's own contents so it is not painted over.
+     * Draws the box itself, with the background so item tooltips stay on top of it.
      *
      * <p>Positioned under the menu rather than inside it: a container's own area belongs to the
      * server's layout, and a box floating over the middle of a bazaar page would cover the thing
-     * being searched for.
+     * being searched for. That is also what lets it draw this early - nothing of the menu's own
+     * reaches down here to paint over it.
      */
     public static void renderBox(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
                                  int mx, int my) {

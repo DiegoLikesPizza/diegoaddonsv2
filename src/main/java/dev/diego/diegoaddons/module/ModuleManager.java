@@ -382,6 +382,12 @@ public final class ModuleManager {
                     // belongs under the item, not painted over it.
                     dev.diego.diegoaddons.gui.InventorySearch.renderHighlights(
                             (AbstractContainerScreen<?>) scr, g);
+                    // The box moved here from afterExtract, where it sat on top of item tooltips.
+                    // It can: it is drawn *below* the menu's rectangle, so there is nothing of the
+                    // menu's own left to paint over it - which is what afterExtract was guarding
+                    // against - and a tooltip now covers it, which is the right way round.
+                    dev.diego.diegoaddons.gui.InventorySearch.renderBox(
+                            (AbstractContainerScreen<?>) scr, g, mx, my);
                     PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
@@ -389,10 +395,6 @@ public final class ModuleManager {
                     // extension (see InventoryButtonsExtension), which owns their hit testing too.
                     dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
                     dev.diego.diegoaddons.util.SlotLocks.keys((AbstractContainerScreen<?>) scr, mx, my);
-                    // After the menu's own contents so the box is not painted over, and before the
-                    // toasts so a toast still lands on top of everything.
-                    dev.diego.diegoaddons.gui.InventorySearch.renderBox(
-                            (AbstractContainerScreen<?>) scr, g, mx, my);
                     Toasts.render(g);
                 });
                 // Deny the click to the menu when it lands on a locked slot. Our own buttons are
