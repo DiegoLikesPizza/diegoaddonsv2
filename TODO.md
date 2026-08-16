@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.5-b-2** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
+**Current version: 2.5.5-b-3** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
 (tag `v2.5.4`, jar attached, marked Latest) and supersedes every `2.5.4-b-N` on every instance,
 whether or not pre-releases are switched on, because a release outranks any pre-release of the same
 numbers.
@@ -11,6 +11,23 @@ numbers.
 ---
 
 ## 2.5.5, in progress
+
+### 0. The HUD editor crashed the game from the main menu (2.5.5-b-3)
+Opening the HUD editor on the title screen killed the client outright:
+`NullPointerException: Components not bound yet`, thrown inside `new ItemStack(...)` in
+`HarvestFeast.icon` while `FeastHudModule` drew its preview.
+
+An item's component map is bound when the server's data arrives, not at startup, so **every**
+`new ItemStack` outside a world dies in the constructor. `HarvestFeast` is the only place in this
+repo that builds stacks from `Items.*` — the other HUD elements show stacks read out of the
+player's inventory, which is simply empty on the title screen — so the guard sits there: no level,
+no stack. `HudSlots.item` already skips an empty stack, so the card keeps its size and its
+countdown and just shows no icons until you are in a world.
+
+Not a b-2 regression, only reached because the HUD editor is reachable from the custom title
+screen. **Worth considering:** `HudRegistry.draw` in configlib lets an element's exception escape
+into the render loop, so one bad element takes the whole game down. Catching there — log once per
+element, then stop drawing it — would make this class of bug a missing card instead of a crash.
 
 ### 0a. configlib draws rounded shapes with a shader (2.5.5-b-2)
 Done over in `diegos-config-lib`, not here: rounded rectangles, outlines and circles now go through

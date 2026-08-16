@@ -178,8 +178,18 @@ public final class HarvestFeast {
      *
      * <p>Vanilla items rather than SkyBlock's own icons: these are the blocks you actually break,
      * every client already has them, and they are what the crop looks like in your hand.
+     *
+     * <p><b>Empty when there is no world.</b> An item's component map is bound when the server's
+     * data arrives, not at startup, so {@code new ItemStack(...)} on the title screen dies inside
+     * the constructor with "Components not bound yet" - which is what crashed the game when the HUD
+     * editor was opened from the main menu and this element drew its preview. {@code HudSlots.item}
+     * skips an empty stack, so the card keeps its size and its countdown and simply shows no icons
+     * until you are in a world.
      */
     public static ItemStack icon(String cropName) {
+        if (Minecraft.getInstance().level == null) {
+            return ItemStack.EMPTY;
+        }
         String s = cropName.toLowerCase(Locale.ROOT);
         if (s.contains("wheat")) {
             return new ItemStack(net.minecraft.world.item.Items.WHEAT);
