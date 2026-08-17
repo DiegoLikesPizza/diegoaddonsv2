@@ -126,6 +126,8 @@ public final class ModuleSpec {
                 () -> c.gfsItems, v -> c.gfsItems = (List<GfsItem>) v);
         b.hidden("portalImages", List.class, new TypeToken<List<PortalImage>>() { }.getType(),
                 () -> c.portalImages, v -> c.portalImages = (List<PortalImage>) v);
+        b.hidden("invButtons", List.class, new TypeToken<List<InvButton>>() { }.getType(),
+                () -> c.invButtons, v -> c.invButtons = (List<InvButton>) v);
         b.hidden("espTerms", List.class, new TypeToken<List<String>>() { }.getType(),
                 () -> c.espTerms, v -> c.espTerms = (List<String>) v);
         b.hidden("lockedSlots", Set.class, new TypeToken<Set<Integer>>() { }.getType(),

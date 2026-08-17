@@ -174,6 +174,7 @@ public final class ModuleManager {
         register(new CustomScoreboardModule(), false);
         register(new SlotLockModule(), false);
         register(new StorageOverlayModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.InventoryButtonsModule(), false);
         register(new NoCursorResetModule(), false);
         register(new MinigamesModule(), false);
         register(new dev.diego.diegoaddons.module.modules.PestTimerModule(), false);
@@ -394,15 +395,17 @@ public final class ModuleManager {
                     PartyFinder.render((AbstractContainerScreen<?>) scr, g);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
-                    // Inventory buttons are not drawn here any more - they are a screen
-                    // extension (see InventoryButtonsExtension), which owns their hit testing too.
+                    // After the menu's own pass and before its tooltips, which is where the mod
+                    // this was ported from puts them: over the recipe book, under a hovered item.
+                    dev.diego.diegoaddons.gui.InvButtonsOverlay.render(
+                            (AbstractContainerScreen<?>) scr, g, mx, my);
                     dev.diego.diegoaddons.util.LeapOverlay.render((AbstractContainerScreen<?>) scr, g);
                     dev.diego.diegoaddons.util.SlotLocks.keys((AbstractContainerScreen<?>) scr, mx, my);
                     Toasts.render(g);
                 });
-                // Deny the click to the menu when it lands on a locked slot. Our own buttons are
-                // absent here on purpose: they are real widgets now, and a widget
-                // consumes its own press, so the click never reaches the menu and needs no veto.
+                // Deny the click to the menu when it lands on a locked slot, or on one of our own
+                // inventory buttons - a button sits over the menu, so a press on it must not also
+                // be a press on whatever is underneath.
                 //
                 // The storage sheet goes first and takes every click while it is up: it is standing
                 // in for the menu, and a press reaching the menu underneath would land on whatever
@@ -412,6 +415,10 @@ public final class ModuleManager {
                     boolean shift = (ev.modifiers() & org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT) != 0;
                     if (dev.diego.diegoaddons.gui.StorageOverlay.mouseClicked(
                             container, ev.x(), ev.y(), ev.button(), shift)) {
+                        return false;
+                    }
+                    if (dev.diego.diegoaddons.gui.InvButtonsOverlay.mouseClicked(
+                            container, ev.x(), ev.y(), ev.button())) {
                         return false;
                     }
                     // Before the slot logic: the box sits under the menu, so a click that lands on

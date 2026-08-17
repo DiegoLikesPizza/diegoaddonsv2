@@ -41,7 +41,8 @@ Hide Effects, Skin Changer, Party Finder, Borderless Fullscreen, Title Screen.
 
 **Misc** — Chat (compacting, filters, search), Replace Words, Better Ignore List, Command Hotkeys,
 Party Commands, Auto GFS, Auto Sprint, Slot Lock, Item Rarity, Ability Cooldown, Etherwarp Helper,
-Old Master Stars, Hydration Reminder, Announce SB Kick, Storage Overlay, No Cursor Reset, Minigames, Auto Update.
+Old Master Stars, Hydration Reminder, Announce SB Kick, Storage Overlay, Inventory Buttons,
+No Cursor Reset, Minigames, Auto Update.
 
 Every module's own settings live on its card. ESP modules all share a style and a colour; HUD
 elements all share four appearance rows, plus a per-element override.
@@ -94,11 +95,14 @@ version, which is the right way for an updater to fail.
 
 ## Network
 
-Two requests, both only when you have asked for them:
+Three requests, all only when you have asked for them:
 
 - **Auto Update** talks to `api.github.com` and `github.com` for the release list and the jar.
 - **Music Display**, with *Album cover* switched on, sends the track title to the iTunes search API
   for cover art. That setting is off by default for exactly that reason.
+- **Inventory Buttons**, once switched on, fetches Hypixel's public SkyBlock item list from
+  `api.hypixel.net` so the icon picker can offer the game's own heads. Once per session, no key,
+  and nothing about you goes with it.
 
 Nothing else leaves your machine. The mod reads Hypixel's own menus, scoreboard and chat, and
 everything it learns from them stays in your config.
@@ -126,7 +130,7 @@ Output: `build/libs/diegoaddonsv2-<version>.jar`, with configlib and JLayer bund
 
 ## Licensing and credits
 
-The mod is **MIT**. Three things in the jar are not ours:
+The mod is **MIT**. Four things in the jar are not ours:
 
 - **Poppins** (Indian Type Foundry & contributors), the mod's typeface, under the
   **SIL Open Font License 1.1** — free to use, embed and redistribute. The TTFs are at
@@ -134,6 +138,13 @@ The mod is **MIT**. Three things in the jar are not ours:
 - **JLayer** (JavaZOOM), **LGPL 2.1**, bundled unmodified as a jar-in-jar. It decodes MP3, which
   neither Minecraft nor Java can: the game's sound engine reads OGG Vorbis out of resource packs and
   nothing else, so a file you drop into `sounds/` would otherwise be unplayable.
+- **Inventory Buttons** is a port of
+  [Inventory-Buttons](https://github.com/afranz29/Inventory-Buttons) (© 2026 Panda/afranz29), itself
+  a port of the feature from [NotEnoughUpdates](https://github.com/NotEnoughUpdates/NotEnoughUpdates)
+  (© Moulberry and contributors). Both are **LGPLv3**, so the ported files and the button textures
+  stay LGPLv3 and carry that notice — the rest of the mod is unaffected. The files are
+  `util/InvButtons`, `util/HypixelSkulls`, `gui/InvButtonsOverlay`, `gui/InvButtonEditor` and
+  `assets/diegoaddonsv2/textures/invbuttons/`.
 - **Puzzle Solvers** takes its quiz answer table and the Three Weirdos line lists from
   [Odin](https://github.com/odtheking/Odin) (BSD-3-Clause, © odtheking and contributors), whose
   licence permits reuse with attribution. The solver code itself is written for this mod.

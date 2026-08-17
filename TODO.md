@@ -12,6 +12,38 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 7. Inventory Buttons, ported from afranz29's mod (2.5.5-b-4)
+Diego: "port it, meaning exact same looks for the inventory buttons and editor." So this is a port
+and not a rework - which is what the old §5 entry below asked for and was never done. The source is
+[Inventory-Buttons](https://github.com/afranz29/Inventory-Buttons) (LGPLv3, itself NEU's feature
+carried forward); the geometry, colours and layout numbers are its own and are **not** to be restyled
+into the mod's configlib look. The ported files carry its copyright header.
+
+Nothing of the 2.2.2 implementation was reused - it was removed for RenderLib and the upstream mod
+is a different, better thing. New files: `util/InvButtons` (list, icons, profiles, clipboard),
+`util/HypixelSkulls` (the SkyBlock head catalogue), `gui/InvButtonsOverlay` (drawn on real menus),
+`gui/InvButtonEditor` (the editor), `module/modules/InventoryButtonsModule`, `config/InvButton`.
+
+**What changed against upstream**, all of it deliberate:
+- **Its two screens are gone.** The settings are rows on the module card and the profile list is a
+  picker there, because that is where every other setting in this mod lives. The buttons and the
+  editor are pixel-identical; only the config surface moved.
+- **The layout is in the mod's config**, not `config/inventorybuttons/invbuttons.json`, so it is
+  carried with everything else. Profiles are still files, under `config/diegoaddons/invbuttons/`.
+- **Drawn from the screen events rather than a mixin**, like the storage sheet and the search box -
+  after the menu's own pass, before its tooltips, with the click vetoed so it never reaches a slot.
+
+- [ ] **Open your inventory with a button or two placed.** They should sit exactly where the editor
+      showed them, tooltip on hover, and the command should fire on a click.
+- [ ] **Open a SkyBlock menu that is taller than the inventory** (a bazaar page). A button above the
+      midline should stay put; one below it should move down with the menu's extra rows.
+- [ ] **Drag with snapping off, then press S.** Off: free everywhere except over the slots, where it
+      magnets to the nearest gap. On: the thirteen free slots inside, a 20px tiling outside.
+- [ ] **Pick a SkyBlock head in the icon list.** It needs the Hypixel item list, which is fetched on
+      enable - if the heads are missing, that request failed and the log says so.
+- [ ] **Export, then Import.** The clipboard blob should also accept one from the upstream mod, and
+      an old 1.8-era layout should come back with real items rather than question marks.
+
 ### 6. The keybind swap now closes the menu when it has finished reloading (2.5.5-b-4)
 Diego: "just make it that it can just close the menu when it was already fully reloaded." That
 replaces a bet with an observation, and it also closes the hole left in §5 — a keybind swap shuts the
@@ -568,7 +600,7 @@ contain `-sources` or `-dev` are skipped, so attaching more than the mod jar is 
       `MainMenuScreen.java:186` and the subtitle just below it.
 - [ ] **Door & Key ESP / Voidgloom beacon + nukekebi** — left on their semantic colours (a wither
       door is black, a blood key is red). They should get the style setting without the colour one.
-- [ ] **Inventory Buttons** — removed in 2.2.2 rather than ported. Wants a rework, not a port.
+- [x] **Inventory Buttons** — ported from afranz29's mod in 2.5.5-b-4, see §7.
 - [ ] **configlib has no GitHub remote** — committed locally only. Needs a repo name and visibility
       before it can be pushed.
 - [ ] **`IMPLEMENTATION_PLAN.md` is stale** — written for the RenderLib era. Rewrite or delete.

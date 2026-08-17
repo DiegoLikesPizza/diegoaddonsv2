@@ -100,6 +100,9 @@ public class AddonConfig {
     /** Which PNG hangs on which portal, keyed by the portal's position (Portal Images module). */
     public List<PortalImage> portalImages = new ArrayList<>();
 
+    /** The buttons drawn around your inventory, and what each of them runs. */
+    public List<InvButton> invButtons = new ArrayList<>();
+
     /** The items Auto GFS keeps topped up, in the order they are checked. */
     public List<GfsItem> gfsItems = new ArrayList<>();
 

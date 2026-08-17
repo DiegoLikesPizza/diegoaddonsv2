@@ -150,6 +150,17 @@ public final class ListSpecs {
                             .setCustomSound(v),
                     ListSpecs::prettyFile, "Pick a sound file");
 
+            // Button layouts are files rather than a list in the settings, so this is a picker over
+            // the folder like the sound ones. Picking is what loads it - see the module - and the
+            // Delete row beneath removes whichever is picked.
+            case "inventorybuttons" -> b.picker("profile", "Load profile",
+                    "A saved button layout from config/diegoaddons/invbuttons/",
+                    dev.diego.diegoaddons.util.InvButtons::profileNames,
+                    () -> dev.diego.diegoaddons.module.modules.InventoryButtonsModule.INSTANCE.profile(),
+                    v -> dev.diego.diegoaddons.module.modules.InventoryButtonsModule.INSTANCE
+                            .setProfile(v),
+                    name -> name.isEmpty() ? "None" : name, "Pick a profile");
+
             case "secretchime" -> b.picker("sound", "Sound", "Played when a secret is found",
                     ListSpecs::allSounds,
                     () -> dev.diego.diegoaddons.module.modules.SecretChimeModule.INSTANCE.soundId(),

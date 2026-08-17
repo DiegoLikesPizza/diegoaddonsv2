@@ -47,6 +47,7 @@ public final class DiegoCommands {
             new Help("resign", "Give up the running game"),
             new Help("game", "Reopen the board"),
             new Help("update", "Check for a new version of the mod"),
+            new Help("buttons", "Open the inventory button editor"),
             new Help("words", "Open the word replacement list"),
             new Help("hotkeys", "Open the command hotkey list"),
             new Help("blocked", "Open the blocked player list"),
@@ -111,6 +112,9 @@ public final class DiegoCommands {
                         .executes(c -> run(dev.diego.diegoaddons.gui.GameScreen::open)))
                 .then(ClientCommands.literal("update")
                         .executes(c -> update(c.getSource())))
+                .then(ClientCommands.literal("buttons")
+                        .executes(c -> open(() ->
+                                new dev.diego.diegoaddons.gui.InvButtonEditor(null))))
                 .then(ClientCommands.literal("words")
                         .executes(c -> openList("misc.words")))
                 .then(ClientCommands.literal("hotkeys")
