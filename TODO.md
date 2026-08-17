@@ -12,6 +12,48 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 9. The Farming Session showed a clock and copper and nothing else (2.5.5-b-4)
+Diego: "Farming Session tracker is broken. It shows only the session time and copper. No profit and
+no pests killed amount." Four separate faults, each one enough on its own to hide a line - and every
+one of them a string that was guessed from a screenshot and shipped without being read back.
+
+- **No crop, so no crops line and no profit.** The milestone widget was parsed by taking the line
+  under `Crop Milestones` and treating its leading words as a crop, with the count read from a
+  `Counter:` line. It now scans the heading and the four lines under it, accepts the count either on
+  a `Counter:` line or as the trailing number beside the crop, and only ever takes a crop name from
+  a **closed list of the eleven Garden crops**. A closed list because a pattern that accepts "the
+  leading words" accepts a heading too, and then the coins figure prices whatever was written there.
+- **Nether Wart has no bazaar id called `NETHER_WART`.** `Bazaar.idFor` upcases the display name,
+  which is exact for most farming items and wrong for exactly the crops Diego farms: the ids are
+  Minecraft's old ones (`NETHER_STALK`, `CARROT_ITEM`, `POTATO_ITEM`, `INK_SACK:3`). The price came
+  back 0, the coins figure went to -1, and the profit line hid itself. There is now an alias table,
+  which fixes the **Visitor Helper** at the same time - it could not price half of what a visitor asks.
+- **The pest kill line was anchored at the start** (`^You received ...`), and Hypixel prefixes it
+  with its own banner, exactly like the spawn line the field above it already allows for. Searched
+  rather than matched now, and there is a **second source**: the Pests widget's alive count falling
+  is a pest that died. Chat wins where it works, because it carries the drop as well; the two are
+  never added, and the first chat kill takes the widget's count with it.
+- **The clock paused while farming.** Idle was measured off copper and the milestone counter, and
+  copper only moves on a visitor while the counter needs a widget that may be off. Activity is now
+  the action bar's **farming XP** - the thing gained on the crop itself. The segment's text has to
+  *change* to count, not merely be present: SkyBlock leaves the last one drawn for a few seconds.
+
+The card no longer hides a number it cannot produce - a missing line reads as a broken mod, which is
+how this stayed broken. Crops says "enable the Crop Milestones widget", profit says whether it is
+waiting for prices or has no price for this crop, and pests is drawn at 0.
+
+- [ ] **Farm for two minutes and watch the clock keep running** past the 2-minute pause without
+      touching a visitor. That is the XP signal working.
+- [ ] **Stand still for two minutes** and it should say "(paused)". If it never pauses, the action
+      bar keeps its last segment up and presence has to stop counting.
+- [ ] **Crops, profit and pests should all carry a number.** Nether Wart is the one to test - it is
+      the crop the alias table exists for.
+- [ ] **Kill a pest** and check the count moves once, not twice. Twice means chat and the widget are
+      both being counted.
+- [ ] With **Debug scan (log)** on, the log prints the whole tab list every 15s plus the parse, and
+      any chat line with "killing" in it that did not match. **If crops still reads as missing, that
+      dump is the answer** - paste it back and the widget shapes come from it rather than a guess.
+
 ### 8. The equipped panel was never being found at all (2.5.5-b-4)
 Diego: "why does scanning the loadouts screen still not work, it only shows the new pet and equipment
 on my 2 farming loadouts." That shape - some loadouts and not others - is the tooltip fallback, which

@@ -84,10 +84,34 @@ public final class Bazaar {
      * rather than a wrong price, which is the failure this feature can live with.
      */
     public static String idFor(String displayName) {
-        return displayName.trim().toUpperCase(Locale.ROOT)
+        String plain = displayName.trim().toUpperCase(Locale.ROOT)
                 .replaceAll("[^A-Z0-9]+", "_")
                 .replaceAll("^_+|_+$", "");
+        return ALIASES.getOrDefault(plain, plain);
     }
+
+    /**
+     * The ids that are <b>not</b> the display name upcased - all of them Minecraft's own old item
+     * names, which SkyBlock kept.
+     *
+     * <p>This is not a nicety. Every one of these is a crop somebody farms in the Garden, so without
+     * the table the farming session prices a Nether Wart run at nothing and the visitor helper
+     * cannot price half of what a visitor asks for - which reads as "the tracker is broken", because
+     * from the outside it is. {@code NETHER_WART} and {@code CARROT} are ids the bazaar simply does
+     * not have, so the miss was silent.
+     *
+     * <p>Cocoa beans are the odd one: their id still carries the old dye metadata, {@code INK_SACK:3}.
+     */
+    private static final Map<String, String> ALIASES = Map.ofEntries(
+            Map.entry("NETHER_WART", "NETHER_STALK"),
+            Map.entry("ENCHANTED_NETHER_WART", "ENCHANTED_NETHER_STALK"),
+            Map.entry("MUTANT_NETHER_WART", "MUTANT_NETHER_STALK"),
+            Map.entry("CARROT", "CARROT_ITEM"),
+            Map.entry("POTATO", "POTATO_ITEM"),
+            Map.entry("COCOA_BEANS", "INK_SACK:3"),
+            Map.entry("ENCHANTED_COCOA_BEANS", "ENCHANTED_COCOA"),
+            Map.entry("MUSHROOM", "RED_MUSHROOM"),
+            Map.entry("ENCHANTED_MUSHROOM", "ENCHANTED_RED_MUSHROOM"));
 
     /** Price by display name, or 0 when the bazaar does not know it. */
     public static double priceOf(String displayName) {

@@ -369,6 +369,11 @@ public final class ModuleManager {
                 // Autopet swaps the pet without any menu being opened, so chat is the only place
                 // the HUD can learn about it.
                 dev.diego.diegoaddons.util.SkyblockHud.onChat(plain);
+            } else {
+                // The action bar, which is where SkyBlock prints skill XP as it is gained - the
+                // farming session's idle clock runs off that rather than off the tab counters.
+                dev.diego.diegoaddons.util.FarmingSession.onActionBar(
+                        LegacyText.strip(message.getString()));
             }
         });
 

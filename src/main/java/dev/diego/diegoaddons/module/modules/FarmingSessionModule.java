@@ -50,6 +50,8 @@ public class FarmingSessionModule extends HudModule {
             new NumberSetting(this, "endAfter", "End after idle (minutes)", 60, 5, 180, 5);
     private final ActionSetting reset =
             new ActionSetting(this, "reset", "This session", "Reset", FarmingSession::reset);
+    private final BooleanSetting debug =
+            new BooleanSetting(this, "debug", "Debug scan (log)", false);
 
     public FarmingSessionModule() {
         super("farmingsession", Category.GARDEN, "Farming Session",
@@ -63,6 +65,7 @@ public class FarmingSessionModule extends HudModule {
         settings.add(pauseAfter);
         settings.add(endAfter);
         settings.add(reset);
+        settings.add(debug);
         INSTANCE = this;
     }
 
@@ -84,6 +87,7 @@ public class FarmingSessionModule extends HudModule {
     @Override
     public void onClientTick(Minecraft mc) {
         FarmingSession.setTimeouts((long) (pauseAfter.get() * 60_000), (long) (endAfter.get() * 60_000));
+        FarmingSession.setDebug(debug.get());
         FarmingSession.tick(mc);
         if (showCoins.get() && Pests.inGarden()) {
             Bazaar.refreshIfDue();
@@ -105,11 +109,15 @@ public class FarmingSessionModule extends HudModule {
         if (crops >= 0) {
             out.add(line(FarmingSession.crop().isEmpty() ? "Crops" : FarmingSession.crop(),
                     count(crops), FarmingSession.perHour(crops)));
+        } else {
+            // A line that is simply absent reads as a broken tracker and gives nobody anything to
+            // act on. The counter comes from a widget that can be switched off, so say that.
+            out.add("Crops: enable the Crop Milestones widget");
         }
         if (showCoins.get()) {
-            double total = FarmingSession.profit();
-            double farming = Math.max(0, FarmingSession.coins());
+            double farming = FarmingSession.coins();
             double pestSide = FarmingSession.pestProfit();
+            double total = (farming < 0 ? 0 : farming) + pestSide;
             // The reason matters: "no prices yet" resolves itself, "not on the bazaar" does not.
             if (total > 0) {
                 out.add(line("Profit", Visitors.coins(total), FarmingSession.perHour((long) total)));
@@ -119,6 +127,11 @@ public class FarmingSessionModule extends HudModule {
                 }
             } else if (!Bazaar.fresh()) {
                 out.add("Profit: waiting for prices");
+            } else if (farming < 0 && crops > 0) {
+                out.add("Profit: no bazaar price for "
+                        + (FarmingSession.crop().isEmpty() ? "this crop" : FarmingSession.crop()));
+            } else {
+                out.add("Profit: 0");
             }
         }
         if (showCopper.get()) {
@@ -127,7 +140,9 @@ public class FarmingSessionModule extends HudModule {
                 out.add(line("Copper", count(copper), FarmingSession.perHour(copper)));
             }
         }
-        if (showPests.get() && FarmingSession.pests() > 0) {
+        // Shown at zero as well, and deliberately: "no pests yet" and "the pest count is broken"
+        // looked identical from the outside, which is how a kill counter stays broken for a month.
+        if (showPests.get()) {
             out.add(line("Pests", count(FarmingSession.pests()),
                     FarmingSession.perHour(FarmingSession.pests())));
         }
