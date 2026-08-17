@@ -138,6 +138,28 @@ public final class SkyblockHud {
     /** When the forced re-read window ends, in epoch millis. */
     private static long forceScanUntil;
 
+    /** When the last {@code You equipped ...} arrived, in epoch millis. */
+    private static long equippedAt;
+
+    /**
+     * When the equipped panel last read as something <b>different</b>, in epoch millis.
+     *
+     * <p>Different, not "was read": inside the forced window the panel is re-applied every tick
+     * whether or not it moved, and something waiting for the menu to settle needs to know when it
+     * last actually moved.
+     */
+    private static long panelChangedAt;
+
+    /** When the last {@code You equipped ...} arrived. 0 for never. */
+    public static long equippedAt() {
+        return equippedAt;
+    }
+
+    /** When the equipped panel last changed. 0 for never. See {@link #panelChangedAt}. */
+    public static long panelChangedAt() {
+        return panelChangedAt;
+    }
+
     /**
      * A loadout's contents, which it lists in its own tooltip.
      *
@@ -695,15 +717,18 @@ public final class SkyblockHud {
             sb.append(nameOf(at(slots, limit, (top + 1) * COLS + col + 2)));
         }
         String signature = sb.toString();
-        // Inside the window after "You equipped ...", the panel is believed whatever it says. The
-        // fingerprint is still written, so the moment the window closes the normal "has anything
-        // moved" test carries on from what was last read rather than from what it was before.
-        boolean forced = System.currentTimeMillis() < forceScanUntil;
-        if (!forced && signature.equals(panelSignature)) {
-            return false;
+        boolean different = !signature.equals(panelSignature);
+        if (different) {
+            panelSignature = signature;
+            // Only on a real change, which is what "the menu is still being rewritten" means to
+            // anything waiting for it to settle - see panelChangedAt.
+            panelChangedAt = System.currentTimeMillis();
         }
-        panelSignature = signature;
-        return true;
+        // Inside the window after "You equipped ...", the panel is believed whatever it says, so an
+        // unchanged read still counts as an answer. The fingerprint above is written either way, so
+        // the moment the window closes the normal "has anything moved" test carries on from what was
+        // last read rather than from what it was before.
+        return different || System.currentTimeMillis() < forceScanUntil;
     }
 
     /** The stack at a slot index, or empty when the index is outside the menu. */
@@ -856,7 +881,8 @@ public final class SkyblockHud {
         // reading in itself. Whether anything comes of it depends on the Loadouts menu being open,
         // which is the only place the forced re-read is reachable from.
         if (EQUIPPED.matcher(line).find()) {
-            forceScanUntil = System.currentTimeMillis() + FORCE_SCAN_MS;
+            equippedAt = System.currentTimeMillis();
+            forceScanUntil = equippedAt + FORCE_SCAN_MS;
             if (debug) {
                 DiegoAddonsV2Client.LOGGER.info(
                         "[SB DEBUG] '{}' - re-reading the loadout panel for {} ms", line, FORCE_SCAN_MS);

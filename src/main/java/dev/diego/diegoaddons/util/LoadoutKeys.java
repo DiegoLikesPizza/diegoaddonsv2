@@ -204,8 +204,12 @@ public final class LoadoutKeys {
         }
         pending = null;
         clickAt = 0;
-        closeAt = System.currentTimeMillis() + roll(delay(false));
+        clickedAt = System.currentTimeMillis();
+        closeAt = clickedAt + roll(delay(false));
     }
+
+    /** When the preset was actually clicked, so "has anything happened since" has a since. */
+    private static long clickedAt;
 
     /** When the pending click is due, or 0 when one has not been scheduled yet. */
     private static long clickAt;
@@ -251,8 +255,36 @@ public final class LoadoutKeys {
     private static final long CLOSE_DELAY_MS = 100;
     private static long closeAt;
 
+    /** How long the menu has to hold still before it counts as finished reloading. */
+    private static final long SETTLE_MS = 300;
+
+    /**
+     * The longest the close will wait for the reload to be observed.
+     *
+     * <p>The signals it waits on come from the chat line and the equipped panel, and a menu whose
+     * layout is not what the panel scan expects produces neither. Waiting forever on a signal that
+     * is never coming would leave the menu open, which is worse than closing a little late - so
+     * past this the configured delay is all there is and the menu shuts on it.
+     */
+    private static final long RELOAD_CAP_MS = 3000;
+
     /**
      * Shuts the loadout menu once the swap has gone through.
+     *
+     * <p>"Gone through" is watched rather than timed, when the card says so: the swap is announced
+     * in chat and answered by SkyBlock rewriting the menu, so the menu is finished when it has
+     * changed since the click and then held still for {@link #SETTLE_MS}. That is right at any ping,
+     * where a fixed delay is a bet on one.
+     *
+     * <p><b>It also stops the swap outrunning the thing it exists for.</b> The equipped panel is
+     * where the HUD reads your new gear and pet, and closing before the panel had been rewritten
+     * meant closing before the mod had read it - so the keybind swap could leave the Player HUD and
+     * Pet HUD on the loadout you just left.
+     *
+     * <p>The two signals are taken together, later of the two. The chat line arrives first and the
+     * panel change after it, so the message alone would settle too early; but a swap between two
+     * loadouts with the same gear changes nothing in the panel, and then the message is the only
+     * evidence there is. Whichever came last is what has to go quiet.
      *
      * <p>Only if a loadout menu is still what is open: between the click and this, you may have hit
      * Escape yourself or the server may have put something else up, and closing that would be the
@@ -262,6 +294,9 @@ public final class LoadoutKeys {
         if (closeAt == 0 || System.currentTimeMillis() < closeAt) {
             return;
         }
+        if (!reloaded()) {
+            return;   // the configured wait is up, but the menu is still being rewritten
+        }
         closeAt = 0;
         if (mc.player == null || !(mc.screen instanceof AbstractContainerScreen<?> screen)) {
             return;
@@ -269,6 +304,25 @@ public final class LoadoutKeys {
         if (LegacyText.strip(screen.getTitle().getString()).toLowerCase(Locale.ROOT).contains("loadout")) {
             mc.player.closeContainer();
         }
+    }
+
+    /**
+     * Whether the menu has finished reloading since the click, or the wait for that has run out.
+     *
+     * <p>True immediately when the option is off, which is the old fixed-delay behaviour.
+     */
+    private static boolean reloaded() {
+        LoadoutKeybindModule module = LoadoutKeybindModule.INSTANCE;
+        if (module == null || !module.closeWhenReloaded()) {
+            return true;
+        }
+        long now = System.currentTimeMillis();
+        if (now - clickedAt > RELOAD_CAP_MS) {
+            return true;   // nothing is coming; the configured delay is all there is
+        }
+        // The later of the two signals: the chat line lands first, the panel rewrite after it.
+        long latest = Math.max(SkyblockHud.equippedAt(), SkyblockHud.panelChangedAt());
+        return latest > clickedAt && now - latest >= SETTLE_MS;
     }
 
     /**

@@ -12,6 +12,32 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 6. The keybind swap now closes the menu when it has finished reloading (2.5.5-b-4)
+Diego: "just make it that it can just close the menu when it was already fully reloaded." That
+replaces a bet with an observation, and it also closes the hole left in §5 — a keybind swap shuts the
+menu, so the panel re-read had nothing on screen to read.
+
+**"Wait before closing" was always a guess at how long SkyBlock takes to rewrite the menu**, on a
+number that depends on the ping. The rewrite is something the client can simply watch happen: the
+panel changes, then stops changing. New row on the Loadout Keybinds card, **"Close once the menu has
+reloaded", on by default**; the delay stays as the floor, so a swap never closes sooner than it did.
+
+- **Finished = changed since the click, then held still for 300 ms.**
+- **Two signals, whichever came last.** The chat line lands first and the panel rewrite after it, so
+  the message alone would settle too early - but a swap between two loadouts with the same gear
+  changes nothing in the panel, and then the message is the only evidence there is.
+- **`panelChangedAt` moves only on a real change**, not on every forced re-read inside §5's window,
+  or "held still" could never become true while the window was open.
+- **Three seconds and it closes anyway.** Both signals can be missing - a menu whose layout the panel
+  scan does not recognise produces neither - and waiting forever on a signal that is not coming
+  would leave the menu open, which is worse than closing late.
+- [ ] **Press a loadout key and watch the Player HUD and Pet HUD**. They should be on the new loadout
+      by the time the menu disappears. This is the case §5 could not reach.
+- [ ] **Swap between two loadouts with identical gear** — it should still close, ~300 ms after the
+      chat line, rather than sitting there for the full three seconds.
+- [ ] Does the menu ever now feel slow to shut? The floor is still your "Wait before closing"; if it
+      lingers, the settle is waiting on a panel that keeps being rewritten.
+
 ### 5. The swap announces itself in chat — Diego's fix (2.5.5-b-4)
 Diego: "lwk just scan the menu when the player has the `(X/3) Loadouts` menu open and theres a chat
 message saying `You equipped XXX`." **He is right and it is the better design**, so it is now the

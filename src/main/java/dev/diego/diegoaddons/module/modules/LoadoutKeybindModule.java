@@ -47,6 +47,23 @@ public class LoadoutKeybindModule extends Module {
     private final NumberSetting closeDelay =
             new NumberSetting(this, "closeDelay", "Wait before closing (ms)", 100, 0, 2000, 25);
     /**
+     * Wait for the menu to have finished reloading instead of only waiting out the delay above.
+     *
+     * <p>Diego's ask, and it turns a guess into an observation. The delay is a bet on how long
+     * SkyBlock takes to rewrite the menu after a swap, and the bet is on a number that depends on
+     * the ping - whereas the rewrite is something the client can simply <b>watch happen</b>: the
+     * equipped panel changes, and then stops changing. Closing when it has stopped is right at any
+     * ping and needs no tuning.
+     *
+     * <p>It also fixes what the swap was closing <i>before</i>: the panel is where the HUD reads
+     * your new gear and pet from, so a menu shut too early was shut before the mod had read it - the
+     * keybind swap could leave the Player HUD and Pet HUD showing the loadout you just left.
+     *
+     * <p>The delay above stays as the floor, so a swap never closes sooner than it used to.
+     */
+    private final BooleanSetting closeWhenReloaded =
+            new BooleanSetting(this, "closeWhenReloaded", "Close once the menu has reloaded", true);
+    /**
      * Vary each wait by a percentage instead of using it exactly.
      *
      * <p>What this is actually good for is not landing on the same moment every time: a fixed delay
@@ -66,6 +83,7 @@ public class LoadoutKeybindModule extends Module {
         settings.add(command);
         settings.add(clickDelay);
         settings.add(closeDelay);
+        settings.add(closeWhenReloaded);
         settings.add(randomDelay);
         settings.add(randomPercent);
         INSTANCE = this;
@@ -82,6 +100,11 @@ public class LoadoutKeybindModule extends Module {
 
     public long closeDelayMs() {
         return (long) closeDelay.get();
+    }
+
+    /** Whether the close waits for the menu to stop changing rather than only for the delay. */
+    public boolean closeWhenReloaded() {
+        return closeWhenReloaded.get();
     }
 
     public boolean randomDelay() {
