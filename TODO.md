@@ -12,6 +12,43 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 12. Pick your own SkyBlock level colour (2.5.5-b-4)
+Diego: "mach mal dass man seine level color aussuchen kann zwischen denen die man schon unlocked
+hat" — the badge in front of your name, and only ever an **earlier** colour than the one you are
+wearing.
+
+`module/modules/LevelColorModule` (Misc) is one dropdown; the work is in `util/LevelColor`.
+
+- **Applied at the font, like the word replacer.** `FontMixin` is the one choke point every drawn
+  string passes through, so the tab list, the name plate over your head and every chat line carrying
+  your badge are covered by one hook rather than three. Purely visual and purely local.
+- **Your level is read out of the badge being recoloured.** No menu scan, no cached number: the
+  badge carries the level, so the same string that says "recolour me" also says what you are allowed
+  to recolour it to. Nothing to go stale, and it works on the first frame after a login.
+- **The unlock rule is the table.** One colour per 40 levels, last at 480, thirteen in all — your
+  tier is `level / 40`, and anything at or below it is yours. A pick above your level falls back to
+  the tier you are in, which is the colour you already had, so it simply does nothing until you get
+  there. The menu still lists all thirteen with their level beside them (`Gold (400)`), because the
+  spec is built once at startup, when your level is not known — a list built then could only lie.
+- **Whose badge it is, is decided by what stands between it and your name**: spaces and bracketed
+  tags (a rank, a guild tag), nothing else. "Your name somewhere in the next few characters" was
+  tried first and gives away your colour on `[200] Someone: hey Diego`, and picks the wrong badge on
+  a line carrying two.
+- **The style is put back after the closing bracket**, so the colour stops at the badge instead of
+  running on into your rank and name.
+- Checked with a harness over 16 cases — chat with a rank, tab, a bare name plate, two badges on one
+  line, a longer name starting with yours, bold, a locked pick, and the brackets that are not badges.
+  All pass.
+
+- [ ] **The colour ramp is from memory and is the one thing to check by eye**: gray, white, yellow,
+      green, dark green, aqua, dark aqua, blue, light purple, dark purple, gold, red, dark red. Pick
+      the tier you are actually wearing — if the badge changes colour, that entry is wrong and
+      `LevelColor.CODES` is the only thing to fix.
+- [ ] **Pick something below your level and look at the tab list, your name plate and a chat line** —
+      all three come from the one hook, so all three should change together.
+- [ ] **Pick something above your level**: nothing should happen, and that is the unlock rule
+      working, not a bug. Worth deciding whether it should say so instead of staying silent.
+
 ### 11. Fire Freeze Timer for F3/M3 (2.5.5-b-4)
 Diego went looking through old 1.8.9 mods for this one: "a timer on screen like the hydration
 reminder that counts down after P1 in the boss fight to the point before P2 where you have to fire

@@ -1,6 +1,7 @@
 package dev.diego.diegoaddons.mixin;
 
 import dev.diego.diegoaddons.util.GlobalTextReplacer;
+import dev.diego.diegoaddons.util.LevelColor;
 import net.minecraft.client.gui.Font;
 import net.minecraft.util.FormattedCharSequence;
 import org.spongepowered.asm.mixin.Mixin;
@@ -8,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 /**
- * Applies the word replacements to every string the game draws.
+ * Applies the word replacements - and the level badge's colour - to every string the game draws.
  *
  * <p>These two methods are the choke point: all three {@code drawInBatch} overloads - the ones taking
  * a String, a Component and a FormattedCharSequence - end up calling one of them, so rewriting here
@@ -26,7 +27,7 @@ public class FontMixin {
             argsOnly = true,
             ordinal = 0)
     private String diego$replacePlain(String text) {
-        return GlobalTextReplacer.forString(text);
+        return LevelColor.forString(GlobalTextReplacer.forString(text));
     }
 
     @ModifyVariable(
@@ -35,6 +36,6 @@ public class FontMixin {
             argsOnly = true,
             ordinal = 0)
     private FormattedCharSequence diego$replaceStyled(FormattedCharSequence text) {
-        return GlobalTextReplacer.forSequence(text);
+        return LevelColor.forSequence(GlobalTextReplacer.forSequence(text));
     }
 }

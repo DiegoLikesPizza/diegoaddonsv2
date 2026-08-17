@@ -142,6 +142,7 @@ public final class ModuleManager {
         register(new HideEffectsModule(), false);
         register(new BetterIgnoreListModule(), false);
         register(new ReplaceWordsModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.LevelColorModule(), false);
         register(new PartyCommandsModule(), false);
         register(new PartyFinderModule(), false);
         register(new PuzzleSolversModule(), false);
