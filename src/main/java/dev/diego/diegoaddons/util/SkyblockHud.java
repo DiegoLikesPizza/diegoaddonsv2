@@ -112,6 +112,33 @@ public final class SkyblockHud {
     private static final Pattern DESPAWN = Pattern.compile("You\\s+despawned\\s+your\\s+");
 
     /**
+     * Switching loadout announces itself: {@code You equipped ...}.
+     *
+     * <p>Diego's reading of the bug, and it is the right one. Everything before this treated a swap
+     * as something to be <i>inferred</i> - the menu stays open, so the only evidence was its
+     * contents changing under you, and the whole apparatus of fingerprints and freshly-opened-screen
+     * resets exists to turn that into an event. The server was saying so in chat the entire time.
+     *
+     * <p>Deliberately loose about what follows. What is equipped is not read from here - the menu is
+     * read, and this only says when to look - so the name does not have to be parsed, and a wording
+     * that varies by what you equipped cannot stop the trigger firing.
+     */
+    private static final Pattern EQUIPPED = Pattern.compile("(?i)^\\s*You equipped\\b");
+
+    /**
+     * How long after the message the panel is re-read every tick, ignoring the fingerprint.
+     *
+     * <p>A window rather than a single re-read, because the message arrives <b>before</b> the menu
+     * has finished being rewritten: SkyBlock sends the line and then repopulates the slots, so one
+     * scan on the message would read the loadout you just left. Re-reading for a second means
+     * whatever the panel settles on is what lands, and the fingerprint takes over again afterwards.
+     */
+    private static final long FORCE_SCAN_MS = 1500;
+
+    /** When the forced re-read window ends, in epoch millis. */
+    private static long forceScanUntil;
+
+    /**
      * A loadout's contents, which it lists in its own tooltip.
      *
      * <pre>
@@ -668,7 +695,11 @@ public final class SkyblockHud {
             sb.append(nameOf(at(slots, limit, (top + 1) * COLS + col + 2)));
         }
         String signature = sb.toString();
-        if (signature.equals(panelSignature)) {
+        // Inside the window after "You equipped ...", the panel is believed whatever it says. The
+        // fingerprint is still written, so the moment the window closes the normal "has anything
+        // moved" test carries on from what was last read rather than from what it was before.
+        boolean forced = System.currentTimeMillis() < forceScanUntil;
+        if (!forced && signature.equals(panelSignature)) {
             return false;
         }
         panelSignature = signature;
@@ -821,6 +852,16 @@ public final class SkyblockHud {
      */
     public static boolean onChat(String raw) {
         String line = strip(raw);
+        // Not consumed and not returned on: a swap is a reason to look at the menu again, not a
+        // reading in itself. Whether anything comes of it depends on the Loadouts menu being open,
+        // which is the only place the forced re-read is reachable from.
+        if (EQUIPPED.matcher(line).find()) {
+            forceScanUntil = System.currentTimeMillis() + FORCE_SCAN_MS;
+            if (debug) {
+                DiegoAddonsV2Client.LOGGER.info(
+                        "[SB DEBUG] '{}' - re-reading the loadout panel for {} ms", line, FORCE_SCAN_MS);
+            }
+        }
         if (DESPAWN.matcher(line).find()) {
             pet = ItemStack.EMPTY;
             petInfoSource = null;

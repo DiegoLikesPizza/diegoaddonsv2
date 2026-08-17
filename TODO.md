@@ -12,6 +12,34 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 5. The swap announces itself in chat — Diego's fix (2.5.5-b-4)
+Diego: "lwk just scan the menu when the player has the `(X/3) Loadouts` menu open and theres a chat
+message saying `You equipped XXX`." **He is right and it is the better design**, so it is now the
+trigger rather than another guess layered on the old one.
+
+Everything before this treated a swap as something to be *inferred*: the menu does not close when
+you switch, so the only evidence was the panel's contents changing under you, and the fingerprint,
+the freshly-opened-screen reset and the name-not-identity comparison all exist to turn that into an
+event. **The server was saying so in chat the whole time.**
+
+- On `You equipped ...`, the panel is re-read every tick for **1.5 s, ignoring the fingerprint**. A
+  window rather than one re-read, because the message arrives *before* the menu has been rewritten -
+  SkyBlock sends the line and then repopulates the slots, so a single scan on the message would read
+  the loadout you just left. Whatever the panel settles on is what lands.
+- The fingerprint is still written during the window, so the normal "has anything moved" test picks
+  up from what was last read rather than from what was there before the swap.
+- **Nothing is parsed out of the message.** What was equipped is read from the menu; the line only
+  says when to look. So a wording that varies with what you equipped cannot stop it firing.
+- It is only reachable from the Loadouts menu - the forced re-read lives in the panel scan, which
+  nothing else calls - so this cannot fire against some other menu that happens to be open.
+- [ ] **Switch loadouts with `/loadout` open** and watch the Player HUD and Pet HUD follow, for a
+      loadout that used to work and one that did not. This is the one that should just work now.
+- [ ] Is 1.5 s long enough on a bad connection? "Debug scan (log)" prints the trigger and the window,
+      and the route line after it says what was read.
+- [ ] **A keybind swap closes the menu**, so this does nothing for those - the panel is not on screen
+      to be re-read. Worth deciding whether the message should also drive a swap made that way, which
+      would need the gear from somewhere other than a menu.
+
 ### 4. Loadout swaps only updated the HUD for two of Diego's loadouts (2.5.5-b-4)
 Diego: "updating the pet hud and equipment in player hud when using another loadout somehow only
 works with my 2 farming loadouts." **Three real defects found, and the cause is not confirmed** -
