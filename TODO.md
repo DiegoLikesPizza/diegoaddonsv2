@@ -3,7 +3,7 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.5-b-3** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
+**Current version: 2.5.5-b-4** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
 (tag `v2.5.4`, jar attached, marked Latest) and supersedes every `2.5.4-b-N` on every instance,
 whether or not pre-releases are switched on, because a release outranks any pre-release of the same
 numbers.
@@ -11,6 +11,55 @@ numbers.
 ---
 
 ## 2.5.5, in progress
+
+### 2. Your own PNGs on portals and on the Hub's big map (2.5.5-b-4) — Diego's ask this session
+"Add a feature that lets me display .png files on portals. oh and make a feature for custom hub map.
+Yk the big ass map in the hub." Two modules, both in **Render**, both reading the same folder:
+**`<config>/diegoaddons/images/`**. Drop a `.png` in, name it on the card or with a command.
+
+Neither replaces anything the game draws. A picture is hung **2 cm off the surface** it covers
+(`WorldRender.PICTURE_OFFSET`), so a translucent PNG shows the portal swirl through it, nothing has
+to be mixed into block or map rendering, and switching a module off puts the world straight back.
+Drawn on the engine's translucent-entity type, which is **not back-face culled**, at full brightness
+— a portal is a light source and the map wall is read from across the courtyard, so a picture that
+went dark at night would be the one time you could not see it.
+
+- **Fit / Fill / Stretch** (Diego's follow-up: "add options for filling and stretching the image to
+  fit"), on both cards, defaulting to **Fill**. The three differ in what they give up, and the
+  difference is where the work happens: **Stretch** distorts, **Fill** keeps the shape and crops the
+  overflow **in the UVs** (so nothing is drawn that is not seen), **Fit** keeps the shape and shrinks
+  the **geometry**, leaving the rest of the surface bare rather than painting over it. All of it is
+  `util/ImageQuad.fit`, checked by hand against a 4×3 surface with 16:9 and 1:1 images.
+- **Portal Images.** Portal blocks are flood-filled into **panes** first — a portal is a rectangle of
+  blocks, and drawing per block would tile the image once per square metre. Which image goes where is
+  stored **per portal position** (`/da portal <file>` while facing one), so every portal in the Hub
+  can have its own; anything unassigned shows the card's default (`portal.png`).
+  - Keyed on the **position only, not the island name**: the island comes from the tab list and is
+    blank for the first seconds after a warp, and a briefly-blank key is a picture that briefly falls
+    off every time you change lobby.
+  - "Which portal am I looking at" is **not a ray trace** — a nether portal has no collision box, so
+    the crosshair passes through it and the game's own hit result never names one. It asks which
+    nearby pane is closest to the middle of the screen instead.
+  - The scan is on a timer (1.5 s, or at once after moving 6 blocks) like the Floor Drops one, and
+    **shorter than it is wide** (±8 blocks vertically): the third axis is what multiplies the cost.
+  - The block is a **text setting**, defaulting to `minecraft:nether_portal`, so an end portal or
+    whatever else Hypixel uses somewhere is one line to fix rather than a new build.
+- **Hub Map.** The wall is **found, not hard-coded**: it looks for the biggest group of framed maps
+  facing one way in one plane and takes the rectangle from the frames' own bounding boxes. Coordinates
+  would have been shorter to write and wrong the day a wall moves; this way it also covers a map wall
+  anywhere else. "Only in the Hub" is on by default.
+- [ ] **The one assumption: the Hub's map is filled maps in item frames.** If it is not, the module
+      finds nothing. **"Count frames (log)" on the card is the measurement that settles it** — it says
+      how many item frames are nearby and how many hold a map. Frames but no maps → try "Any framed
+      item". No frames at all → the wall is built from something else and I need to know what.
+- [ ] **Do the SkyBlock portals turn out to be `minecraft:nether_portal`?** Same shape of question,
+      same answer: if nothing is papered over, the block id is the first thing to change.
+- [ ] **Check the picture is the right way round on all four walls**, and not mirrored. The "right"
+      edge is worked out as `forward × up` rather than listed per direction, which is the part that
+      would show up as text reading backwards on half of them.
+- [ ] **`/da images`** lists what is in the folder and re-reads it, so an edited PNG takes effect
+      without a restart. Both cards also have a "Reload images" button.
+- **Not yet run in game.** Built and deployed to the test instance only.
 
 ### 0. The menu search box was too small and sat over tooltips (2.5.5-b-3)
 Diego: "die search bar ist sehr klein und die font scaled nicht richtig. Außerdem overlapt sie

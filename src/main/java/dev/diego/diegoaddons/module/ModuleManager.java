@@ -207,6 +207,9 @@ public final class ModuleManager {
         register(new dev.diego.diegoaddons.module.modules.ColdWarningModule(), false);
         register(new dev.diego.diegoaddons.module.modules.SafariItemsModule(), false);
         register(new dev.diego.diegoaddons.module.modules.InventorySearchModule(), false);
+        // Your own pictures on things in the world. Both read the same images folder.
+        register(new dev.diego.diegoaddons.module.modules.PortalImagesModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.HubMapModule(), false);
         // Off by default like everything else, and for one more reason: it reaches the network and
         // replaces the mod's own jar, which is nobody's default.
         register(new AutoUpdateModule(), false);
@@ -512,6 +515,9 @@ public final class ModuleManager {
             dev.diego.diegoaddons.util.SparkleParticles.clear();
             dev.diego.diegoaddons.util.Hideyho.reset();
             dev.diego.diegoaddons.util.Cold.reset();
+            // The portals and the map wall are somewhere else now; the scans find them again.
+            dev.diego.diegoaddons.util.PortalImages.clear();
+            dev.diego.diegoaddons.util.HubMap.clear();
             dev.diego.diegoaddons.util.WorldRender.clear();
             dev.diego.diegoaddons.util.EspDraw.clear();
             dev.diego.diegoaddons.util.EspWorld.clear();

@@ -11,6 +11,8 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -43,6 +45,10 @@ public final class WorldRender {
     private record Line(Vec3 a, Vec3 b, int argb) {
     }
 
+    /** One queued picture: which texture, on which rectangle, tinted how. */
+    private record Picture(Identifier texture, ImageQuad quad, int argb) {
+    }
+
     // Features submit once per client tick (20/s) but the world is drawn per frame (60+/s). If the
     // draw list were cleared every frame, boxes would show for only the one frame after each tick and
     // flicker. Instead submissions accumulate into BUILDING, and once per tick {@link #flip()} swaps
@@ -51,9 +57,11 @@ public final class WorldRender {
     private static final List<Box> BUILDING = new ArrayList<>();
     private static final List<Label> BUILDING_LABELS = new ArrayList<>();
     private static final List<Line> BUILDING_LINES = new ArrayList<>();
+    private static final List<Picture> BUILDING_IMAGES = new ArrayList<>();
     private static volatile List<Box> RENDER = new ArrayList<>();
     private static volatile List<Label> RENDER_LABELS = new ArrayList<>();
     private static volatile List<Line> RENDER_LINES = new ArrayList<>();
+    private static volatile List<Picture> RENDER_IMAGES = new ArrayList<>();
     private static boolean registered;
 
     private WorldRender() {
@@ -209,6 +217,35 @@ public final class WorldRender {
         }
     }
 
+    /**
+     * How far off the surface a picture is hung.
+     *
+     * <p>Small enough to read as painted on rather than floating, large enough that the depth test
+     * never has to decide between two coplanar things - which is what a portal's own swirl and a map
+     * in an item frame would otherwise be.
+     */
+    public static final double PICTURE_OFFSET = 0.02;
+
+    /**
+     * Queues a picture on a rectangle in the world, drawn where it is put rather than through walls:
+     * this is a thing hanging on a surface, and a portal seen through a hillside would be a mistake
+     * rather than a feature.
+     *
+     * @param bothSides also hang it on the far side, the right way round rather than mirrored - what
+     *                  a portal wants, since you walk round it, and what a map on a wall does not
+     */
+    public static void image(Identifier texture, ImageQuad quad, int argb, boolean bothSides) {
+        if (texture == null || quad == null) {
+            return;
+        }
+        synchronized (BUILDING) {
+            BUILDING_IMAGES.add(new Picture(texture, quad.offset(PICTURE_OFFSET), argb));
+            if (bothSides) {
+                BUILDING_IMAGES.add(new Picture(texture, quad.flipped(PICTURE_OFFSET), argb));
+            }
+        }
+    }
+
     /** Queues a polyline: a line through each consecutive pair of points. */
     public static void lines(List<Vec3> points, int argb) {
         synchronized (BUILDING) {
@@ -228,9 +265,11 @@ public final class WorldRender {
             RENDER = new ArrayList<>(BUILDING);
             RENDER_LABELS = new ArrayList<>(BUILDING_LABELS);
             RENDER_LINES = new ArrayList<>(BUILDING_LINES);
+            RENDER_IMAGES = new ArrayList<>(BUILDING_IMAGES);
             BUILDING.clear();
             BUILDING_LABELS.clear();
             BUILDING_LINES.clear();
+            BUILDING_IMAGES.clear();
         }
     }
 
@@ -240,16 +279,73 @@ public final class WorldRender {
             BUILDING.clear();
             BUILDING_LABELS.clear();
             BUILDING_LINES.clear();
+            BUILDING_IMAGES.clear();
         }
         RENDER = new ArrayList<>();
         RENDER_LABELS = new ArrayList<>();
         RENDER_LINES = new ArrayList<>();
+        RENDER_IMAGES = new ArrayList<>();
+    }
+
+    /**
+     * Draws this tick's pictures: one textured quad each, at full brightness.
+     *
+     * <p>Full brightness rather than the light where it hangs, and that is a choice: a portal is a
+     * light source and the Hub's map wall is read from across the courtyard, so a picture that went
+     * dark at night would be the one time you could not see it. It also means nothing has to be
+     * asked about the light at a position the player may be nowhere near.
+     *
+     * <p>The render type is the engine's translucent entity one, which is <b>not</b> back-face
+     * culled - so a picture is visible from behind even when only one side was hung.
+     */
+    private static void drawImages(PoseStack pose, MultiBufferSource buffers, Vec3 cam) {
+        List<Picture> pictures = RENDER_IMAGES;
+        if (pictures.isEmpty()) {
+            return;
+        }
+        try {
+            for (Picture p : pictures) {
+                ImageQuad q = p.quad();
+                Vec3 n = q.normal();
+                VertexConsumer vc = buffers.getBuffer(RenderTypes.entityTranslucent(p.texture()));
+                Vec3 bl = q.origin().subtract(cam);
+                Vec3 br = bl.add(q.right());
+                Vec3 tl = bl.add(q.up());
+                Vec3 tr = br.add(q.up());
+                vertex(vc, pose, tl, q.u0(), q.v0(), p.argb(), n);
+                vertex(vc, pose, bl, q.u0(), q.v1(), p.argb(), n);
+                vertex(vc, pose, br, q.u1(), q.v1(), p.argb(), n);
+                vertex(vc, pose, tr, q.u1(), q.v0(), p.argb(), n);
+            }
+        } catch (RuntimeException | LinkageError e) {
+            // Once, for the same reason the labels report once: this runs every frame, and a picture
+            // that cannot draw is not worth taking the world render down for.
+            if (imageFailure == null) {
+                imageFailure = e;
+                DiegoAddonsV2Client.LOGGER.error("[DiegoAddons] World images failed to draw; "
+                        + "portal and map pictures will be missing", e);
+            }
+        }
+    }
+
+    /** The first picture-render failure, so it is reported once rather than sixty times a second. */
+    private static Throwable imageFailure;
+
+    private static void vertex(VertexConsumer vc, PoseStack pose, Vec3 at, float u, float v,
+                               int argb, Vec3 normal) {
+        vc.addVertex(pose.last(), (float) at.x, (float) at.y, (float) at.z)
+                .setColor(argb)
+                .setUv(u, v)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(FULL_BRIGHT)
+                .setNormal(pose.last(), (float) normal.x, (float) normal.y, (float) normal.z);
     }
 
     private static void draw(LevelRenderContext ctx) {
         List<Box> boxes = RENDER;
         List<Line> segments = RENDER_LINES;
-        if (boxes.isEmpty() && segments.isEmpty() && RENDER_LABELS.isEmpty()) {
+        if (boxes.isEmpty() && segments.isEmpty() && RENDER_LABELS.isEmpty()
+                && RENDER_IMAGES.isEmpty()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
@@ -281,6 +377,7 @@ public final class WorldRender {
         } catch (Throwable ignored) {
             // A line-render hiccup must never take the whole batch (boxes/labels) down with it.
         }
+        drawImages(pose, buffers, cam);
         drawLabels(pose, buffers, cam);
         buffers.endBatch();
     }

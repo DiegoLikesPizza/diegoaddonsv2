@@ -6,8 +6,10 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.diego.diegoaddons.config.MiningRoute;
 import dev.diego.diegoaddons.util.CustomEsp;
+import dev.diego.diegoaddons.util.CustomImages;
 import dev.diego.diegoaddons.util.IgnoreList;
 import dev.diego.diegoaddons.util.MiningRoutes;
+import dev.diego.diegoaddons.util.PortalImages;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -59,7 +61,13 @@ public final class DiegoCommands {
             new Help("route show <name>", "Draw a saved route"),
             new Help("route hide", "Stop drawing the route"),
             new Help("route list", "List your mining routes"),
-            new Help("route delete <name>", "Delete a mining route"));
+            new Help("route delete <name>", "Delete a mining route"),
+            new Help("portal <file>", "Put an image on the portal you are looking at"),
+            new Help("portal", "Say which portal you are looking at and what is on it"),
+            new Help("portal clear", "Take the image off that portal"),
+            new Help("portal clear all", "Take every portal image off"),
+            new Help("portal list", "List the portals you have given an image"),
+            new Help("images", "List the images you have dropped in, and re-read them"));
 
     private DiegoCommands() {
     }
@@ -148,6 +156,23 @@ public final class DiegoCommands {
                                 .then(ClientCommands.argument("name", StringArgumentType.greedyString())
                                         .executes(c -> routeDelete(c.getSource(),
                                                 StringArgumentType.getString(c, "name"))))))
+                .then(ClientCommands.literal("portal")
+                        .executes(c -> portalStatus(c.getSource()))
+                        .then(ClientCommands.literal("list")
+                                .executes(c -> portalList(c.getSource())))
+                        .then(ClientCommands.literal("clear")
+                                .executes(c -> portalSet(c.getSource(), ""))
+                                .then(ClientCommands.literal("all")
+                                        .executes(c -> portalClearAll(c.getSource()))))
+                        .then(ClientCommands.argument("file", StringArgumentType.greedyString())
+                                .suggests((c, b) -> {
+                                    dev.diego.diegoaddons.util.CustomImages.names().forEach(b::suggest);
+                                    return b.buildFuture();
+                                })
+                                .executes(c -> portalSet(c.getSource(),
+                                        StringArgumentType.getString(c, "file")))))
+                .then(ClientCommands.literal("images")
+                        .executes(c -> images(c.getSource())))
                 .then(ClientCommands.literal("unblock")
                         .then(ClientCommands.argument("player", StringArgumentType.word())
                                 .executes(c -> unblock(c.getSource(),
@@ -306,6 +331,100 @@ public final class DiegoCommands {
         source.sendFeedback(Component.literal(ok
                 ? "§b[DiegoAddons] §fDeleted §e" + name.trim() + "§f."
                 : "§b[DiegoAddons] §fNo route named §e" + name.trim() + "§f."));
+        return 1;
+    }
+
+    /**
+     * The portal in front of you, or a line saying why there is none.
+     *
+     * <p>The module has to be on for any of this: the portals it knows about are the ones its own
+     * scan found, and with it off nothing has been scanned. Saying so is worth a line - "no portal
+     * found" while standing in one would otherwise read as the feature being broken.
+     */
+    private static PortalImages.Pane aimedPortal(FabricClientCommandSource source) {
+        var module = dev.diego.diegoaddons.module.modules.PortalImagesModule.INSTANCE;
+        if (module == null || !module.isEnabled()) {
+            source.sendFeedback(Component.literal(
+                    "§b[DiegoAddons] §fTurn §ePortal Images§f on first §7(Render category)§f."));
+            return null;
+        }
+        PortalImages.Pane pane = PortalImages.looking();
+        if (pane == null) {
+            source.sendFeedback(Component.literal(
+                    "§b[DiegoAddons] §fNo portal in front of you. Stand facing one and try again."));
+        }
+        return pane;
+    }
+
+    /** Assigns an image to the portal being looked at; a blank file takes the image off. */
+    private static int portalSet(FabricClientCommandSource source, String file) {
+        PortalImages.Pane pane = aimedPortal(source);
+        if (pane == null) {
+            return 1;
+        }
+        if (file.isBlank()) {
+            PortalImages.assign(pane, "");
+            source.sendFeedback(Component.literal(
+                    "§b[DiegoAddons] §fTook the image off the portal at §e" + pane.key() + "§f."));
+            return 1;
+        }
+        PortalImages.assign(pane, file);
+        boolean exists = CustomImages.get(file.trim()) != null;
+        source.sendFeedback(Component.literal("§b[DiegoAddons] §fPut §e" + file.trim()
+                + "§f on the portal at §e" + pane.key() + "§f."
+                + (exists ? "" : " §cThat file is not in the images folder yet.")));
+        return 1;
+    }
+
+    private static int portalStatus(FabricClientCommandSource source) {
+        PortalImages.Pane pane = aimedPortal(source);
+        if (pane == null) {
+            return 1;
+        }
+        var module = dev.diego.diegoaddons.module.modules.PortalImagesModule.INSTANCE;
+        String assigned = PortalImages.assignment(pane.key());
+        source.sendFeedback(Component.literal("§b[DiegoAddons] §fPortal at §e" + pane.key()
+                + "§f shows §e" + (assigned != null ? assigned : module.defaultImage() + " §7(the default)")
+                + "§f. §7" + PortalImages.panes().size() + " portal(s) in range."));
+        return 1;
+    }
+
+    private static int portalList(FabricClientCommandSource source) {
+        var list = dev.diego.diegoaddons.config.ConfigManager.get().portalImages;
+        if (list.isEmpty()) {
+            source.sendFeedback(Component.literal("§b[DiegoAddons] §fNo portal has its own image yet. "
+                    + "Stand in front of one and type §e/da portal <file>§f."));
+            return 1;
+        }
+        source.sendFeedback(Component.literal("§b[DiegoAddons] §fPortal images:"));
+        for (var p : list) {
+            source.sendFeedback(Component.literal("  §7- §e" + p.key + " §8-> §e" + p.file));
+        }
+        return 1;
+    }
+
+    private static int portalClearAll(FabricClientCommandSource source) {
+        int n = dev.diego.diegoaddons.config.ConfigManager.get().portalImages.size();
+        PortalImages.clearAssignments();
+        source.sendFeedback(Component.literal(
+                "§b[DiegoAddons] §fCleared §e" + n + "§f portal image(s)."));
+        return 1;
+    }
+
+    /** Lists the PNGs in the images folder and re-reads them, so an edited file takes effect. */
+    private static int images(FabricClientCommandSource source) {
+        Minecraft.getInstance().execute(CustomImages::reload);
+        List<String> names = CustomImages.names();
+        source.sendFeedback(Component.literal("§b[DiegoAddons] §fImages in §e"
+                + CustomImages.folder() + "§f:"));
+        if (names.isEmpty()) {
+            source.sendFeedback(Component.literal("  §7- none yet; drop a .png in that folder"));
+            return 1;
+        }
+        for (String n : names) {
+            source.sendFeedback(Component.literal("  §7- §e" + n));
+        }
+        source.sendFeedback(Component.literal("§7Re-read from disk."));
         return 1;
     }
 
