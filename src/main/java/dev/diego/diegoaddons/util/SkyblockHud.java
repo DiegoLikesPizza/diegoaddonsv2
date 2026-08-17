@@ -54,6 +54,16 @@ public final class SkyblockHud {
     };
     /** The armour categories, in the order they are worn and drawn: head down to feet. */
     private static final String[] ARMOUR_CATEGORIES = {"HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"};
+    /**
+     * Every rarity SkyBlock writes, which is how the rarity line is picked out of the lore.
+     *
+     * <p>"VERY SPECIAL" needs no entry of its own - it contains "SPECIAL" as a whole word, which is
+     * what the search tests for.
+     */
+    private static final String[] RARITIES = {
+            "COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "MYTHIC", "DIVINE", "SPECIAL",
+            "SUPREME", "ULTIMATE", "ADMIN",
+    };
     // Menu titles are like "(1/2) Equipment Sets" and "(1/2) Pets" - match the stable part.
     /** Matches both "Equipment" (what you are wearing) and "(1/2) Equipment Sets" (the wardrobe). */
     private static final String EQUIPMENT_WORD = "equipment";
@@ -606,9 +616,8 @@ public final class SkyblockHud {
      * whole panel is located from one thing it states about itself, and a menu that gains a border
      * row or moves down a slot is still read correctly.
      *
-     * <p>The presets cannot be mistaken for the panel: an icon's bottom lore line is its price or
-     * its creation date, so it has no equipment category at all. If one ever did, the two columns
-     * would disagree and this gives up rather than mixing them - the tooltip route still answers.
+     * <p>The presets cannot be mistaken for the panel: an icon names its contents but carries no
+     * rarity line, and a category is only read off a rarity line - see {@link #rarityLine}.
      *
      * @return whether the panel was found, i.e. whether the caller can stop here
      */
@@ -622,9 +631,8 @@ public final class SkyblockHud {
         //
         // This used to give up the moment a second column claimed a piece, and giving up is the
         // expensive answer - it drops the whole menu onto the tooltip route, which can only draw
-        // pieces this session has already seen elsewhere. One preset whose bottom lore line happens
-        // to end in a category word ("... Gloves/Bracelet: Peony Bracelet" with no click prompt
-        // under it) was therefore enough to take the panel away from every loadout at once.
+        // pieces this session has already seen elsewhere. Leftmost-wins rather than giving up, so a
+        // preset that somehow scores a category costs nothing.
         int col = -1;
         for (int i = 0; i < limit; i++) {
             ItemStack stack = slots.get(i).getItem();
@@ -789,9 +797,9 @@ public final class SkyblockHud {
 
     /** @return armour category index (0=helmet .. 3=boots), or -1 if this isn't a piece of armour. */
     private static int armourCategoryOf(ItemStack stack) {
-        String last = lastLoreLine(stack);
+        String rarity = rarityLine(stack);
         for (int c = 0; c < ARMOUR_CATEGORIES.length; c++) {
-            if (last.endsWith(ARMOUR_CATEGORIES[c])) {
+            if (containsWord(rarity, ARMOUR_CATEGORIES[c])) {
                 return c;
             }
         }
@@ -1099,10 +1107,10 @@ public final class SkyblockHud {
 
     /** @return equipment category index (0..3), or -1 if this isn't an equipment piece. */
     private static int categoryOf(ItemStack stack) {
-        String last = lastLoreLine(stack);
+        String rarity = rarityLine(stack);
         for (int c = 0; c < CATEGORIES.length; c++) {
             for (String word : CATEGORIES[c]) {
-                if (last.endsWith(word)) {
+                if (containsWord(rarity, word)) {
                     return c;
                 }
             }
@@ -1111,23 +1119,63 @@ public final class SkyblockHud {
     }
 
     /**
-     * The item's rarity line, upper-cased - its last non-blank lore line, e.g. "LEGENDARY NECKLACE".
+     * The item's rarity line, upper-cased - {@code "MYTHIC DUNGEON CLOAK"} and the like.
      *
-     * <p>Empty for anything without lore, which is how a loadout preset icon fails both category
-     * tests: its bottom line is a price or a date, not a rarity.
+     * <p><b>Found by looking for a rarity, not by taking the last line.</b> It used to be the last
+     * non-blank lore line, and that is wrong for every item on the screen: a price mod writes
+     * {@code [NF] Lowest BIN} and {@code [NF] Created} underneath it, so the bottom line is a number
+     * and a date and nothing anywhere scores a category. That is what took the equipped panel away
+     * from the Loadouts menu entirely and dropped every loadout onto the tooltip fallback - which
+     * can only draw gear seen elsewhere this session, hence "it only works for two of my loadouts".
+     *
+     * <p>Searched bottom-up because the rarity line is the last thing SkyBlock itself writes;
+     * anything below it was added by something else.
+     *
+     * <p>Empty for anything with no rarity at all, which is how a loadout preset icon still fails
+     * both category tests - it names its contents ({@code "Necklace: Peony Necklace"}) but has no
+     * rarity line for those names to be found on. That immunity is the whole reason this looks for
+     * a rarity rather than simply scanning every line for a category word.
      */
-    private static String lastLoreLine(ItemStack stack) {
+    private static String rarityLine(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return "";
         }
         List<String> lore = loreOf(stack);
         for (int i = lore.size() - 1; i >= 0; i--) {
-            String l = lore.get(i).trim();
-            if (!l.isEmpty()) {
-                return l.toUpperCase(Locale.ROOT);
+            String line = lore.get(i).trim().toUpperCase(Locale.ROOT);
+            for (String rarity : RARITIES) {
+                if (containsWord(line, rarity)) {
+                    return line;
+                }
             }
         }
         return "";
+    }
+
+    /**
+     * Whether {@code word} appears in {@code line} as a word of its own.
+     *
+     * <p>{@code contains} rather than {@code endsWith}, because the rarity line is decorated at both
+     * ends - a starred item reads {@code "✦ MYTHIC DUNGEON CLOAK ✦"}, and the glyph after the
+     * category word was on its own enough to make the old test miss. Whole-word, so a category is
+     * not found inside a longer one.
+     */
+    private static boolean containsWord(String line, String word) {
+        int from = 0;
+        while (true) {
+            int at = line.indexOf(word, from);
+            if (at < 0) {
+                return false;
+            }
+            int before = at - 1;
+            int after = at + word.length();
+            boolean freeBefore = before < 0 || !Character.isLetter(line.charAt(before));
+            boolean freeAfter = after >= line.length() || !Character.isLetter(line.charAt(after));
+            if (freeBefore && freeAfter) {
+                return true;
+            }
+            from = at + 1;
+        }
     }
 
     /** True when any lore line contains {@code needle} (lower-case, colour codes already stripped). */

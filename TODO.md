@@ -12,6 +12,33 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 8. The equipped panel was never being found at all (2.5.5-b-4)
+Diego: "why does scanning the loadouts screen still not work, it only shows the new pet and equipment
+on my 2 farming loadouts." That shape - some loadouts and not others - is the tooltip fallback, which
+can only draw gear seen elsewhere this session. So the panel route was not running **at all**, and
+had not been since the price mod was installed.
+
+`categoryOf` read an item's **last non-blank lore line** and asked whether it ended in a category
+word. Diego's screenshot of a panel cloak shows why that never matched: under the rarity line
+`✦ MYTHIC DUNGEON CLOAK ✦` sit `[NF] Lowest BIN: 5,589,000` and `[NF] Created: Saturday 2/8/25`. So
+the line tested was a date, every piece scored -1, `col` stayed -1, and the panel was declared
+missing on every menu. **Two independent faults in one test**, either enough on its own: the extra
+lines below, and the decorative glyph *after* the category word that `endsWith` could not see past.
+
+The category is now read off the **rarity line**, found by searching the lore bottom-up for a line
+carrying a rarity word, and matched with a whole-word `contains` instead of `endsWith`. Bottom-up
+because the rarity line is the last thing SkyBlock itself writes - anything under it came from
+something else. The preset icons stay immune for a better reason than before: they name their
+contents (`Necklace: Peony Necklace`) but have no rarity line, and a category is only ever read off
+one. That is why this looks for a rarity rather than just scanning every line for a category word -
+scanning every line would make each preset look like a panel piece.
+
+- [ ] **Swap between loadouts that are not the farming ones.** Both HUDs should follow every one of
+      them now, including gear this session has never opened a menu for.
+- [ ] **A loadout with no pet** should clear the pet rather than leave the last one up.
+- [ ] With **Debug scan (log)** on, the log should say `loadout read by panel`, never `tooltip`.
+- [ ] Worth a look with the price mod **off** too - the fix should be indifferent to it either way.
+
 ### 7. Inventory Buttons, ported from afranz29's mod (2.5.5-b-4)
 Diego: "port it, meaning exact same looks for the inventory buttons and editor." So this is a port
 and not a rework - which is what the old §5 entry below asked for and was never done. The source is
