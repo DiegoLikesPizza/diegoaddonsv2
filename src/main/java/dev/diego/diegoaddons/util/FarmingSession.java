@@ -236,18 +236,21 @@ public final class FarmingSession {
                 counter = number(c.group("count"));
                 continue;
             }
-            if (line.startsWith("Crop Milestones")) {
-                // "Crop Milestones: Nether Wart 42" is one of the shapes the widget takes; the crop
-                // is read off the heading itself when it is there.
+            if (MILESTONE_HEADING.matcher(line).find()) {
+                // Matched on the word "Milestone" rather than on the exact heading: "Crop Milestones"
+                // was itself a guess, and a widget called "Crop Milestone" would have failed the
+                // whole read on the letter s.
                 inWidget = WIDGET_LINES;
-                String rest = line.substring("Crop Milestones".length());
+                // "Crop Milestones: Nether Wart 42" is one of the shapes it takes; the crop is read
+                // off the heading itself when it is there.
+                String rest = line.replaceAll("(?i).*milestones?", "");
                 String named = cropIn(rest);
                 if (named != null) {
                     crop = named;
-                }
-                long inline = trailingCount(rest);
-                if (inline >= 0) {
-                    counter = inline;
+                    long inline = trailingCount(rest);
+                    if (inline >= 0) {
+                        counter = inline;
+                    }
                 }
                 continue;
             }
@@ -255,11 +258,14 @@ public final class FarmingSession {
                 inWidget--;
                 if (crop == null) {
                     crop = cropIn(line);
-                }
-                if (counter < 0 && crop != null) {
-                    long value = trailingCount(line);
-                    if (value >= 0) {
-                        counter = value;
+                    // Only off the crop's own line, never off a neighbouring one. The widget under
+                    // this one is Jacob's Contest, which carries both a crop and a big number, and a
+                    // count taken from it would be a contest total reported as your harvest.
+                    if (crop != null) {
+                        long value = trailingCount(line);
+                        if (value >= 0 && counter < 0) {
+                            counter = value;
+                        }
                     }
                 }
             }
@@ -288,6 +294,16 @@ public final class FarmingSession {
 
     /** How many lines after the heading are still the milestone widget's own. */
     private static final int WIDGET_LINES = 4;
+
+    /**
+     * The milestone widget's heading, and deliberately not Jacob's Contest.
+     *
+     * <p>The contest widget names a crop too, and sits near this one. Taking a crop from it would
+     * price the session as whatever the contest happens to be running rather than what is being
+     * farmed - a wrong number, which is worse than the missing one this replaces.
+     */
+    private static final Pattern MILESTONE_HEADING =
+            Pattern.compile("(?i)^(?!.*contest).*milestones?\\b");
 
     /**
      * Kills counted off the Pests widget, as the fallback for a chat line that did not match.

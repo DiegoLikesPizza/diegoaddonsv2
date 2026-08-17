@@ -148,6 +148,7 @@ public final class ModuleManager {
         register(new DungeonMapModule(), false);
         register(new DoorKeyEspModule(), false);
         register(new MimicMessageModule(), false);
+        register(new dev.diego.diegoaddons.module.modules.FireFreezeModule(), false);
         register(new PrinceMessageModule(), false);
         register(new StarredMobEspModule(), false);
         register(new SecretChimeModule(), false);
@@ -363,6 +364,7 @@ public final class ModuleManager {
                 dev.diego.diegoaddons.util.FarmingSession.onMessage(plain);
                 dev.diego.diegoaddons.util.Hideyho.onMessage(plain);
                 dev.diego.diegoaddons.module.modules.ColdWarningModule.onMessage(plain);
+                dev.diego.diegoaddons.module.modules.FireFreezeModule.onMessage(plain);
                 PrinceMessageModule.onMessage(plain);
                 AutoRequeueModule.onMessage(plain);
                 AnnounceKickModule.onMessage(plain);

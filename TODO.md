@@ -12,6 +12,44 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 11. Fire Freeze Timer for F3/M3 (2.5.5-b-4)
+Diego went looking through old 1.8.9 mods for this one: "a timer on screen like the hydration
+reminder that counts down after P1 in the boss fight to the point before P2 where you have to fire
+freeze so the professor is frozen."
+
+The staff freezes five seconds **after** it is cast, so the cast has to happen before there is
+anything on screen to react to - which is why this is a timer and not a highlight. The one readable
+event is the Professor's own line when the Guardians die, and the gap from there to the right cast is
+fixed. Cue and delay are taken from [SkyImprover](https://github.com/ItzGreenCat/SkyImprover)'s
+`M3FreezeHelper`: the message fragment `You found my Guardians' one weakness?` and **5.25 seconds**.
+Both are settings-adjustable anyway - a fixed number a quarter-second off is a feature nobody can fix
+from in game.
+
+`module/modules/FireFreezeModule` (Dungeons), a HUD element like every other: countdown to one
+decimal, `§cNOW` for two seconds, then it clears itself. Title and sound on by default, a per-second
+tick off by default.
+
+- [ ] **Run an F3 and watch it fire once** on the Guardians line, not on entering the room.
+- [ ] **Does the freeze actually land on him?** If he is frozen a beat early or late, that is the
+      5.25 slider and not the cue - move it a quarter second and say which way.
+- [ ] **Nothing left on the HUD after the boss dies** - it clears two seconds after the call.
+
+### 10. The Farming Session, second pass (2.5.5-b-4)
+Pests and copper read correctly now. Crop and profit do not, and the parse has been tightened twice
+against a widget nobody has actually printed yet:
+
+- The heading is matched on the word **Milestone** rather than the exact string `Crop Milestones`,
+  so a widget named in the singular can no longer fail the whole read on one letter.
+- **Jacob's Contest is excluded by name.** It sits near the milestone widget and carries both a crop
+  and a big number, and either would be adopted as the harvest - a wrong figure, which is worse than
+  the missing one.
+- The counter is only ever taken from a `Counter:` line or from **the crop's own line**, never from a
+  neighbouring one in the same block.
+
+- [ ] **The dump settles it.** Debug scan (log) on, thirty seconds in the Garden, then read
+      `[FarmingSession] tab |` in `logs/latest.log` - the widget's real shape is in there and every
+      remaining guess here can be deleted.
+
 ### 9. The Farming Session showed a clock and copper and nothing else (2.5.5-b-4)
 Diego: "Farming Session tracker is broken. It shows only the session time and copper. No profit and
 no pests killed amount." Four separate faults, each one enough on its own to hide a line - and every
