@@ -22,6 +22,20 @@ public class KeybindSetting extends Setting {
         super(owner, key, name);
     }
 
+    /**
+     * A binding that starts on a key rather than unbound.
+     *
+     * <p>Unbound is the right default for a key that <i>adds</i> a way to do something you can
+     * already do - which is most of them here, and why the plain constructor exists. It is the wrong
+     * default for a key that <b>is</b> the feature: a hold-to-peek with nothing to hold is a module
+     * that does nothing when you switch it on. The module is still off by default, so this takes no
+     * key from anybody who has not asked for it.
+     */
+    public KeybindSetting(Module owner, String key, String name, int def) {
+        super(owner, key, name);
+        this.value = def;
+    }
+
     public int get() {
         return value;
     }
@@ -62,6 +76,17 @@ public class KeybindSetting extends Setting {
         boolean pressed = down && !wasDown;
         wasDown = down;
         return pressed;
+    }
+
+    /**
+     * Whether the key is being held right now.
+     *
+     * <p>Unlike {@link #consumePress()} this keeps no state, so it is safe to ask from the render
+     * thread as often as a frame needs - which is what a hold-to-do-something key is read by.
+     */
+    public boolean isDown() {
+        int code = get();
+        return code != UNBOUND && isDown(code);
     }
 
     private static boolean isDown(int code) {

@@ -12,6 +12,41 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 3. Chat peek — hold a key to read the chat while still playing (2.5.5-b-4)
+Diego: "while you have it pressed the chat is opened but like you can still play its just that the
+chat is visible without being able to type." On the **Chat** card, at his call, rather than as a
+module of its own — it is "how my chat behaves", which is what that card already is.
+
+**Unbound by default.** Same rule as Ctrl+F and the Inventory Search box: the Chat module is on for
+anyone who wants unlimited history, so a default key would quietly take that key off everyone who
+never asked for this. Bound is on, unbound is off — no second switch, because a hold key with
+nothing to hold is already the off state. `KeybindSetting` gained an `isDown()` and a
+default-key constructor (unused so far, and documented as being for the case where the key *is* the
+feature).
+
+- **It is not an approximation of "open the chat", it is the same code path.** 26.1 hands the chat a
+  `DisplayMode`, and that one argument is the whole difference between the HUD's chat and the chat
+  screen's: `BACKGROUND` fades each line on a timer (hence the ten seconds you can see while
+  playing), `FOREGROUND` uses `AlphaCalculator.FULLY_VISIBLE`. The mixin swaps that one argument in
+  `Gui.extractChat` while the key is held — nothing is opened, no input is captured.
+- **The second half is the height**, or the peek would un-fade the lines and then show the same
+  handful of them. `ChatComponent.getHeight()` picks between two saved heights on whether the chat
+  screen is up, and `getLinesPerPage()` is built on it, so one inject covers both.
+- **The obvious way is a trap and is written down in the mixin**: making `isChatFocused()` lie would
+  *stop the chat drawing at all*, because `Gui.extractChat` returns early when it is true — the chat
+  screen is supposed to be drawing it instead, and during a peek there is no chat screen.
+- **No state is kept.** The key is polled where the answer is needed, so releasing it lands on the
+  next frame rather than the next tick, and no flag can be left set by a screen change, a disconnect
+  or the module being switched off mid-hold. A screen being open rules a peek out, which covers both
+  the chat screen (already open, HUD does not draw it) and any other menu (you are not playing).
+- [ ] **Bind it and hold it.** Lines older than ten seconds should come back and stay while held.
+- [ ] **Check you can still walk and look around** with it held - that is the whole ask.
+- [ ] **Watch for a hovered-line highlight.** The foreground path is handed the mouse position, which
+      while the cursor is grabbed is wherever it was last, so a chat line may light up. Harmless, but
+      it is the one visible difference from just "the chat, showing".
+- [ ] Scrolling while peeking is **not** in: it would mean taking the mouse wheel off the hotbar
+      while held. Worth adding as an off-by-default row if reading one page back is not enough.
+
 ### 2. Your own PNGs on portals and on the Hub's big map (2.5.5-b-4) — Diego's ask this session
 "Add a feature that lets me display .png files on portals. oh and make a feature for custom hub map.
 Yk the big ass map in the hub." Two modules, both in **Render**, both reading the same folder:

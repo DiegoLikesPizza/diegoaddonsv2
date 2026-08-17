@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.diego.diegoaddons.gui.ChatSearchScreen;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
+import dev.diego.diegoaddons.module.KeybindSetting;
 import dev.diego.diegoaddons.module.Module;
 import dev.diego.diegoaddons.module.NumberSetting;
 import net.minecraft.client.Minecraft;
@@ -45,6 +46,20 @@ public class ChatModule extends Module {
     private final BooleanSetting caseSensitive =
             new BooleanSetting(this, "caseSensitive", "Search is case sensitive", false);
 
+    /**
+     * Hold to read the chat without opening it.
+     *
+     * <p><b>Unbound by default</b>, and that is the same rule Ctrl+F and the Inventory Search box
+     * follow: this module is on for anybody who wants unlimited history, so shipping a default key
+     * would quietly take that key off everybody who never asked for the feature. Bound is on;
+     * unbound is off. There is no second switch, because a hold key with nothing to hold is already
+     * the off state.
+     */
+    private final KeybindSetting peekKey =
+            new KeybindSetting(this, "peekKey", "Hold to peek at chat");
+    private final BooleanSetting peekFullHeight =
+            new BooleanSetting(this, "peekFullHeight", "Peek shows the full chat height", true);
+
     private boolean wasDown;
 
     public ChatModule() {
@@ -56,6 +71,8 @@ public class ChatModule extends Module {
         settings.add(search);
         settings.add(copy);
         settings.add(caseSensitive);
+        settings.add(peekKey);
+        settings.add(peekFullHeight);
         INSTANCE = this;
     }
 
@@ -83,6 +100,15 @@ public class ChatModule extends Module {
 
     public boolean caseSensitive() {
         return caseSensitive.get();
+    }
+
+    /** The hold-to-peek key. See {@link dev.diego.diegoaddons.util.ChatPeek}. */
+    public KeybindSetting peekKey() {
+        return peekKey;
+    }
+
+    public boolean peekFullHeight() {
+        return peekFullHeight.get();
     }
 
     @Override

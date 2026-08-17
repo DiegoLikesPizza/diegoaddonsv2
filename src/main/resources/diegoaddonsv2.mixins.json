@@ -10,6 +10,8 @@
     "ChatComponentAccessor",
     "ChatCompactMixin",
     "ChatComponentMixin",
+    "ChatPeekGuiMixin",
+    "ChatPeekHeightMixin",
     "ChatScreenMixin",
     "ClientPacketListenerMixin",
     "ClientboundPingPacketMixin",
