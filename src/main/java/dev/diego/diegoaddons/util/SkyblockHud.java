@@ -130,8 +130,18 @@ public final class SkyblockHud {
      */
     private static final Pattern LOADOUT_PIECE =
             Pattern.compile("(Necklace|Cloak|Belt|Gloves/Bracelet|Gloves|Bracelet)\\s*:\\s*(.+)");
+    /**
+     * A loadout's pet line: {@code Pet: [Lvl 189] Rose Dragon}.
+     *
+     * <p><b>A pet skin decorates this line the same two ways it decorates Autopet's</b>, and this
+     * pattern was left behind when those were fixed in 2.5.5-b-1: a skinned pet reads
+     * {@code ... Rose Dragon ✦} and a skin-numbered dragon {@code ... [122✦] Golden Dragon}. Taking
+     * everything after the level put the decoration <i>into</i> the name, which then matched nothing
+     * in {@link #seenPets} - so a loadout whose pet has a skin could not draw its pet while a plain
+     * one could, which is exactly the shape of "it only works for some of my loadouts".
+     */
     private static final Pattern LOADOUT_PET =
-            Pattern.compile("Pet\\s*:\\s*\\[Lvl (\\d+)]\\s*(.+)");
+            Pattern.compile("Pet\\s*:\\s*\\[Lvl (\\d+)]\\s*(?:\\[\\d+✦]\\s*)?(.+?)(?:\\s*✦)?\\s*$");
     /**
      * How a loadout says it is <i>not</i> the one you are wearing: {@code Left-click to equip!}
      *
@@ -474,6 +484,9 @@ public final class SkyblockHud {
      */
     private static void scanLoadouts(List<Slot> slots, int limit) {
         if (scanEquippedPanel(slots, limit)) {
+            if (debug) {
+                logRoute("panel");
+            }
             return;
         }
         List<String> equipped = null;
@@ -506,6 +519,33 @@ public final class SkyblockHud {
         if (count == 1) {
             applyLoadout(equipped);
         }
+        if (debug) {
+            logRoute("tooltip (" + count + " candidate(s), panel not found)");
+        }
+    }
+
+    /**
+     * What the loadout menu was just read as, once per change rather than once per tick.
+     *
+     * <p>Which of the two routes ran is the one thing that cannot be worked out from the slot dump,
+     * and it is the whole diagnosis when the HUD follows some loadouts and not others: the panel
+     * route reads the gear itself and always works, while the tooltip route can only draw a name it
+     * has a model for - so "it works for two of my loadouts" is what the tooltip route looks like
+     * when two of them happen to be made of things already seen this session.
+     */
+    private static String lastRoute;
+
+    private static void logRoute(String route) {
+        String line = route + " -> equipment "
+                + nameOf(equipment[0]) + " / " + nameOf(equipment[1]) + " / "
+                + nameOf(equipment[2]) + " / " + nameOf(equipment[3])
+                + " | pet " + (pet == null || pet.isEmpty() ? "(none)" : nameOf(pet))
+                + " | known: " + seenEquipment.size() + " piece(s), " + seenPets.size() + " pet(s)";
+        if (line.equals(lastRoute)) {
+            return;
+        }
+        lastRoute = line;
+        DiegoAddonsV2Client.LOGGER.info("[SB DEBUG] loadout read by {}", line);
     }
 
     /**
@@ -526,7 +566,30 @@ public final class SkyblockHud {
     private static boolean scanEquippedPanel(List<Slot> slots, int limit) {
         ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
         int[] rows = {-1, -1, -1, -1};
+
+        // Which column the panel is in, decided before anything is read out of it: the leftmost one
+        // holding an equipment piece. The panel is down the left and the presets are to the right,
+        // so leftmost is what "the panel" means here.
+        //
+        // This used to give up the moment a second column claimed a piece, and giving up is the
+        // expensive answer - it drops the whole menu onto the tooltip route, which can only draw
+        // pieces this session has already seen elsewhere. One preset whose bottom lore line happens
+        // to end in a category word ("... Gloves/Bracelet: Peony Bracelet" with no click prompt
+        // under it) was therefore enough to take the panel away from every loadout at once.
         int col = -1;
+        for (int i = 0; i < limit; i++) {
+            ItemStack stack = slots.get(i).getItem();
+            if (stack.isEmpty() || categoryOf(stack) < 0) {
+                continue;
+            }
+            int c = i % COLS;
+            if (col < 0 || c < col) {
+                col = c;
+            }
+        }
+        if (col < 0) {
+            return false;
+        }
         for (int i = 0; i < limit; i++) {
             ItemStack stack = slots.get(i).getItem();
             if (stack.isEmpty()) {
@@ -536,17 +599,15 @@ public final class SkyblockHud {
             if (cat < 0) {
                 continue;
             }
-            if (col >= 0 && i % COLS != col) {
-                return false;   // two columns claim a piece; this is not the panel
-            }
-            col = i % COLS;
-            set[cat] = stack;
-            rows[cat] = i / COLS;
+            // Remembered wherever it was found, panel or preset column: the tooltip route needs a
+            // model for a name, and a piece seen anywhere in this menu is one it can use.
             seenEquipment.put(strip(stack.getHoverName().getString()).trim()
                     .toLowerCase(Locale.ROOT), stack.copy());
-        }
-        if (col < 0) {
-            return false;
+            if (i % COLS != col) {
+                continue;
+            }
+            set[cat] = stack;
+            rows[cat] = i / COLS;
         }
 
         // The row the panel starts on, from whichever piece was found: the four sit in category
@@ -688,7 +749,7 @@ public final class SkyblockHud {
      */
     private static void applyLoadout(List<String> lore) {
         ItemStack[] set = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
-        boolean anyPiece = false;
+        boolean namedPiece = false;
         for (String raw : lore) {
             String line = strip(raw).trim();
 
@@ -696,9 +757,16 @@ public final class SkyblockHud {
             if (piece.matches()) {
                 int cat = loadoutCategory(piece.group(1));
                 ItemStack known = seenEquipment.get(piece.group(2).trim().toLowerCase(Locale.ROOT));
-                if (cat >= 0 && known != null) {
-                    set[cat] = known;
-                    anyPiece = true;
+                // Named counts even when it cannot be resolved. The write below used to need at
+                // least one piece to have a model, which meant a loadout made entirely of gear this
+                // session had not seen left the *previous* loadout's gear sitting on the HUD - a
+                // confident wrong answer, and the same mistake the pet slot was fixed for. An
+                // unresolvable piece now shows as empty, which is at least true.
+                if (cat >= 0) {
+                    namedPiece = true;
+                    if (known != null) {
+                        set[cat] = known;
+                    }
                 }
                 continue;
             }
@@ -706,7 +774,7 @@ public final class SkyblockHud {
             Matcher p = LOADOUT_PET.matcher(line);
             if (p.matches()) {
                 String name = p.group(2).trim();
-                ItemStack known = seenPets.get(name.toLowerCase(Locale.ROOT));
+                ItemStack known = seenPets.get(petKey(name));
                 petInfoSource = null;
                 if (known != null) {
                     pet = known;
@@ -719,7 +787,7 @@ public final class SkyblockHud {
                 }
             }
         }
-        if (anyPiece) {
+        if (namedPiece) {
             System.arraycopy(set, 0, equipment, 0, 4);
         }
     }
@@ -767,7 +835,7 @@ public final class SkyblockHud {
             }
         }
         String name = m.group("pet").trim();
-        ItemStack known = seenPets.get(name.toLowerCase(Locale.ROOT));
+        ItemStack known = seenPets.get(petKey(name));
         if (known != null && !known.isEmpty()) {
             pet = known;
             petInfoSource = null;   // force a re-parse against the new stack
@@ -918,11 +986,31 @@ public final class SkyblockHud {
         return null;
     }
 
-    /** The pet's name without its {@code [Lvl n]} prefix, as Autopet's message spells it. */
+    /**
+     * The pet's name with everything a skin adds stripped off, which is the form every lookup uses.
+     *
+     * <p>The three places a pet is named - the pets menu, Autopet's message and a loadout's tooltip
+     * - decorate the name differently, and this map is what they all have to meet in. 2.5.5-b-1
+     * taught the <i>messages</i> to drop {@code [122✦]} and a trailing {@code ✦} but left this key
+     * carrying them, so a skinned pet was stored under "rabbit ✦" and looked up as "rabbit" and the
+     * icon went missing for the pets most worth showing. Both ends now spell it the same way.
+     */
     private static String petKey(ItemStack stack) {
-        String name = strip(stack.getHoverName().getString());
-        return LEVEL.matcher(name).replaceAll("").trim().toLowerCase(Locale.ROOT);
+        return petKey(strip(stack.getHoverName().getString()));
     }
+
+    /** The same normalisation for a name that came from a message or a tooltip rather than an item. */
+    static String petKey(String rawName) {
+        String name = LEVEL.matcher(rawName).replaceAll("");
+        name = SKIN_COUNT.matcher(name).replaceAll("");
+        name = STAR_SUFFIX.matcher(name).replaceAll("");
+        return name.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** The {@code [122✦]} a skin number puts in front of a pet's name. */
+    private static final Pattern SKIN_COUNT = Pattern.compile("\\[\\d+✦]");
+    /** The bare {@code ✦} a skin puts after it. */
+    private static final Pattern STAR_SUFFIX = Pattern.compile("\\s*✦\\s*$");
 
     private static void scanPets(List<Slot> slots, int limit) {
         // Remember every pet on the page first, whether or not it is the active one - an Autopet

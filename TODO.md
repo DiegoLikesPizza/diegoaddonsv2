@@ -12,6 +12,44 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 4. Loadout swaps only updated the HUD for two of Diego's loadouts (2.5.5-b-4)
+Diego: "updating the pet hud and equipment in player hud when using another loadout somehow only
+works with my 2 farming loadouts." **Three real defects found, and the cause is not confirmed** -
+"some loadouts but not others" is the symptom of the *tooltip* route running instead of the panel
+one, because that route can only draw a name it already has a model for, so the loadouts that work
+are whichever happen to be made of things seen this session.
+
+- **A pet skin broke the loadout's pet line** - the same bug as the Autopet lines, and this pattern
+  was simply left behind when those were fixed in b-1. `Pet: [Lvl 90] Rabbit ✦` and
+  `Pet: [Lvl 100] [122✦] Golden Dragon` had the decoration taken *into* the name, which then matched
+  nothing. **This alone fits the report exactly**: a loadout whose pet has a skin cannot draw it
+  while a plain one can.
+- **The key the three name sources meet in still carried the decoration.** b-1 taught the messages to
+  strip `[122✦]` and a trailing `✦`; `petKey` went on storing the pet under "rabbit ✦" while every
+  lookup asked for "rabbit". Both ends now normalise the same way, so the menu, the chat line and the
+  tooltip agree.
+- **The panel scan gave up too easily.** It bailed the moment a second column held anything that
+  looked like an equipment piece - and giving up is the expensive answer, since it drops the whole
+  menu onto the tooltip route. One preset icon whose bottom lore line ends in a category word is
+  enough to do that to *every* loadout at once. It now takes the **leftmost** column with a piece,
+  which is what "the panel" means, and still remembers pieces found anywhere in the menu.
+- **The tooltip route left the previous loadout's gear on the HUD** when it could not resolve a
+  single piece of the new one. That is a confident wrong answer, and the same mistake the pet slot
+  was fixed for in b-1: a named-but-unknown piece now shows empty, which is at least true.
+- Patterns checked with a harness over 17 cases - the plain form, both skin decorations together and
+  apart, varied spacing, the key normalisation from all three sources, and the lines that must *not*
+  parse as a pet. All pass. The `✦` literal survives the build: its UTF-8 bytes appear 7 times in
+  the compiled class, up from the 3 b-1 verified.
+- [ ] **This is the measurement that settles it.** Inventory HUD -> **"Debug scan (log)"** on, open
+      `/loadout`, switch between a loadout that works and one that does not. The log now says
+      `loadout read by panel -> ...` or `loadout read by tooltip (N candidate(s), panel not found)`,
+      with the gear and pet it came out with and how many pieces/pets it knows.
+      **panel for both** - the read is fine and the bug is downstream, in the HUD elements.
+      **tooltip** - the panel is not being found at all, and the slot dump above it says why.
+- [ ] If it is the tooltip route, the fix after this one is **remembering pets and gear between
+      sessions** rather than only for as long as the client has been open. That is the standing
+      question from b-1 about seeding the pet cache, and this is the second thing to run into it.
+
 ### 3. Chat peek — hold a key to read the chat while still playing (2.5.5-b-4)
 Diego: "while you have it pressed the chat is opened but like you can still play its just that the
 chat is visible without being able to type." On the **Chat** card, at his call, rather than as a
