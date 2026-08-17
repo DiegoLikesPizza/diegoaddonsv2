@@ -31,6 +31,8 @@ public class ItemRarityModule extends Module {
             new BooleanSetting(this, "accessoryBag", "Accessory bag", true);
     private final BooleanSetting pets =
             new BooleanSetting(this, "pets", "Pets menu", true);
+    private final BooleanSetting chests =
+            new BooleanSetting(this, "chests", "Chests and backpacks", true);
 
     public ItemRarityModule() {
         super("itemrarity", Category.MISC, "Item Rarity",
@@ -39,6 +41,7 @@ public class ItemRarityModule extends Module {
         settings.add(everywhere);
         settings.add(accessoryBag);
         settings.add(pets);
+        settings.add(chests);
         INSTANCE = this;
     }
 
@@ -59,5 +62,17 @@ public class ItemRarityModule extends Module {
     /** Whether the pets menu's own slots are coloured - every one of them is a pet you own. */
     public boolean pets() {
         return pets.get();
+    }
+
+    /**
+     * Whether a chest's own slots are coloured: an Ender Chest page, a backpack, a plain chest on
+     * your island, and a dungeon reward chest.
+     *
+     * <p>These belong with the accessory bag rather than with the filler menus - what is in them is
+     * items, not buttons. The dungeon chest is the one where the colour does real work: it is a
+     * preview you decide to pay for, and the rarity is the decision.
+     */
+    public boolean chests() {
+        return chests.get();
     }
 }

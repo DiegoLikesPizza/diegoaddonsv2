@@ -46,9 +46,10 @@ public final class ItemRarity {
                 screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen;
         String title = LegacyText.strip(screen.getTitle().getString())
                 .toLowerCase(java.util.Locale.ROOT);
-        // The two server menus whose every slot is something you own.
+        // The server menus whose slots hold items rather than buttons.
         boolean serverSlots = (mod.accessoryBag() && isAccessoryBag(title))
-                || (mod.pets() && isPetsMenu(title));
+                || (mod.pets() && isPetsMenu(title))
+                || (mod.chests() && isChest(title));
         if (!inventoryScreen && !serverSlots && !mod.everywhere()) {
             return;
         }
@@ -105,6 +106,25 @@ public final class ItemRarity {
      */
     private static boolean isPetsMenu(String lowerTitle) {
         return lowerTitle.startsWith("pets");
+    }
+
+    /**
+     * Whether this is a chest of some kind: a plain or large chest, an Ender Chest page, a backpack,
+     * a personal vault, or a dungeon reward chest.
+     *
+     * <p>One check for all of them because they are one thing - a box of items - and the word is in
+     * every title SkyBlock and vanilla give them: "Chest", "Large Chest", "Ender Chest (1/9)",
+     * "Wood Chest" through "Bedrock Chest". Backpacks are the same idea under a different noun, so
+     * they are named here too.
+     *
+     * <p>The reward chest's own furniture needs no excluding: the "Open Reward Chest" button and the
+     * coin cost carry no rarity line, so {@link #color} answers 0 and they are left alone. That is
+     * the same reason the pets menu's buttons come out uncoloured.
+     */
+    private static boolean isChest(String lowerTitle) {
+        return lowerTitle.contains("chest")
+                || lowerTitle.contains("backpack")
+                || lowerTitle.contains("personal vault");
     }
 
     /**
