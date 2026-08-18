@@ -12,6 +12,43 @@ numbers.
 
 ## 2.5.5, in progress
 
+### 13. The class panel is back in the party finder (2.5.5-b-4)
+Diego: "wie in 2.0.38 das party finder module den spaß im party finder screen gezeigt hat — kannst du
+das mit der neuen configlib wieder so machen". The strip 2.0.x drew beside the menu, rebuilt on
+configlib: `PartyFinder.renderPanel` / `PartyFinder.click`.
+
+- **The toggles are the settings, not a copy of them.** Each `ToggleWidget` is wired straight to the
+  module's `BooleanSetting`, so a pick made in the menu is the same pick the settings screen shows,
+  and it saves the moment it is flipped. The strip this replaces held its own state, which is why it
+  was deleted rather than fixed.
+- **configlib's own pills, palette and font**, drawn hi-res like the inventory search box — not a
+  second look invented for one menu.
+- **Drawn with the background**, which is allowed because the panel sits outside the menu rectangle:
+  nothing of the menu is left to paint over it, and an item tooltip reaching that far covers it.
+- **Clicks are denied to the menu.** A click beside the menu is a click on nothing, and vanilla reads
+  that as "throw the carried stack on the floor".
+- Right of the menu, flipping to the left when the window is too narrow. New setting
+  `panel` ("Show the class panel in the menu"), on by default, hides it.
+- **Draggable by its title bar**, like a window. The grab point is kept, so the panel does not snap
+  its corner to the cursor; the bar lights up under the cursor and carries a grip mark, which is the
+  only thing telling you it moves. The whole panel swallows a click either way - it is a surface,
+  not a hole, and a press reaching the menu behind it would be a click on empty space, which vanilla
+  reads as "throw the carried stack on the floor".
+- **The position is an offset from the menu's corner**, not a screen point (`partyFinderPanelX/Y`,
+  hidden config). The menu is centred, so the offset still means the same thing after a resize or a
+  GUI-scale change. It is clamped to the window on every frame, so a panel dragged to an edge and
+  then a smaller window cannot end up out of reach, and there is a `Reset` button on the card.
+- Saved on mouse-release rather than per frame - a drag would otherwise be a hundred writes.
+
+- [ ] **Open the party finder and flip a class in the panel** — the highlight should follow on the
+      same frame, and the settings screen should show the same pick afterwards.
+- [ ] **Drag it by the title bar**, close the menu, reopen it: it should still be there. Then check
+      it holds after a GUI-scale change, which is what the offset-not-a-point choice is for.
+- [ ] **Check it does not sit over anything** at your GUI scale, and that a tooltip on the rightmost
+      column covers it rather than the other way round.
+- [ ] **Narrow the window** until the panel flips to the left side, and click a toggle there. Only
+      before it has been dragged — after that it stays where you put it, clamped to the edge.
+
 ### 12. Pick your own SkyBlock level colour (2.5.5-b-4)
 Diego: "mach mal dass man seine level color aussuchen kann zwischen denen die man schon unlocked
 hat" — the badge in front of your name, and only ever an **earlier** colour than the one you are

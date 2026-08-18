@@ -106,6 +106,15 @@ public class AddonConfig {
     /** The items Auto GFS keeps topped up, in the order they are checked. */
     public List<GfsItem> gfsItems = new ArrayList<>();
 
+    // Where the party finder's class panel was dragged to. Kept as an offset from the menu's own
+    // top-left rather than as a screen position: the menu is centred, so an offset survives a
+    // window resize or a GUI-scale change where an absolute point would land off screen. Until it
+    // has been moved once the panel sits beside the menu and follows whatever that menu's width is,
+    // which is why the flag is a field and not "an offset of zero means unset".
+    public boolean partyFinderPanelMoved = false;
+    public int partyFinderPanelX;
+    public int partyFinderPanelY;
+
     /** Whether the three it used to have built in have been offered once. Emptying the list sticks. */
     public boolean gfsSeeded = false;
     public String activeMiningRoute = "";

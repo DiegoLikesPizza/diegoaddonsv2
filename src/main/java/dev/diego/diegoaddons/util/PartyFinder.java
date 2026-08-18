@@ -1,10 +1,12 @@
 package dev.diego.diegoaddons.util;
 
+import dev.diego.configlib.gui.widget.ToggleWidget;
+import dev.diego.configlib.render.Fonts;
+import dev.diego.configlib.render.Theme;
+import dev.diego.configlib.render.Ui;
+import dev.diego.diegoaddons.DiegoAddonsV2Client;
+import dev.diego.diegoaddons.config.AddonConfig;
 import dev.diego.diegoaddons.config.ConfigManager;
-import dev.diego.diegoaddons.gui.Fonts;
-import dev.diego.diegoaddons.gui.Theme;
-import dev.diego.diegoaddons.gui.Themes;
-import dev.diego.diegoaddons.gui.UiRender;
 import dev.diego.diegoaddons.mixin.AbstractContainerScreenAccessor;
 import dev.diego.diegoaddons.module.modules.PartyFinderModule;
 import net.minecraft.client.Minecraft;
@@ -54,11 +56,25 @@ public final class PartyFinder {
      */
     private static final int HIGHLIGHT = 0xFF55FF55;
 
-    // Toggle strip drawn beside the menu.
-    private static final int ROW_H = 14;
-    private static final int PANEL_W = 74;
+    // The panel beside the menu, in configlib units (two to a screen pixel).
+    private static final int PANEL_W = 214;
+    private static final int PAD = 12;
+    private static final int ROW_H = 30;
+    private static final int TITLE_H = 28;
+    private static final int DIVIDER_H = 11;
+    /** Gap between the menu and the panel, in screen pixels - the menu's own coordinates. */
     private static final int PANEL_GAP = 6;
-    private static final int BOX = 8;
+
+    /**
+     * The five class toggles and the "missing classes" one, built on first use.
+     *
+     * <p>One set for the whole game rather than one per screen: they hold no state of their own
+     * beyond the knob's slide animation, and read the settings they edit on every frame.
+     */
+    private static ToggleWidget[] widgets;
+
+    /** Grab offset while the title bar is held, in screen pixels, or null when it is not. */
+    private static int[] grab;
 
     private PartyFinder() {
     }
@@ -142,6 +158,236 @@ public final class PartyFinder {
             }
         }
         return false;
+    }
+
+    // --- the panel beside the menu --------------------------------------------------------------
+
+    /**
+     * Draws the class picks beside the party finder, so the choice can be changed without leaving
+     * the menu.
+     *
+     * <p>This is the strip 2.0.x drew, rebuilt on configlib: the same pill toggles, palette and font
+     * as the settings menu rather than a second look invented for the occasion, and each one wired
+     * straight to the setting it edits, so a pick made here is a pick made there.
+     *
+     * <p>It sits <b>outside</b> the menu's own rectangle, which is what lets it be drawn with the
+     * background: there is nothing of the menu left to paint over it, and an item tooltip that
+     * reaches this far covers it, which is the right way round.
+     */
+    public static void renderPanel(AbstractContainerScreen<?> screen, GuiGraphicsExtractor g,
+                                   int mouseX, int mouseY) {
+        if (!panelUp(screen)) {
+            return;
+        }
+        Theme t = DiegoAddonsV2Client.CONFIG.theme();
+        Minecraft mc = Minecraft.getInstance();
+
+        Ui.beginHiRes(g);
+        int[] rect = layout(screen);
+        int x = rect[0];
+        int y = rect[1];
+        int h = rect[2];
+
+        int mx = Ui.u(mouseX);
+        int my = Ui.u(mouseY);
+        int r = t.cardRadius();
+
+        Ui.roundRect(g, x, y, PANEL_W, h, r, t.surface());
+        // The title bar: its own surface, square along the bottom where it meets the rows, so it
+        // reads as a bar rather than as a card sitting on a card.
+        boolean onBar = grab != null || Ui.hovered(mx, my, x, y, PANEL_W, TITLE_H);
+        Ui.roundRect(g, x, y, PANEL_W, TITLE_H, r, r, 0, 0,
+                onBar ? t.cardHover() : t.surfaceAlt(), onBar ? t.cardHover() : t.surfaceAlt());
+        Ui.hLine(g, x, y + TITLE_H, PANEL_W, t.stroke());
+        Ui.roundOutline(g, x, y, PANEL_W, h, r, 1, t.stroke());
+        Fonts.draw(g, mc.font, "PARTY FINDER", x + PAD,
+                Fonts.centerY(y, TITLE_H, Fonts.EYEBROW_SZ), Fonts.UI_EYEBROW,
+                onBar ? t.textDim() : t.textFaint());
+        // The two-line grip on the right, the one mark that says a bar can be dragged. Faint until
+        // the cursor is on the bar, which is where a window title bar earns its cursor change.
+        int gripY = y + TITLE_H / 2 - 3;
+        for (int i = 0; i < 2; i++) {
+            Ui.hLine(g, x + PANEL_W - PAD - 16, gripY + i * 5, 16,
+                    Ui.fade(t.textFaint(), onBar ? 0.9f : 0.45f));
+        }
+
+        int rowY = y + TITLE_H + PAD;
+        for (int i = 0; i < widgets.length; i++) {
+            if (i == CLASSES.length) {
+                // The last row is not a class - it is what the tooltip says - so it is separated
+                // from the five that are, rather than reading as a sixth class.
+                Ui.hLine(g, x + PAD, rowY + DIVIDER_H / 2, PANEL_W - PAD * 2, t.stroke());
+                rowY += DIVIDER_H;
+            }
+            boolean on = i < CLASSES.length
+                    ? PartyFinderModule.INSTANCE.wants(i)
+                    : PartyFinderModule.INSTANCE.showMissing();
+            Fonts.draw(g, mc.font, label(i), x + PAD,
+                    Fonts.centerY(rowY, ROW_H, Fonts.BODY_SZ), Fonts.UI_BODY,
+                    on ? t.text() : t.textDim());
+            widgets[i].render(g, t, mx, my);
+            rowY += ROW_H;
+        }
+        Ui.endHiRes(g);
+    }
+
+    /**
+     * Handles a click on the panel: a toggle, or the title bar starting a drag.
+     *
+     * @return true when the panel took the click, so the menu must not also process it
+     */
+    public static boolean click(AbstractContainerScreen<?> screen, double mouseX, double mouseY,
+                                int button) {
+        if (!panelUp(screen)) {
+            return false;
+        }
+        int[] rect = layout(screen);
+        int mx = Ui.u(mouseX);
+        int my = Ui.u(mouseY);
+        for (ToggleWidget w : widgets) {
+            if (w.mouseClicked(mx, my, button)) {
+                return true;
+            }
+        }
+        if (button == 0 && Ui.hovered(mx, my, rect[0], rect[1], PANEL_W, TITLE_H)) {
+            // Where inside the bar it was grabbed, so the panel does not jump its corner to the
+            // cursor on the first pixel of movement - the thing every window drag gets right.
+            grab = new int[]{(int) mouseX - Ui.px(rect[0]), (int) mouseY - Ui.px(rect[1])};
+            return true;
+        }
+        // The rest of the panel still swallows the click. It is a surface, not a hole: a press on
+        // the label beside a toggle must not reach the menu underneath as a click on empty space.
+        return Ui.hovered(mx, my, rect[0], rect[1], PANEL_W, rect[2]);
+    }
+
+    /**
+     * Moves the panel while the title bar is held.
+     *
+     * @return true while a drag is in progress, so the menu does not read it as a slot drag
+     */
+    public static boolean drag(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
+        if (grab == null) {
+            return false;
+        }
+        if (!panelUp(screen)) {
+            grab = null;
+            return false;
+        }
+        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
+        AddonConfig cfg = ConfigManager.get();
+        int[] pos = clamp(screen, (int) mouseX - grab[0], (int) mouseY - grab[1], panelHeight());
+        cfg.partyFinderPanelMoved = true;
+        cfg.partyFinderPanelX = pos[0] - acc.diego$leftPos();
+        cfg.partyFinderPanelY = pos[1] - acc.diego$topPos();
+        return true;
+    }
+
+    /**
+     * Ends a drag, and this is where the new position is written to disk - a save per frame of a
+     * drag would be a hundred writes for one move.
+     *
+     * @return true when a drag was in progress
+     */
+    public static boolean release() {
+        if (grab == null) {
+            return false;
+        }
+        grab = null;
+        ConfigManager.save();
+        return true;
+    }
+
+    /** Puts the panel back beside the menu. */
+    public static void resetPosition() {
+        AddonConfig cfg = ConfigManager.get();
+        cfg.partyFinderPanelMoved = false;
+        cfg.partyFinderPanelX = 0;
+        cfg.partyFinderPanelY = 0;
+        ConfigManager.save();
+    }
+
+    /** Whether the panel is on screen right now, building its toggles the first time it is. */
+    private static boolean panelUp(AbstractContainerScreen<?> screen) {
+        PartyFinderModule mod = PartyFinderModule.INSTANCE;
+        if (mod == null || !mod.isEnabled() || !mod.panel() || !isPartyFinder(screen)) {
+            return false;
+        }
+        if (widgets == null) {
+            widgets = new ToggleWidget[CLASSES.length + 1];
+            for (int i = 0; i < CLASSES.length; i++) {
+                int c = i;
+                widgets[i] = new ToggleWidget(() -> mod.wants(c), v -> mod.setWanted(c, v));
+            }
+            widgets[CLASSES.length] = new ToggleWidget(mod::showMissing, mod::setShowMissing);
+        }
+        return true;
+    }
+
+    /** Height of the panel in units - the same sum wherever it is asked for. */
+    private static int panelHeight() {
+        return TITLE_H + PAD * 2 + DIVIDER_H + widgets.length * ROW_H;
+    }
+
+    /**
+     * Places the panel and its toggles, in configlib units.
+     *
+     * <p>Until it has been dragged it sits beside the menu on the right, and on the left when the
+     * window is too narrow for that - a panel half off the screen edge is worse than one on the
+     * other side. After a drag it sits where it was put, as an <b>offset from the menu's own
+     * corner</b>: the menu is centred, so that offset still means the same thing after a resize or
+     * a GUI-scale change, where a remembered screen position would not.
+     *
+     * <p>Both the draw and the click go through here, so a toggle is always where it was painted.
+     *
+     * @return {@code {x, y, height}}, in units
+     */
+    private static int[] layout(AbstractContainerScreen<?> screen) {
+        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) screen;
+        AddonConfig cfg = ConfigManager.get();
+        int h = panelHeight();
+
+        int px;
+        int py;
+        if (cfg.partyFinderPanelMoved) {
+            px = acc.diego$leftPos() + cfg.partyFinderPanelX;
+            py = acc.diego$topPos() + cfg.partyFinderPanelY;
+        } else {
+            int right = acc.diego$leftPos() + acc.diego$imageWidth() + PANEL_GAP;
+            px = right + Ui.px(PANEL_W) + 2 <= screen.width
+                    ? right
+                    : acc.diego$leftPos() - PANEL_GAP - Ui.px(PANEL_W);
+            py = acc.diego$topPos();
+        }
+        // Clamped on every frame, not only while dragging: a window resized smaller since the drag
+        // would otherwise leave the panel parked outside the screen with no way to grab it back.
+        int[] pos = clamp(screen, px, py, h);
+        int x = Ui.u(pos[0]);
+        int y = Ui.u(pos[1]);
+
+        int rowY = y + TITLE_H + PAD;
+        for (int i = 0; i < widgets.length; i++) {
+            if (i == CLASSES.length) {
+                rowY += DIVIDER_H;
+            }
+            widgets[i].bounds(x + PAD, rowY, PANEL_W - PAD * 2, ROW_H);
+            rowY += ROW_H;
+        }
+        return new int[]{x, y, h};
+    }
+
+    /** Keeps the panel's top-left inside the window, in screen pixels. */
+    private static int[] clamp(AbstractContainerScreen<?> screen, int x, int y, int heightUnits) {
+        int w = Ui.px(PANEL_W);
+        int h = Ui.px(heightUnits);
+        return new int[]{
+                Math.max(0, Math.min(x, screen.width - w)),
+                Math.max(0, Math.min(y, screen.height - h)),
+        };
+    }
+
+    /** The row's label: the five classes, then the tooltip line. */
+    private static String label(int row) {
+        return row < CLASS_NAMES.length ? CLASS_NAMES[row] : "Missing";
     }
 
     /** The classes currently played in this listing, lower-case. */

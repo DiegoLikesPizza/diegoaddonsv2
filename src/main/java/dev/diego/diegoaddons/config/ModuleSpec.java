@@ -92,6 +92,12 @@ public final class ModuleSpec {
                 () -> c.legacyImported, v -> c.legacyImported = (Boolean) v);
         b.hidden("sbHintShown", boolean.class, () -> c.sbHintShown, v -> c.sbHintShown = (Boolean) v);
         b.hidden("gfsSeeded", boolean.class, () -> c.gfsSeeded, v -> c.gfsSeeded = (Boolean) v);
+        b.hidden("partyFinderPanelMoved", boolean.class,
+                () -> c.partyFinderPanelMoved, v -> c.partyFinderPanelMoved = (Boolean) v);
+        b.hidden("partyFinderPanelX", int.class,
+                () -> c.partyFinderPanelX, v -> c.partyFinderPanelX = (Integer) v);
+        b.hidden("partyFinderPanelY", int.class,
+                () -> c.partyFinderPanelY, v -> c.partyFinderPanelY = (Integer) v);
         b.hidden("activeMiningRoute", String.class,
                 () -> c.activeMiningRoute, v -> c.activeMiningRoute = (String) v);
         b.hidden("savedEquipment", String[].class,

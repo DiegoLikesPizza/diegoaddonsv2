@@ -401,6 +401,10 @@ public final class ModuleManager {
                     dev.diego.diegoaddons.gui.InventorySearch.renderBox(
                             (AbstractContainerScreen<?>) scr, g, mx, my);
                     PartyFinder.render((AbstractContainerScreen<?>) scr, g);
+                    // Beside the menu rather than over it, so it can be drawn here for the same
+                    // reason the search box is: nothing of the menu is left to paint over it, and a
+                    // tooltip reaching that far covers it.
+                    PartyFinder.renderPanel((AbstractContainerScreen<?>) scr, g, mx, my);
                 });
                 ScreenEvents.afterExtract(screen).register((scr, g, mx, my, dt) -> {
                     // After the menu's own pass and before its tooltips, which is where the mod
@@ -435,18 +439,35 @@ public final class ModuleManager {
                             container, ev.x(), ev.y(), ev.button())) {
                         return false;
                     }
+                    // The party finder's class panel, for the same reason: it sits beside the menu,
+                    // and a click on a toggle would otherwise reach the menu as a click on nothing,
+                    // which vanilla reads as "throw what you are carrying on the floor".
+                    if (PartyFinder.click(container, ev.x(), ev.y(), ev.button())) {
+                        return false;
+                    }
                     return !dev.diego.diegoaddons.util.SlotLocks.locksClick(container, ev.x(), ev.y());
                 });
                 // The release and the drag, which the click veto does not cover and which move
                 // items on their own - vanilla's mouseReleased throws the carried stack on the
                 // floor via slot -999. This is the storage sheet dropping things; see
                 // StorageOverlay.mouseReleased.
-                ScreenMouseEvents.allowMouseRelease(screen).register((scr, ev) ->
-                        !dev.diego.diegoaddons.gui.StorageOverlay.mouseReleased(
-                                (AbstractContainerScreen<?>) scr));
-                ScreenMouseEvents.allowMouseDrag(screen).register((scr, ev, dx, dy) ->
-                        !dev.diego.diegoaddons.gui.StorageOverlay.mouseDragged(
-                                (AbstractContainerScreen<?>) scr, ev.x(), ev.y(), ev.button()));
+                ScreenMouseEvents.allowMouseRelease(screen).register((scr, ev) -> {
+                    if (PartyFinder.release()) {
+                        return false;
+                    }
+                    return !dev.diego.diegoaddons.gui.StorageOverlay.mouseReleased(
+                            (AbstractContainerScreen<?>) scr);
+                });
+                // The party finder panel's title bar, held: the menu must not read the same drag as
+                // a slot drag, which is what spreads a carried stack across everything it touches.
+                ScreenMouseEvents.allowMouseDrag(screen).register((scr, ev, dx, dy) -> {
+                    AbstractContainerScreen<?> cs = (AbstractContainerScreen<?>) scr;
+                    if (PartyFinder.drag(cs, ev.x(), ev.y())) {
+                        return false;
+                    }
+                    return !dev.diego.diegoaddons.gui.StorageOverlay.mouseDragged(
+                            cs, ev.x(), ev.y(), ev.button());
+                });
                 ScreenMouseEvents.allowMouseScroll(screen).register((scr, mx, my, hs, vs) ->
                         !dev.diego.diegoaddons.gui.StorageOverlay.mouseScrolled(
                                 (AbstractContainerScreen<?>) scr, vs));

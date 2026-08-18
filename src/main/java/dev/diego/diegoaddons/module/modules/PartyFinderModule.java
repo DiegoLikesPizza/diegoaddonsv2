@@ -1,5 +1,6 @@
 package dev.diego.diegoaddons.module.modules;
 
+import dev.diego.diegoaddons.module.ActionSetting;
 import dev.diego.diegoaddons.module.BooleanSetting;
 import dev.diego.diegoaddons.module.Category;
 import dev.diego.diegoaddons.module.Module;
@@ -21,27 +22,51 @@ public class PartyFinderModule extends Module {
     private final BooleanSetting[] classes = new BooleanSetting[PartyFinder.CLASSES.length];
     private final BooleanSetting showMissing =
             new BooleanSetting(this, "showMissing", "Show missing classes on hover", true);
+    private final BooleanSetting panel =
+            new BooleanSetting(this, "panel", "Show the class panel in the menu", true);
 
     public PartyFinderModule() {
         super("partyfinder", Category.RENDER, "Party Finder",
                 "Highlight parties still missing a class you picked.");
-        // The class picks used to live only in a strip drawn inside the party finder menu, kept out
-        // of the settings list so the two could not disagree. The strip is gone and the settings
-        // menu is the one place now, so they belong in it.
+        // These are settings first and panel rows second. The panel edits the same objects the
+        // settings menu does, so the two cannot disagree - which is what the old strip, with its own
+        // copy of the picks, could not promise.
         for (int i = 0; i < classes.length; i++) {
             classes[i] = new BooleanSetting(this, "class_" + PartyFinder.CLASSES[i],
                     PartyFinder.CLASS_NAMES[i], false);
             settings.add(classes[i]);
         }
         settings.add(showMissing);
+        settings.add(panel);
+        // The panel is dragged by its title bar and remembers where it was put, so the one thing it
+        // cannot do for itself is come back from somewhere you would rather it was not.
+        settings.add(new ActionSetting(this, "resetPanel", "Panel position", "Reset",
+                PartyFinder::resetPosition));
         INSTANCE = this;
     }
 
-    /** Flips a class on or off - used by the toggle strip inside the party finder menu. */
+    /** Flips a class on or off - used by the panel inside the party finder menu. */
     public void toggle(int index) {
         if (index >= 0 && index < classes.length) {
             classes[index].toggle();
         }
+    }
+
+    /** Sets a class pick - the panel's toggles hand a value rather than a flip. */
+    public void setWanted(int index, boolean value) {
+        if (index >= 0 && index < classes.length) {
+            classes[index].set(value);
+        }
+    }
+
+    /** Whether the panel is drawn beside the party finder. */
+    public boolean panel() {
+        return panel.get();
+    }
+
+    /** The "missing classes" setting itself, so the panel can flip it. */
+    public void setShowMissing(boolean value) {
+        showMissing.set(value);
     }
 
     /** Whether the class at {@code index} is one you are looking to play. */
