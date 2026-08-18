@@ -3,10 +3,11 @@
 `[ ]` open · `[~]` in progress · `[x]` done. Each item ends with a build, a deploy to the Prism
 "DiegoAddonsV2 Test" instance, and a run in game before the next starts.
 
-**Current version: 2.5.5-b-4** — a beta, `mod_version` in `gradle.properties`. **2.5.4 is released**
-(tag `v2.5.4`, jar attached, marked Latest) and supersedes every `2.5.4-b-N` on every instance,
-whether or not pre-releases are switched on, because a release outranks any pre-release of the same
-numbers.
+**Current version: 2.5.5-b-5** — a beta, `mod_version` in `gradle.properties`. **2.5.5-b-4 is
+released** (tag `v2.5.5-b-4`, jar attached, pre-release) and carries everything numbered b-3 and b-4
+below; b-5 is the open bucket. **2.5.4 is the newest full release** and supersedes every
+`2.5.4-b-N` on every instance, whether or not pre-releases are switched on, because a release
+outranks any pre-release of the same numbers.
 
 ---
 
